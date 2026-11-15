@@ -120,6 +120,15 @@ func run() lmget.ExitCode {
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { code = doDoctor(f); return nil },
 	}
+	index := &cobra.Command{
+		Use:   "index",
+		Short: "Fetch the signed index of mirrored models, verify it and show it",
+		Long: "The index lists the models the project mirrors, with every file's sha256 and the\n" +
+			"nodes that serve them, signed with minisign. lmget verifies the signature, refuses\n" +
+			"an older or expired index, and keeps the verified copy in the store.",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error { code = doIndex(f); return nil },
+	}
 	doctor.Flags().BoolVar(&f.verify, "verify", false, "re-hash every blob; corrupt ones are moved to quarantine")
 	for _, c := range []*cobra.Command{root, get, info} {
 		fs := c.Flags()
@@ -140,7 +149,7 @@ func run() lmget.ExitCode {
 	root.PersistentFlags().BoolVar(&f.json, "json", false, "emit one JSON event per line (schema v1)")
 	root.PersistentFlags().BoolVar(&f.plain, "plain", false, "plain log lines even on a terminal")
 	root.PersistentFlags().StringVar(&f.lockfile, "lockfile", lmget.DefaultLockName, "lockfile path")
-	root.AddCommand(get, info, sync, ls, rm, doctor)
+	root.AddCommand(get, info, sync, ls, rm, doctor, index)
 	root.SetVersionTemplate("lmget {{.Version}}\n")
 
 	if err := root.Execute(); err != nil {
@@ -346,6 +355,22 @@ func doDoctor(f flags) lmget.ExitCode {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return ui.Doctor(mode, os.Stdout, c.Doctor(ctx, lmget.DoctorOptions{Verify: f.verify, LockPath: f.lockfile}))
+}
+
+func doIndex(f flags) lmget.ExitCode {
+	mode := outputMode(f)
+	c, err := lmget.New(lmget.Options{})
+	if err != nil {
+		return fail(mode, err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ix, err := c.UpdateIndex(ctx)
+	if err != nil {
+		return fail(mode, err)
+	}
+	ui.IndexSummary(mode, os.Stdout, ix)
+	return lmget.ExitOK
 }
 
 func resumeCmd() string {

@@ -32,10 +32,15 @@ type Options struct {
 	// https://www.modelscope.ai. NoMirror never asks it.
 	ModelScopeEndpoint string
 	NoMirror           bool
-	Conns              int   // parallel connections per file; default 8
-	ChunkSize          int64 // ranged request size; default 16 MiB
-	HTTP               *http.Client
-	UserAgent          string
+	// IndexURL is the signed index (https); default $LMGET_INDEX_URL. Its
+	// signature is IndexURL+".minisig". IndexKeys add minisign public keys
+	// to the built-in ones; default $LMGET_INDEX_KEY.
+	IndexURL  string
+	IndexKeys []string
+	Conns     int   // parallel connections per file; default 8
+	ChunkSize int64 // ranged request size; default 16 MiB
+	HTTP      *http.Client
+	UserAgent string
 }
 
 type Client struct {
@@ -71,6 +76,12 @@ func New(o Options) (*Client, error) {
 		o.OllamaRegistry = "https://registry.ollama.ai"
 	}
 	o.OllamaRegistry = strings.TrimRight(o.OllamaRegistry, "/")
+	if o.IndexURL == "" {
+		o.IndexURL = os.Getenv("LMGET_INDEX_URL")
+	}
+	if len(o.IndexKeys) == 0 && os.Getenv("LMGET_INDEX_KEY") != "" {
+		o.IndexKeys = []string{os.Getenv("LMGET_INDEX_KEY")}
+	}
 	if o.ModelScopeEndpoint == "" {
 		o.ModelScopeEndpoint = "https://www.modelscope.ai"
 	}

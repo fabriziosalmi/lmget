@@ -85,6 +85,30 @@ func List(mode Mode, w io.Writer, models []lmget.Installed, st lmget.StoreStats)
 	lipgloss.Fprint(w, b.String()+"\n")
 }
 
+// IndexSummary renders lmget index.
+func IndexSummary(mode Mode, w io.Writer, ix *lmget.Index) {
+	switch mode {
+	case ModeJSON:
+		writeJSON(w, "index", map[string]any{"index": ix})
+		return
+	case ModePlain:
+		fmt.Fprintf(w, "lmget: index sequence=%d issued=%s expires=%s models=%d nodes=%d\n",
+			ix.Sequence, ix.Issued.UTC().Format(time.RFC3339), ix.Expires.UTC().Format(time.RFC3339), len(ix.Models), len(ix.Nodes))
+		for _, m := range ix.Models {
+			fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", clean(m.Ref), m.Commit, len(m.Files), clean(m.License))
+		}
+		return
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n  %s index %d verified  %s\n", sAccent.Render(check), ix.Sequence,
+		sDim.Render(fmt.Sprintf("issued %s, expires %s", ix.Issued.UTC().Format(time.DateOnly), ix.Expires.UTC().Format(time.DateOnly))))
+	for _, m := range ix.Models {
+		fmt.Fprintf(&b, "    %s  %s  %s\n", clean(m.Ref), sDim.Render(m.Commit[:7]), sDim.Render(clean(m.License)))
+	}
+	fmt.Fprintf(&b, "    %s%d nodes\n", sLabel.Render("served by"), len(ix.Nodes))
+	lipgloss.Fprint(w, b.String()+"\n")
+}
+
 // Removed renders lmget rm.
 func Removed(mode Mode, w io.Writer, r *lmget.RemoveResult, lockNote string) {
 	switch mode {
