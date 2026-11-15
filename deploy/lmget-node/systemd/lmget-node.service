@@ -1,0 +1,25 @@
+[Unit]
+Description=lmget-node serve: the signed index and the blobs it names, on loopback
+Documentation=https://github.com/fabriziosalmi/lmget
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=lmget
+Group=lmget
+Environment=LMGET_HOME=/var/lib/lmget-node
+Environment=LMGET_INDEX_URL=https://lmget.org/index.json
+# loopback only: the TLS front (Cloudflare Tunnel, Caddy) is the only client
+ExecStart=/usr/local/bin/lmget-node serve -listen 127.0.0.1:8080
+# with no valid index yet (first boot, before the first mirror) serve exits:
+# try again every minute
+Restart=always
+RestartSec=60
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/lmget-node
+
+[Install]
+WantedBy=multi-user.target

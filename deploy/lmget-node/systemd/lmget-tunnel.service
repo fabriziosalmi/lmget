@@ -1,0 +1,24 @@
+[Unit]
+Description=Cloudflare Tunnel in front of lmget-node serve
+Documentation=https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+After=network-online.target lmget-node.service
+Wants=network-online.target
+ConditionPathExists=/etc/lmget-node/tunnel.env
+
+[Service]
+User=cftunnel
+Group=cftunnel
+# TUNNEL_TOKEN=... in a root-only file: never on the command line, so not in
+# the process list
+EnvironmentFile=/etc/lmget-node/tunnel.env
+# http2 over TCP 7844: what the egress allowlist of the bridge permits
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel --protocol http2 run
+Restart=always
+RestartSec=10
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

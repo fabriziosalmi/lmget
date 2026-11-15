@@ -1,0 +1,11 @@
+[Unit]
+Description=Run lmget-node mirror every 6 hours
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=6h
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=lmget-node mirror: fetch and verify the signed index, mirror its models
+Documentation=https://github.com/fabriziosalmi/lmget
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=lmget
+Group=lmget
+Environment=LMGET_HOME=/var/lib/lmget-node
+Environment=LMGET_INDEX_URL=https://lmget.org/index.json
+ExecStart=/usr/local/bin/lmget-node mirror
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/lmget-node
