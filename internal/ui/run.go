@@ -113,7 +113,11 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 			if p.Ref.Source == "url" {
 				id = "hash_from=" + p.HashFrom
 			}
-			logf("plan %s %s license=%s files=%d bytes=%d to_fetch=%d", p.Ref.Display(), id, orNone(p.License), len(p.Selected()), p.Bytes, p.ToFetch)
+			lic := orNone(p.License)
+			if lf := licenseFile(p); p.License == "" && lf != "" {
+				lic = "file:" + lf
+			}
+			logf("plan %s %s license=%s files=%d bytes=%d to_fetch=%d", p.Ref.Display(), id, lic, len(p.Selected()), p.Bytes, p.ToFetch)
 			skipped := map[string]int{}
 			var reasons []string
 			for _, f := range p.Files {

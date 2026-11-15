@@ -73,6 +73,20 @@ func padLeft(s string, w int) string {
 	return s
 }
 
+// licenseFile names the file that carries the license when the source has
+// no license metadata: Ollama ships it as a layer, saved as "license".
+func licenseFile(p *lmget.Plan) string {
+	if p.Ref.Source != "ollama" {
+		return ""
+	}
+	for _, f := range p.Files {
+		if f.Path == "license" {
+			return f.Path
+		}
+	}
+	return ""
+}
+
 // renderPlan is the block shown before anything is downloaded. full lists
 // every file (lmget info); otherwise the largest files and a summary line.
 func renderPlan(p *lmget.Plan, width int, full bool) string {
@@ -86,6 +100,8 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 		head = append(head, c(p.License))
 	} else if p.Ref.Source == "url" {
 		head = append(head, sDim.Render("license unknown"))
+	} else if lf := licenseFile(p); lf != "" {
+		head = append(head, sDim.Render("license in file "+c(lf)))
 	} else {
 		head = append(head, sWarn.Render("no license"))
 	}

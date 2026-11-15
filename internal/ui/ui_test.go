@@ -143,3 +143,18 @@ func TestSummaryOfAnOllamaExportSaysHowToRunIt(t *testing.T) {
 		t.Fatalf("ls: %q", b.String())
 	}
 }
+
+// Ollama has no license metadata: the plan points at the license layer
+// instead of claiming there is none.
+func TestOllamaPlanPointsAtItsLicenseFile(t *testing.T) {
+	p := &lmget.Plan{Ref: lmget.Ref{Source: "ollama", Repo: "library/smollm2", Revision: "135m"}, Commit: strings.Repeat("9", 64),
+		Files: []lmget.File{{Path: "license", Size: 10}, {Path: "model.gguf", Size: 10}}, Bytes: 20, DiskFree: -1}
+	out := ansi.ReplaceAllString(renderPlan(p, 100, false), "")
+	if strings.Contains(out, "no license") || !strings.Contains(out, "license in file license") {
+		t.Fatalf("plan:\n%s", out)
+	}
+	p.Files = p.Files[1:] // without a license layer it says so
+	if out := ansi.ReplaceAllString(renderPlan(p, 100, false), ""); !strings.Contains(out, "no license") {
+		t.Fatalf("plan without a license:\n%s", out)
+	}
+}
