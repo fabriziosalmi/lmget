@@ -179,6 +179,11 @@ func (c *Client) exportHF(plan *Plan) (string, []string, error) {
 
 func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
 	var links []string
+	// the target is the one the user chose (or a lock target already checked
+	// to be inside the project): create it, so the checks below can resolve it
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return root, nil, diskErr(err)
+	}
 	for _, f := range plan.Selected() {
 		dst := filepath.Join(root, filepath.FromSlash(f.Path))
 		src := c.store.BlobPath(f.SHA256)

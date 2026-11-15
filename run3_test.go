@@ -462,3 +462,17 @@ func TestRemoveKeepsHFBlobsASnapshotOfHuggingfaceHubUses(t *testing.T) {
 		t.Fatalf("rm deleted a blob huggingface_hub's own snapshot links to: %v", err)
 	}
 }
+
+// Found live: an export to a directory that does not exist yet must create it
+// (the containment check resolves the root, so it has to exist first).
+func TestExportDirCreatesTheTarget(t *testing.T) {
+	f := &fakeHF{files: modelFiles()}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	dir := filepath.Join(t.TempDir(), "models", "new")
+	pullTo(t, c, "org/m", Target{Kind: "dir", Path: dir})
+	if _, err := os.Stat(filepath.Join(dir, "config.json")); err != nil {
+		t.Fatal(err)
+	}
+}
