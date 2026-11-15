@@ -1,0 +1,24 @@
+[Unit]
+Description=lmget-node seed: every indexed blob as a BitTorrent v2 torrent, on the DHT
+Documentation=https://github.com/fabriziosalmi/lmget
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=lmget
+Group=lmget
+Environment=LMGET_HOME=/var/lib/lmget-node
+Environment=LMGET_INDEX_URL=https://lmget.org/index.json
+# re-reads the index every minute and drops what it no longer names; exits
+# without a valid index (first boot): try again every minute
+ExecStart=/usr/local/bin/lmget-node seed -port 6881
+Restart=always
+RestartSec=60
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/lmget-node
+
+[Install]
+WantedBy=multi-user.target

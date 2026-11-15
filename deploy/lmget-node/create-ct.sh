@@ -5,8 +5,9 @@
 # a bridge that allows nothing else and accepts no inbound connection.
 #
 #   VMID=<id> IP=<address>/24 GW=<gateway> BRIDGE=vmbr1 ./create-ct.sh
+#   VMID=<id> IP=dhcp BRIDGE=vmbr0 TEMPLATE=local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst ./create-ct.sh
 set -euo pipefail
-: "${VMID:?} ${IP:?} ${GW:?} ${BRIDGE:?}"
+: "${VMID:?} ${IP:?} ${BRIDGE:?}"
 STORAGE=${STORAGE:-local-lvm}
 DISK=${DISK:-150}           # GB: the mirrored models live here
 CORES=${CORES:-2}
@@ -18,15 +19,21 @@ if pct status "$VMID" >/dev/null 2>&1; then
 	echo "VMID $VMID already exists: refusing" >&2
 	exit 1
 fi
-ip=${IP%/*}
-if pct list | awk 'NR>1{print $1}' | xargs -r -n1 pct config | grep -q "ip=$ip/"; then
-	echo "$ip is already configured on another container: refusing" >&2
-	exit 1
+if [ "$IP" = dhcp ]; then
+	net="name=eth0,bridge=$BRIDGE,ip=dhcp,type=veth"
+else
+	: "${GW:?a static IP needs GW}"
+	ip=${IP%/*}
+	if pct list | awk 'NR>1{print $1}' | xargs -r -n1 pct config | grep -q "ip=$ip/"; then
+		echo "$ip is already configured on another container: refusing" >&2
+		exit 1
+	fi
+	net="name=eth0,bridge=$BRIDGE,ip=$IP,gw=$GW,type=veth"
 fi
 pct create "$VMID" "$TEMPLATE" \
 	--hostname "$NAME" --unprivileged 1 --features keyctl=1 \
 	--cores "$CORES" --memory "$MEMORY" --swap 512 \
 	--rootfs "$STORAGE:$DISK" \
-	--net0 "name=eth0,bridge=$BRIDGE,ip=$IP,gw=$GW,type=veth" \
-	--nameserver 1.1.1.1 --onboot 1 --start 1
+	--net0 "$net" \
+	--nameserver "1.1.1.1 9.9.9.9" --onboot 1 --start 1
 echo "created CT $VMID ($NAME) on $BRIDGE with $IP"
