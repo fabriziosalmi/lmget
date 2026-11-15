@@ -68,11 +68,12 @@ type nodeHandler struct {
 	c       *Client
 	mu      sync.Mutex
 	stamp   time.Time // mtime of the cached index the set was built from
+	expires time.Time // expiry of that index: the set dies with it
 	allowed map[string]bool
 }
 
 // blobs returns the hashes the current verified index names, rebuilt when
-// the cached index file changes.
+// the cached index file changes and refused once the index expires.
 func (h *nodeHandler) blobs() (map[string]bool, error) {
 	p, _ := h.c.indexPaths()
 	fi, err := os.Stat(p)
@@ -81,20 +82,24 @@ func (h *nodeHandler) blobs() (map[string]bool, error) {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.allowed != nil && fi.ModTime().Equal(h.stamp) {
+	if h.allowed != nil && fi.ModTime().Equal(h.stamp) && time.Now().Before(h.expires) {
 		return h.allowed, nil
 	}
+	h.allowed = nil
 	ix, err := h.c.Index()
 	if err != nil {
 		return nil, err
 	}
 	set := map[string]bool{}
 	for _, m := range ix.Models {
+		if !LicenseAllowed(m.License) { // as mirror and seed
+			continue
+		}
 		for _, f := range m.Files {
 			set[f.SHA256] = true
 		}
 	}
-	h.allowed, h.stamp = set, fi.ModTime()
+	h.allowed, h.stamp, h.expires = set, fi.ModTime(), ix.Expires
 	return set, nil
 }
 

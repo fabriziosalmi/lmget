@@ -83,13 +83,30 @@ func run(args []string) int {
 			return fail(err)
 		}
 		defer s.Close()
-		n, errs := p2p.SeedIndex(c.Store(), ix, s)
-		for _, e := range errs {
-			fmt.Fprintf(os.Stderr, "lmget-node: not seeded: %s\n", lmget.Printable(e.Error()))
+		// seed what the current verified index names, and re-read it every
+		// minute: blobs a newer index withdraws, or all of them once the index
+		// expires, stop being seeded
+		last := ""
+		for {
+			n, errs := p2p.SeedIndex(c.Store(), ix, s)
+			msg := fmt.Sprintf("seeding %d blobs on port %d", n, s.Client().LocalPort())
+			if ix == nil {
+				msg = "no valid index (" + lmget.Printable(lmget.AsError(err).Msg) + "): seeding nothing"
+			}
+			if msg != last {
+				for _, e := range errs {
+					fmt.Fprintf(os.Stderr, "lmget-node: not seeded: %s\n", lmget.Printable(e.Error()))
+				}
+				fmt.Fprintf(os.Stderr, "lmget-node: %s\n", msg)
+				last = msg
+			}
+			select {
+			case <-ctx.Done():
+				return 0
+			case <-time.After(time.Minute):
+			}
+			ix, err = c.Index()
 		}
-		fmt.Fprintf(os.Stderr, "lmget-node: seeding %d blobs on port %d\n", n, s.Client().LocalPort())
-		<-ctx.Done()
-		return 0
 	case "serve":
 		fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 		listen := fs.String("listen", "127.0.0.1:8080", "address to listen on (put a TLS reverse proxy in front)")

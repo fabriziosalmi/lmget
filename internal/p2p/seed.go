@@ -29,6 +29,12 @@ type Config struct {
 // Seeder serves blobs to BitTorrent v2 peers.
 type Seeder struct {
 	cl *torrent.Client
+	on map[string]seeded // seeded blobs by sha256
+}
+
+type seeded struct {
+	t  *torrent.Torrent
+	ih string // the v2 infohash it is seeded under
 }
 
 // New starts a seeding client.
@@ -45,7 +51,7 @@ func New(c Config) (*Seeder, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Seeder{cl: cl}, nil
+	return &Seeder{cl: cl, on: map[string]seeded{}}, nil
 }
 
 // Close stops seeding.
@@ -119,33 +125,50 @@ func (readOnly) OpenTorrent(context.Context, *metainfo.Info, metainfo.Hash) (sto
 	return storage.TorrentImpl{}, errReadOnly
 }
 
-// SeedIndex seeds every file of ix that has a torrent identity, whose blob is
-// in the store, and whose model is on the license allowlist. It returns how
-// many blobs it seeds and why the others are not.
+// SeedIndex makes the seeder serve exactly the blobs of ix: every blob of a
+// model whose license is on the allowlist, mirrored in st, under the
+// infohash the index signs. Blobs seeded by an earlier call that ix no
+// longer names are dropped; a nil ix (no valid index) drops them all. It
+// returns how many blobs are seeded and why the others are not.
 func SeedIndex(st *lmget.Store, ix *lmget.Index, s *Seeder) (int, []error) {
-	n := 0
 	var errs []error
-	seen := map[string]bool{}
-	for _, m := range ix.Models {
-		if !lmget.LicenseAllowed(m.License) {
-			errs = append(errs, fmt.Errorf("%s: license %q is not on the allowlist", m.Ref, m.License))
-			continue
-		}
-		for _, f := range m.Files {
-			if f.BTIH2 == "" || seen[f.SHA256] {
+	want := map[string]bool{}
+	if ix != nil {
+		for _, m := range ix.Models {
+			if !lmget.LicenseAllowed(m.License) {
+				errs = append(errs, fmt.Errorf("%s: license %q is not on the allowlist", m.Ref, m.License))
 				continue
 			}
-			if !st.Has(f.SHA256, f.Size) {
-				errs = append(errs, fmt.Errorf("%s: %s is not mirrored", m.Ref, f.Path))
-				continue
+			for _, f := range m.Files {
+				if f.BTIH2 == "" || want[f.SHA256] {
+					continue
+				}
+				if s.on[f.SHA256].ih == f.BTIH2 {
+					want[f.SHA256] = true // already seeded under this infohash
+					continue
+				}
+				if !st.Has(f.SHA256, f.Size) {
+					errs = append(errs, fmt.Errorf("%s: %s is not mirrored", m.Ref, f.Path))
+					continue
+				}
+				t, err := s.Add(st.BlobPath(f.SHA256), f.SHA256, f.BTIH2)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("%s: %s: %v", m.Ref, f.Path, err))
+					continue
+				}
+				if old := s.on[f.SHA256].t; old != nil && old != t {
+					old.Drop()
+				}
+				s.on[f.SHA256] = seeded{t, f.BTIH2}
+				want[f.SHA256] = true
 			}
-			if _, err := s.Add(st.BlobPath(f.SHA256), f.SHA256, f.BTIH2); err != nil {
-				errs = append(errs, fmt.Errorf("%s: %s: %v", m.Ref, f.Path, err))
-				continue
-			}
-			seen[f.SHA256] = true
-			n++
 		}
 	}
-	return n, errs
+	for sha, b := range s.on {
+		if !want[sha] {
+			b.t.Drop()
+			delete(s.on, sha)
+		}
+	}
+	return len(s.on), errs
 }

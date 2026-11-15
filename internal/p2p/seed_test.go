@@ -200,4 +200,18 @@ func TestSeedIndexSeedsOnlyWhatItShould(t *testing.T) {
 	if !said {
 		t.Fatalf("the blob missing from the store is not reported as such: %v", errs)
 	}
+	// audit run 4: seeding follows the current index. The same index again
+	// changes nothing; an index that withdraws the model, or no valid index
+	// at all, stops the seeding.
+	if n, _ := SeedIndex(st, ix, s); n != 1 || len(s.Client().Torrents()) != 1 {
+		t.Fatalf("re-reading the same index: %d seeded, %d torrents", n, len(s.Client().Torrents()))
+	}
+	withdrawn := &lmget.Index{Models: ix.Models[1:]}
+	if n, _ := SeedIndex(st, withdrawn, s); n != 0 || len(s.Client().Torrents()) != 0 {
+		t.Fatalf("after the model was withdrawn: %d seeded, %d torrents", n, len(s.Client().Torrents()))
+	}
+	SeedIndex(st, ix, s)
+	if n, _ := SeedIndex(st, nil, s); n != 0 || len(s.Client().Torrents()) != 0 {
+		t.Fatalf("with no valid index: %d seeded, %d torrents", n, len(s.Client().Torrents()))
+	}
 }

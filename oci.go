@@ -140,7 +140,7 @@ func (c *Client) ociFetchToken(ctx context.Context, base, name string) (string, 
 	if err != nil {
 		return "", 0, err
 	}
-	c.authorize(req)
+	req.Header.Set("User-Agent", c.opt.UserAgent) // registry requests never carry the HF token
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return "", 0, newErr(ExitNetwork, "network", "cannot reach "+hostOf(base)).wrap(err)
@@ -172,7 +172,9 @@ func (c *Client) ociFetchToken(ctx context.Context, base, name string) (string, 
 	if err != nil {
 		return "", 0, err
 	}
-	c.authorize(treq)
+	// the realm is the registry's choice: it gets the user agent and nothing
+	// else, so a registry cannot borrow the HF token by naming the HF endpoint
+	treq.Header.Set("User-Agent", c.opt.UserAgent)
 	tresp, err := c.http.Do(treq)
 	if err != nil {
 		return "", 0, newErr(ExitNetwork, "network", "cannot reach "+realm.Host).wrap(err)
@@ -194,9 +196,9 @@ func (c *Client) ociFetchToken(ctx context.Context, base, name string) (string, 
 	if tok == "" {
 		tok = t.AccessToken
 	}
-	ttl := time.Duration(t.ExpiresIn) * time.Second
-	if ttl <= 0 {
-		ttl = 60 * time.Second // the distribution spec's default
+	ttl := 60 * time.Second // the distribution spec's default
+	if t.ExpiresIn > 0 {
+		ttl = time.Duration(min(t.ExpiresIn, 3600)) * time.Second // at most an hour: no overflow
 	}
 	return tok, ttl, nil
 }
@@ -212,7 +214,7 @@ func (c *Client) ociDo(ctx context.Context, repo string, build func() (*http.Req
 		if err != nil {
 			return nil, err
 		}
-		c.authorize(req)
+		req.Header.Set("User-Agent", c.opt.UserAgent)
 		if tok != "" {
 			req.Header.Set("Authorization", "Bearer "+tok)
 		}

@@ -168,7 +168,11 @@ func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size
 		if err != nil {
 			return nil, err
 		}
-		c.authorize(req)
+		if f.ociRepo != "" {
+			req.Header.Set("User-Agent", c.opt.UserAgent) // registry blobs: never the HF token
+		} else {
+			c.authorize(req)
+		}
 		if ranged {
 			req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, off+size-1))
 			if f.ifRange != "" {

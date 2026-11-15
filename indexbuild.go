@@ -38,9 +38,12 @@ type BuildOptions struct {
 }
 
 // BuildIndex writes an index from a lockfile. Every model is resolved again
-// at its source at the locked commit: the source must still publish exactly
-// the locked files, the model must not be gated, and the license the source
-// declares (not the lock's) must be on the allowlist.
+// at its source at the locked commit: the lock must list every file the
+// source publishes there (pickle weights next to safetensors only with
+// allow_pickle), with the source's own size, sha256 and git id, the model
+// must not be gated, and the license the source declares (not the lock's)
+// must be on the allowlist. An entry is a whole model, never a selection: a
+// client that falls back to the index applies its own selection to it.
 func (c *Client) BuildIndex(ctx context.Context, l *Lock, o BuildOptions) (*Index, error) {
 	if o.Now.IsZero() {
 		o.Now = time.Now()
@@ -55,10 +58,7 @@ func (c *Client) BuildIndex(ctx context.Context, l *Lock, o BuildOptions) (*Inde
 		refuse := func(format string, a ...any) error {
 			return newErr(ExitUsage, "index", ref.Display()+": "+fmt.Sprintf(format, a...))
 		}
-		sel := Selection{AllowPickle: true}
-		for _, f := range lm.Files {
-			sel.Include = append(sel.Include, GlobEscape(f.Path))
-		}
+		sel := Selection{AllowPickle: lm.AllowPickle}
 		at := ref
 		at.Revision = lm.Commit
 		p, err := c.Resolve(ctx, at, sel)
@@ -82,19 +82,22 @@ func (c *Client) BuildIndex(ctx context.Context, l *Lock, o BuildOptions) (*Inde
 			switch {
 			case !ok:
 				return nil, refuse("%s is in the lock but not at the source", lf.Path)
-			case f.Size != lf.Size, f.SHA256 != "" && f.SHA256 != lf.SHA256, f.GitSHA1 != "" && lf.GitSHA1 != "" && f.GitSHA1 != lf.GitSHA1:
+			// the git id too: it names the blob in the HF cache, so a lock
+			// must not sign one the source never published (LFS files: none)
+			case f.Size != lf.Size, f.SHA256 != "" && f.SHA256 != lf.SHA256, f.GitSHA1 != lf.GitSHA1:
 				return nil, refuse("%s differs between the lock and the source", lf.Path)
 			}
 		}
 		if len(byPath) != len(lm.Files) {
-			return nil, refuse("the source has files the lock does not list")
+			return nil, refuse("the source has %d files at %s, the lock lists %d: the index mirrors whole models",
+				len(byPath), lm.Commit[:7], len(lm.Files))
 		}
 		// every file into the builder's store, pinned to the lock: this
 		// verifies each one against the source (and the small git-id files
 		// against the lock's sha256, so a lock cannot put a wrong hash under
 		// the signature), and gives the bytes the torrent identity needs
 		pin := lm
-		pin.Include = sel.Include
+		pin.Include, pin.Exclude = nil, nil
 		if _, err := c.Pull(ctx, Request{Ref: ref, Selection: sel, Target: Target{Kind: "none"}, Pin: &pin}, nil); err != nil {
 			return nil, refuse("the locked files could not be confirmed at the source: %s", AsError(err).Msg)
 		}

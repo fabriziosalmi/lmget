@@ -7,12 +7,15 @@ import re
 import sys
 
 version, checksums = sys.argv[1], sys.argv[2]
-if not re.fullmatch(r"v\d+\.\d+\.\d+", version):
+if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", version):
     sys.exit("version must look like v0.1.0")
 v = version[1:]
 sums = {}
 for line in open(checksums):
     digest, name = line.split()
+    # the digest lands inside Ruby code: only a sha256 in hex may get there
+    if not re.fullmatch(r"[0-9a-f]{64}", digest) or name in sums:
+        sys.exit(f"{checksums}: bad or repeated line for {name!r}")
     sums[name] = digest
 base = f"https://github.com/fabriziosalmi/lmget/releases/download/{version}"
 
