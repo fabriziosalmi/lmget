@@ -187,7 +187,7 @@ func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size
 				why("its validator no longer matches %s", f.ifRange).
 				fix("", "run the same command again: it starts over with the new version")
 		} else if resp.StatusCode == http.StatusOK || resp.StatusCode >= 500 || resp.StatusCode == 429 {
-			return 0, newErr(ExitNetwork, "network", "unexpected "+resp.Status+" for a ranged request")
+			return 0, newErr(ExitNetwork, "network", "unexpected "+printable(resp.Status)+" for a ranged request")
 		} else {
 			return 0, fileStatus(resp)
 		}
@@ -228,12 +228,12 @@ func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size
 func fileStatus(resp *http.Response) error {
 	switch resp.StatusCode {
 	case 401, 403:
-		return newErr(ExitAuth, "auth", "the source refused the download ("+resp.Status+")").
+		return newErr(ExitAuth, "auth", "the source refused the download ("+printable(resp.Status)+")").
 			fix("export HF_TOKEN=...", "gated or private files need a token with access")
 	case 404, 410:
-		return newErr(ExitNotFound, "not_found", "the file is no longer at the source ("+resp.Status+")")
+		return newErr(ExitNotFound, "not_found", "the file is no longer at the source ("+printable(resp.Status)+")")
 	}
-	return newErr(ExitNetwork, "network", "unexpected "+resp.Status)
+	return newErr(ExitNetwork, "network", "unexpected "+printable(resp.Status))
 }
 
 func diskErr(err error) error {

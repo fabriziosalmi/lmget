@@ -70,6 +70,9 @@ func (l *Lock) Path() string { return l.path }
 // the store or the target. A missing file returns an error matching
 // fs.ErrNotExist.
 func ReadLock(path string) (*Lock, error) {
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return nil, lockErr(path, "is a symlink; lmget only reads and writes a regular lockfile")
+	}
 	var l Lock
 	md, err := toml.DecodeFile(path, &l)
 	if err != nil {
@@ -105,6 +108,16 @@ func ReadLock(path string) (*Lock, error) {
 		if len(m.Files) == 0 {
 			return nil, lockErr(path, where+": no files")
 		}
+		if printable(m.License) != m.License {
+			return nil, lockErr(path, where+": control characters in license")
+		}
+		if ref.Source == "url" {
+			// a URL's commit is its own id, and a URL is one file: anything else
+			// would let a lock write into another model's record
+			if m.Commit != urlID(ref.Repo) || len(m.Files) != 1 {
+				return nil, lockErr(path, where+": a URL entry needs commit "+urlID(ref.Repo)+" and exactly one file")
+			}
+		}
 		files := map[string]bool{}
 		for _, f := range m.Files {
 			switch {
@@ -126,6 +139,9 @@ func ReadLock(path string) (*Lock, error) {
 // Write saves the lock atomically, models sorted by ref and files by path,
 // so the file diffs cleanly.
 func (l *Lock) Write() error {
+	if fi, err := os.Lstat(l.path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return lockErr(l.path, "is a symlink; lmget only reads and writes a regular lockfile")
+	}
 	sort.Slice(l.Models, func(i, j int) bool { return l.Models[i].Ref < l.Models[j].Ref })
 	for i := range l.Models {
 		fs := l.Models[i].Files
@@ -220,7 +236,20 @@ func within(base, dst string) error {
 	if err != nil {
 		return err
 	}
-	cur, rest := filepath.Clean(dst), ""
+	real, err := resolveExisting(dst)
+	if err != nil {
+		return err
+	}
+	if real != realBase && !strings.HasPrefix(real, realBase+string(os.PathSeparator)) {
+		return fmt.Errorf("target resolves to %s, outside the project %s", real, realBase)
+	}
+	return nil
+}
+
+// resolveExisting resolves symlinks in the longest existing prefix of p and
+// appends the part that does not exist yet.
+func resolveExisting(p string) (string, error) {
+	cur, rest := filepath.Clean(p), ""
 	for {
 		if _, err := os.Lstat(cur); err == nil {
 			break
@@ -234,13 +263,9 @@ func within(base, dst string) error {
 	}
 	realCur, err := filepath.EvalSymlinks(cur)
 	if err != nil {
-		return err
+		return "", err
 	}
-	real := filepath.Join(realCur, rest)
-	if real != realBase && !strings.HasPrefix(real, realBase+string(os.PathSeparator)) {
-		return fmt.Errorf("target resolves to %s, outside the project %s", real, realBase)
-	}
-	return nil
+	return filepath.Join(realCur, rest), nil
 }
 
 // targetString stores a directory target relative to the lockfile. Targets
@@ -326,13 +351,19 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 			break
 		}
 	}
+	// Offline only when a pull that checked the source has already bound
+	// these exact paths to these exact hashes for this repository and commit.
+	// A lockfile alone must not be able to re-label stored bytes as another
+	// model (sec-audit finding offline-plan-trusts-lock-repo-commit-file-mapping).
 	if all {
-		p := &Plan{Ref: r.Ref, Commit: pin.Commit, License: pin.License}
-		for _, f := range pin.Files {
-			p.Files = append(p.Files, File{Path: f.Path, Size: f.Size, SHA256: f.SHA256, GitSHA1: f.GitSHA1, Cached: true})
+		if m, err := c.store.loadManifest(r.Ref, pin.Commit); err == nil && boundAll(m, pin.Files) {
+			p := &Plan{Ref: r.Ref, Commit: pin.Commit, License: pin.License, offline: true}
+			for _, f := range pin.Files {
+				p.Files = append(p.Files, File{Path: f.Path, Size: f.Size, SHA256: f.SHA256, GitSHA1: f.GitSHA1, Cached: true})
+			}
+			p.recount(c.store)
+			return p, nil
 		}
-		p.recount(c.store)
-		return p, nil
 	}
 	at := r.Ref
 	at.Revision = pin.Commit
@@ -366,6 +397,15 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 		case f.GitSHA1 != "" && lf.GitSHA1 != "" && f.GitSHA1 != lf.GitSHA1:
 			return nil, drift("%s: the source publishes git id %s, the lock has %s", f.Path, short(f.GitSHA1), short(lf.GitSHA1))
 		}
+		if f.GitSHA1 != "" {
+			// the source names this file only by git id: the lock's sha256 is
+			// trusted only through a verified download of that git id
+			// (a known git id already filled f.SHA256 in Resolve, and a
+			// different locked sha256 was refused as drift above)
+			if _, ok := c.store.LookupGit(f.GitSHA1); !ok {
+				f.mustFetch = true
+			}
+		}
 		// verify will now check the lock's sha256 too, also for git-only files
 		f.SHA256 = lf.SHA256
 		delete(want, f.Path)
@@ -375,6 +415,19 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 	}
 	p.recount(c.store)
 	return p, nil
+}
+
+// boundAll reports whether every locked file is a verified binding of m.
+func boundAll(m *Manifest, files []LockFile) bool {
+	if m == nil || len(m.Verified) == 0 {
+		return false
+	}
+	for _, f := range files {
+		if m.Verified[f.Path] != f.SHA256 {
+			return false
+		}
+	}
+	return true
 }
 
 // LockPathFor returns the lockfile path in dir.

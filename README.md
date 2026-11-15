@@ -26,7 +26,7 @@ What happens on every run:
 - **Verified.** Large files are checked against their sha256 (Git LFS); small files against their git blob id, and their sha256 is recorded. A mismatch discards the partial file and exits with code 5.
 - **Resumable.** Interrupt at any time; the same command resumes from the last completed chunk.
 - **Content-addressed.** Files are stored once by sha256 in `~/.lmget` (or `$LMGET_HOME`) and hardlinked into the target, so nothing is copied twice.
-- **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle (raw, or the zip `torch.save` writes) is refused unless its name says so. Refused files exit with code 5.
+- **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle (any protocol, or the zip `torch.save` writes) is refused unless its name says so. Refused files exit with code 5.
 - **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.ckpt`, ...) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory are refused.
 
 ## Lockfile
@@ -38,6 +38,13 @@ lmget sync --update              # resolve the revisions again and rewrite the l
 ```
 
 `lmget.lock` pins each model to a commit and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
+
+A lockfile usually arrives with a cloned repository, so lmget treats it as untrusted input:
+
+- `sync` works offline only for files whose path and sha256 an earlier pull already checked against the source; a lock cannot re-label bytes in the store as another model.
+- `dir:` targets must stay inside the lockfile's directory, every exported file is checked again with symlinks resolved, and nothing is ever written through a `.git` directory.
+- A URL entry is bound to its own URL, and lmget only reads and writes a lockfile that is a regular file, not a symlink.
+- A lock may list https URLs, and `sync` downloads from them: review the lock of a repository you did not write, as you would review its code.
 
 ## Managing the store
 

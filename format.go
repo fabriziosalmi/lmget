@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 )
 
@@ -36,7 +37,7 @@ func checkFormat(p, name string, declaredPickle bool) error {
 			fix("", "the file was discarded; report it to the publisher")
 	}
 	ext := strings.ToLower(path.Ext(name))
-	if looksPickle(f, head, size) && !declaredPickle {
+	if (looksPickle(f, head, size) || looksOldPickle(f, head, size, ext)) && !declaredPickle {
 		return bad("its content is a Python pickle, which runs code when loaded")
 	}
 	switch ext {
@@ -54,6 +55,29 @@ func checkFormat(p, name string, declaredPickle bool) error {
 		}
 	}
 	return nil
+}
+
+// textExt are formats no loader unpickles; old-protocol detection skips them
+// to avoid mistaking a word list for opcodes.
+var textExt = map[string]bool{".txt": true, ".json": true, ".md": true, ".yaml": true, ".yml": true,
+	".jinja": true, ".html": true, ".csv": true, ".tsv": true, ".cfg": true, ".ini": true, ".toml": true, ".py": true}
+
+var oldPickleGlobal = regexp.MustCompile(`[ci][A-Za-z_][A-Za-z0-9_.]*\n[A-Za-z_][A-Za-z0-9_.]*\n`)
+
+// looksOldPickle recognises protocol 0 and 1 pickles, which have no header:
+// they start with an opcode, end with STOP and, to do harm, name a callable
+// with GLOBAL or INST ("c<module>\n<name>\n").
+func looksOldPickle(f *os.File, head []byte, size int64, ext string) bool {
+	if textExt[ext] || len(head) == 0 || size < 4 || !strings.ContainsRune("(}])ciNISVld", rune(head[0])) {
+		return false
+	}
+	last := make([]byte, 1)
+	if _, err := f.ReadAt(last, size-1); err != nil || last[0] != '.' {
+		return false
+	}
+	buf := make([]byte, min(size, 1<<20))
+	n, _ := f.ReadAt(buf, 0)
+	return oldPickleGlobal.Match(buf[:n])
 }
 
 // looksPickle recognises a raw pickle (protocol 2 to 5 starts with the PROTO

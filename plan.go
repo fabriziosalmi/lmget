@@ -20,6 +20,9 @@ type File struct {
 	ifRange  string // validator sent with every ranged request
 	noRanges bool   // the server ignores Range: one sequential stream
 	tmpKey   string // partial-download key when no hash is known in advance
+	// mustFetch: the stored blob cannot be trusted for this file (its git id
+	// was never verified against it), so it is downloaded and checked
+	mustFetch bool
 }
 
 // Selected reports whether the file will be fetched or exported.
@@ -37,6 +40,7 @@ type Plan struct {
 	ToFetch  int64    `json:"to_fetch"`         // selected and not cached
 	Pickle   []string `json:"pickle,omitempty"` // selected files in a pickle format
 	DiskFree int64    `json:"disk_free"`
+	offline  bool     // built from a lockfile and verified bindings, without the source
 }
 
 // Selection filters the files of a repository.
@@ -115,7 +119,7 @@ func (p *Plan) apply(sel Selection, st *Store, storeRoot string) error {
 				f.SHA256 = s
 			}
 		}
-		f.Cached = f.SHA256 != "" && st.Has(f.SHA256, f.Size)
+		f.Cached = f.SHA256 != "" && !f.mustFetch && st.Has(f.SHA256, f.Size)
 		if !f.Selected() {
 			continue
 		}
@@ -142,7 +146,7 @@ func (p *Plan) recount(st *Store) {
 	p.Bytes, p.ToFetch, p.Pickle = 0, 0, nil
 	for i := range p.Files {
 		f := &p.Files[i]
-		f.Cached = f.SHA256 != "" && st.Has(f.SHA256, f.Size)
+		f.Cached = f.SHA256 != "" && !f.mustFetch && st.Has(f.SHA256, f.Size)
 		if !f.Selected() {
 			continue
 		}

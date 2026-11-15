@@ -98,7 +98,11 @@ type ExportRecord struct {
 type Manifest struct {
 	Plan    *Plan          `json:"plan"`
 	Exports []ExportRecord `json:"exports,omitempty"`
-	Updated time.Time      `json:"updated"`
+	// Verified maps file path to the sha256 that a pull checked against the
+	// source (published hash, git id, or a URL's own download). Only these
+	// bindings let sync work offline: a lockfile alone cannot create one.
+	Verified map[string]string `json:"verified,omitempty"`
+	Updated  time.Time         `json:"updated"`
 }
 
 func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
@@ -116,7 +120,7 @@ func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
 
 // saveManifest writes the plan and merges a new export record (if any) with
 // the ones already recorded for this commit.
-func (s *Store) saveManifest(p *Plan, rec *ExportRecord) error {
+func (s *Store) saveManifest(p *Plan, rec *ExportRecord, verified map[string]string) error {
 	path, err := s.manifestPath(p.Ref, p.Commit)
 	if err != nil {
 		return err
@@ -128,6 +132,8 @@ func (s *Store) saveManifest(p *Plan, rec *ExportRecord) error {
 	defer unlock()
 	m := Manifest{Plan: p}
 	if old, err := readManifest(path); err == nil {
+		m.Plan = unionPlan(p, old.Plan, s)
+		m.Verified = old.Verified
 		for _, e := range old.Exports {
 			if rec == nil || e.Kind != rec.Kind || e.Path != rec.Path {
 				m.Exports = append(m.Exports, e)
@@ -139,6 +145,14 @@ func (s *Store) saveManifest(p *Plan, rec *ExportRecord) error {
 	if rec != nil {
 		m.Exports = append(m.Exports, *rec)
 	}
+	if len(verified) > 0 {
+		if m.Verified == nil {
+			m.Verified = map[string]string{}
+		}
+		for k, v := range verified {
+			m.Verified[k] = v
+		}
+	}
 	m.Updated = time.Now().UTC()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -148,6 +162,46 @@ func (s *Store) saveManifest(p *Plan, rec *ExportRecord) error {
 		return err
 	}
 	return writeFileAtomic(path, b)
+}
+
+// unionPlan keeps, next to the new selection, the files an earlier pull of
+// the same commit selected and the store still holds: a narrower --include
+// must not make gc forget blobs that earlier exports still link.
+func unionPlan(p, old *Plan, s *Store) *Plan {
+	if old == nil {
+		return p
+	}
+	have := map[string]bool{}
+	for _, f := range p.Selected() {
+		have[f.Path] = true
+	}
+	cp := *p
+	cp.Files = append([]File(nil), p.Files...)
+	for _, f := range old.Selected() {
+		if have[f.Path] || f.SHA256 == "" || !s.Has(f.SHA256, f.Size) {
+			continue
+		}
+		replaced := false
+		for i := range cp.Files {
+			if cp.Files[i].Path == f.Path { // known, but not selected this time
+				cp.Files[i].Skipped, cp.Files[i].SHA256 = "", f.SHA256
+				replaced = true
+			}
+		}
+		if !replaced {
+			cp.Files = append(cp.Files, f)
+		}
+	}
+	return &cp
+}
+
+// loadManifest returns the manifest of ref at commit, if any.
+func (s *Store) loadManifest(ref Ref, commit string) (*Manifest, error) {
+	path, err := s.manifestPath(ref, commit)
+	if err != nil {
+		return nil, err
+	}
+	return readManifest(path)
 }
 
 func mergeLinks(a, b []string) []string {
@@ -230,12 +284,15 @@ var errBusy = newErr(ExitFailure, "busy", "another lmget is using the store").
 	why("a download or sync is running in another process").
 	fix("", "run this again when it has finished")
 
+// writeFileAtomic writes through a fresh temporary file (O_EXCL, random
+// name, never a symlink someone placed in advance) and renames it over path.
+// The rename replaces a symlink at path itself, never its target.
 func writeFileAtomic(path string, b []byte) error {
-	tmp := fmt.Sprintf("%s.tmp%d", path, os.Getpid())
-	f, err := os.Create(tmp)
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp*")
 	if err != nil {
 		return err
 	}
+	tmp := f.Name()
 	if _, err = f.Write(b); err == nil {
 		err = f.Sync()
 	}

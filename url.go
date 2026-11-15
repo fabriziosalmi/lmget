@@ -64,12 +64,12 @@ func (c *Client) resolveURL(ctx context.Context, ref Ref, sel Selection) (*Plan,
 	case http.StatusOK:
 		size = resp.ContentLength
 	case 401, 403:
-		return nil, newErr(ExitAuth, "auth", hostOf(ref.Repo)+" refused the download ("+resp.Status+")").
+		return nil, newErr(ExitAuth, "auth", hostOf(ref.Repo)+" refused the download ("+printable(resp.Status)+")").
 			why("lmget sends no credentials to arbitrary hosts")
 	case 404, 410:
-		return nil, newErr(ExitNotFound, "not_found", ref.Repo+" was not found ("+resp.Status+")")
+		return nil, newErr(ExitNotFound, "not_found", ref.Repo+" was not found ("+printable(resp.Status)+")")
 	default:
-		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(ref.Repo), resp.Status))
+		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(ref.Repo), printable(resp.Status)))
 	}
 	if size < 0 {
 		return nil, newErr(ExitFailure, "source", hostOf(ref.Repo)+" does not report the file size").

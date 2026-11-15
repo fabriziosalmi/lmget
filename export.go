@@ -62,7 +62,7 @@ func (c *Client) Export(plan *Plan, t Target) (string, error) {
 	p, links, err := c.export(plan, t)
 	// links made before a failure are recorded too, or rm would never see them
 	if len(links) > 0 || err == nil {
-		if serr := c.store.saveManifest(plan, &ExportRecord{Kind: t.Kind, Path: p, Links: links}); serr != nil && err == nil {
+		if serr := c.store.saveManifest(plan, &ExportRecord{Kind: t.Kind, Path: p, Links: links}, nil); serr != nil && err == nil {
 			err = diskErr(serr)
 		}
 	}
@@ -165,6 +165,11 @@ func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
 	for _, f := range plan.Selected() {
 		dst := filepath.Join(root, filepath.FromSlash(f.Path))
 		src := c.store.BlobPath(f.SHA256)
+		// every file, not only the root: a symlinked directory committed
+		// below the target must not carry a file anywhere else
+		if err := exportContained(root, filepath.Dir(dst)); err != nil {
+			return root, links, err
+		}
 		if same(src, dst) {
 			links = append(links, dst) // ours from an earlier run: keep it recorded
 			continue
@@ -180,12 +185,38 @@ func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return root, links, diskErr(err)
 		}
+		if err := exportContained(root, filepath.Dir(dst)); err != nil { // after creating it, again
+			return root, links, err
+		}
 		if err := linkOrSymlink(src, dst); err != nil {
 			return root, links, diskErr(err)
 		}
 		links = append(links, dst)
 	}
 	return root, links, nil
+}
+
+// exportContained checks that dir, with symlinks resolved, is root or below
+// it, and that no component of the resolved path is a .git directory.
+func exportContained(root, dir string) error {
+	refuse := func(why string) error {
+		return newErr(ExitUsage, "export", "refusing to write "+dir).
+			why("%s", why).
+			fix("", "remove the symlink or choose another target")
+	}
+	if err := within(root, dir); err != nil {
+		return refuse(err.Error())
+	}
+	real, err := resolveExisting(dir)
+	if err != nil {
+		return diskErr(err)
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(real), "/") {
+		if strings.EqualFold(seg, ".git") {
+			return refuse("the path goes through a .git directory")
+		}
+	}
+	return nil
 }
 
 // hasContent reports whether path is a regular file with exactly these bytes.

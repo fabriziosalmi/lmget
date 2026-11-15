@@ -77,7 +77,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	defer unlock()
 	// recorded before downloading: gc must not reclaim the files of a pull
 	// that is interrupted half way
-	if err := c.store.saveManifest(plan, nil); err != nil {
+	if err := c.store.saveManifest(plan, nil, nil); err != nil {
 		return nil, diskErr(err)
 	}
 	all := make(map[string]bool, len(plan.Files))
@@ -101,7 +101,16 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			return nil, err
 		}
 	}
-	if err := c.store.saveManifest(plan, nil); err != nil {
+	// every selected file now matches the source (or the URL's own download):
+	// record the bindings. An offline plan built from a lock adds none.
+	var verified map[string]string
+	if !plan.offline {
+		verified = map[string]string{}
+		for _, f := range plan.Selected() {
+			verified[f.Path] = f.SHA256
+		}
+	}
+	if err := c.store.saveManifest(plan, nil, verified); err != nil {
 		return nil, diskErr(err)
 	}
 	if r.Target.Kind != "" && r.Target.Kind != "none" {
@@ -147,7 +156,7 @@ func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit
 			f.SHA256 = s
 		}
 	}
-	if f.SHA256 != "" && c.store.Has(f.SHA256, f.Size) {
+	if f.SHA256 != "" && !f.mustFetch && c.store.Has(f.SHA256, f.Size) {
 		f.Cached = true
 		e := ev(EvFileDone)
 		e.File, e.SHA256, e.Cached, e.Total = f.Path, f.SHA256, true, f.Size

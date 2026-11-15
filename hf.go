@@ -10,6 +10,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 type hfModelInfo struct {
@@ -123,16 +124,36 @@ func GlobEscape(p string) string {
 	return r.Replace(p)
 }
 
+// isLocalSlash accepts a relative slash path that stays below its root:
+// no "..", no empty segments, no backslashes, no control characters (they
+// would reach the terminal), and no ".git" segment (lmget never writes into
+// a git directory, where a file can change what later git commands run).
 func isLocalSlash(p string) bool {
 	if p == "" || p == "." || strings.HasPrefix(p, "/") || strings.Contains(p, "\\") {
 		return false
 	}
+	for _, r := range p {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || r == utf8.RuneError {
+			return false
+		}
+	}
 	for _, s := range strings.Split(p, "/") {
-		if s == ".." || s == "" {
+		if s == ".." || s == "" || strings.EqualFold(s, ".git") {
 			return false
 		}
 	}
 	return true
+}
+
+// printable drops control characters from text that came from elsewhere
+// (a server's status line, a license field) before it can be displayed.
+func printable(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 func (c *Client) authorize(req *http.Request) {
@@ -199,7 +220,7 @@ func (c *Client) hfStatus(resp *http.Response, ref Ref) error {
 		return newErr(ExitNetwork, "network", "rate limited by "+c.opt.HFEndpoint).
 			fix("", "wait a minute and run again; a token raises the limit")
 	default:
-		return newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", c.opt.HFEndpoint, resp.Status))
+		return newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", c.opt.HFEndpoint, printable(resp.Status)))
 	}
 }
 
@@ -216,6 +237,10 @@ func nextLink(h string) string {
 }
 
 func licenseString(v any) string {
+	return printable(licenseRaw(v))
+}
+
+func licenseRaw(v any) string {
 	switch t := v.(type) {
 	case string:
 		return t
