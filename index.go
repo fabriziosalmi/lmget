@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -170,6 +172,13 @@ func (ix *Index) validate() error {
 		if err != nil || ref.SHA256 != "" || ref.File != "" || Lockable(ref) != nil {
 			return fmt.Errorf("model %s: not a canonical reference", quote(m.Ref))
 		}
+		// the builder signs Hugging Face models only (url, oci and ollama
+		// plans carry no license): an entry of another source would bypass
+		// the checks their resolvers make (a pinned url#sha256, a manifest
+		// whose digest is the commit), so it is refused
+		if ref.Source != "hf" {
+			return fmt.Errorf("model %s: the index lists Hugging Face models only", quote(m.Ref))
+		}
 		key := ref.String() + "@" + m.Commit
 		if seen[key] || !validCommit(ref, m.Commit) || printable(m.License) != m.License || len(m.Files) == 0 {
 			return fmt.Errorf("model %s: bad commit, license, files, or listed twice", quote(m.Ref))
@@ -279,14 +288,13 @@ func (c *Client) UpdateIndex(ctx context.Context) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	if old, err := c.Index(); err == nil {
-		p, _ := c.indexPaths()
-		cur, _ := os.ReadFile(p)
+	sum := sha256.Sum256(data)
+	if seq, had, ok := c.highestIndex(); ok {
 		switch {
-		case ix.Sequence < old.Sequence:
-			return nil, newErr(ExitVerify, "verify", fmt.Sprintf("the index served is older than the cached one (%d < %d)", ix.Sequence, old.Sequence)).
+		case ix.Sequence < seq:
+			return nil, newErr(ExitVerify, "verify", fmt.Sprintf("the index served is older than one already accepted (%d < %d)", ix.Sequence, seq)).
 				why("an old index could hide a withdrawn model or an updated commit")
-		case ix.Sequence == old.Sequence && !bytes.Equal(cur, data):
+		case ix.Sequence == seq && had != hex.EncodeToString(sum[:]):
 			return nil, newErr(ExitVerify, "verify", "two different indexes carry the same sequence number")
 		}
 	}
@@ -301,7 +309,38 @@ func (c *Client) UpdateIndex(ctx context.Context) (*Index, error) {
 	if err := writeFileAtomic(p, data); err != nil {
 		return nil, diskErr(err)
 	}
+	// last: the highest accepted index, kept apart from the copy that expires
+	if err := writeFileAtomic(c.highestPath(), []byte(fmt.Sprintf("%d %x\n", ix.Sequence, sum))); err != nil {
+		return nil, diskErr(err)
+	}
 	return ix, nil
+}
+
+func (c *Client) highestPath() string {
+	return filepath.Join(c.store.Root(), "signed-index", "highest")
+}
+
+// highestIndex returns the sequence and sha256 of the highest index this
+// store accepted. Unlike the cached index it does not expire and needs no
+// key, so an older index cannot come back once the newer one has expired or
+// its key was rotated. A store from before this record falls back to the
+// cached index when that still verifies.
+func (c *Client) highestIndex() (int64, string, bool) {
+	if b, err := os.ReadFile(c.highestPath()); err == nil {
+		var seq int64
+		var sum string
+		if n, _ := fmt.Sscanf(string(b), "%d %64s", &seq, &sum); n == 2 && hex64.MatchString(sum) {
+			return seq, sum, true
+		}
+	}
+	if old, err := c.Index(); err == nil {
+		p, _ := c.indexPaths()
+		if cur, err := os.ReadFile(p); err == nil {
+			s := sha256.Sum256(cur)
+			return old.Sequence, hex.EncodeToString(s[:]), true
+		}
+	}
+	return 0, "", false
 }
 
 func (c *Client) fetchSmall(ctx context.Context, u string, limit int64) ([]byte, error) {
