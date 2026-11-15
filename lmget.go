@@ -18,6 +18,10 @@ import (
 	"time"
 )
 
+// DefaultIndexURL is where the project publishes its signed index (the
+// signature is at the same URL plus ".minisig"). LMGET_INDEX_URL overrides it.
+const DefaultIndexURL = "https://lmget.org/index.json"
+
 // Version is set at build time (-ldflags "-X github.com/fabriziosalmi/lmget.Version=...").
 var Version = "dev"
 
@@ -78,6 +82,9 @@ func New(o Options) (*Client, error) {
 	o.OllamaRegistry = strings.TrimRight(o.OllamaRegistry, "/")
 	if o.IndexURL == "" {
 		o.IndexURL = os.Getenv("LMGET_INDEX_URL")
+	}
+	if o.IndexURL == "" {
+		o.IndexURL = DefaultIndexURL
 	}
 	if len(o.IndexKeys) == 0 && os.Getenv("LMGET_INDEX_KEY") != "" {
 		o.IndexKeys = []string{os.Getenv("LMGET_INDEX_KEY")}

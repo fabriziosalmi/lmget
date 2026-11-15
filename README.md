@@ -47,7 +47,7 @@ The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ol
 
 ## Signed index and nodes
 
-The project keeps a signed index of models it mirrors: for each, the reference, the commit and every file with its size and sha256, and the nodes that serve those files by hash. `lmget index` fetches it, verifies its minisign signature against the project key built into lmget (not published yet; `LMGET_INDEX_URL` and `LMGET_INDEX_KEY` point lmget at another index), refuses an index older than the one it has or past its expiry date, and keeps it in the store.
+The project keeps a signed index of models it mirrors: for each, the reference, the commit and every file with its size and sha256, and the nodes that serve those files by hash. `lmget index` fetches it, verifies its minisign signature against the project key built into lmget (the index is published at `https://lmget.org/index.json`; `LMGET_INDEX_URL` and `LMGET_INDEX_KEY` point lmget at another index), refuses an index older than the one it has or past its expiry date, and keeps it in the store.
 
 With a verified index in the store, the nodes are the last origin of a file: after the source (and, for Hugging Face, ModelScope) failed. When the source cannot be reached at all, or no longer has the model, the plan of an indexed model comes from the index, because its file list is signed. Access refusals (gated, private) are never routed to the nodes, and every byte is verified against the signed hash.
 

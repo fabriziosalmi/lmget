@@ -265,7 +265,7 @@ func (c *Client) UpdateIndex(ctx context.Context) (*Index, error) {
 	u := c.opt.IndexURL
 	if pu, err := url.Parse(u); u == "" || err != nil || pu.Scheme != "https" {
 		return nil, newErr(ExitUsage, "usage", "no index URL is configured").
-			why("the project index is not published yet; LMGET_INDEX_URL sets one (https)")
+			why("LMGET_INDEX_URL must be an https URL")
 	}
 	data, err := c.fetchSmall(ctx, u, indexMaxBytes)
 	if err != nil {

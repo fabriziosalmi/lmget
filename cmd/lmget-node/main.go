@@ -28,7 +28,8 @@ func usage() int {
   lmget-node seed [-port N] [-no-dht]
                                   seed the mirrored blobs as BitTorrent v2 torrents
 
-The store is $LMGET_HOME; the index comes from $LMGET_INDEX_URL, verified with the
+The store is $LMGET_HOME; the index comes from $LMGET_INDEX_URL (default
+https://lmget.org/index.json), verified with the
 built-in key or $LMGET_INDEX_KEY.
 `)
 	return 2
