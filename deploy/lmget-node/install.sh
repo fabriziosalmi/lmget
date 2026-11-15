@@ -26,6 +26,10 @@ id cftunnel >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sb
 install -d -o lmget -g lmget -m 0750 /var/lib/lmget-node
 install -d -o root -g root -m 0700 /etc/lmget-node
 
+# no shell access over the network: the operator uses pct exec. The node
+# listens only on loopback (lmget-node 8080, the local MTA)
+systemctl disable --now ssh.socket ssh.service >/dev/null 2>&1 || true
+
 install -m 0755 lmget-node /usr/local/bin/lmget-node
 install -m 0644 systemd/*.service systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
