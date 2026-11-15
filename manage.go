@@ -40,7 +40,10 @@ func (c *Client) List() ([]Installed, error) {
 	var out []Installed
 	for path, m := range ms {
 		in := Installed{Ref: m.Plan.Ref, Commit: m.Plan.Commit, Exports: m.Exports, Updated: m.Updated, manifest: path}
-		in.Ref.Revision = "main"
+		if in.Ref.Source != "url" {
+			in.Ref.Revision = "main"
+		}
+		in.Ref.File, in.Ref.SHA256 = "", ""
 		for _, f := range m.Plan.Selected() {
 			in.Bytes += f.Size
 			in.Files++
@@ -112,7 +115,7 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		if in.Ref.Source != ref.Source || !strings.EqualFold(in.Ref.Repo, ref.Repo) {
 			continue
 		}
-		if ref.Revision == "main" || (len(ref.Revision) >= 7 && strings.HasPrefix(in.Commit, ref.Revision)) {
+		if ref.Revision == "main" || ref.Revision == "" || (len(ref.Revision) >= 7 && strings.HasPrefix(in.Commit, ref.Revision)) {
 			hit = append(hit, in)
 		}
 	}

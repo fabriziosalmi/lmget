@@ -74,13 +74,22 @@ func padLeft(s string, w int) string {
 func renderPlan(p *lmget.Plan, width int, full bool) string {
 	var b strings.Builder
 	sel := p.Selected()
-	head := []string{sBold.Render(p.Ref.Display()), sDim.Render(p.Commit[:7])}
+	head := []string{sBold.Render(middleTrunc(p.Ref.Display(), max(30, width-40))), sDim.Render(p.Commit[:7])}
+	if p.Ref.Source == "url" {
+		head = head[:1] // a URL has no commit; its id is internal
+	}
 	if p.License != "" {
 		head = append(head, p.License)
+	} else if p.Ref.Source == "url" {
+		head = append(head, sDim.Render("license unknown"))
 	} else {
 		head = append(head, sWarn.Render("no license"))
 	}
-	head = append(head, hb(p.Bytes), fmt.Sprintf("%d files", len(sel)))
+	count := fmt.Sprintf("%d files", len(sel))
+	if len(sel) == 1 {
+		count = "1 file"
+	}
+	head = append(head, hb(p.Bytes), count)
 	fmt.Fprintf(&b, "\n  %s\n\n", strings.Join(head, "  "))
 
 	files := append([]lmget.File(nil), sel...)
@@ -128,12 +137,22 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 	if hasST {
 		checks = append(checks, sAccent.Render("safetensors"))
 	}
+	switch p.HashFrom {
+	case lmget.HashFromUser:
+		checks = append(checks, sAccent.Render("sha256 pinned by you"))
+	case lmget.HashFromServer:
+		checks = append(checks, sAccent.Render("sha256 published by the server"))
+	case lmget.HashFromFirst:
+		checks = append(checks, sWarn.Render("no published hash: pinned on first download"))
+	}
 	if len(p.Pickle) == 0 {
 		checks = append(checks, sAccent.Render("no pickle"))
 	} else {
 		checks = append(checks, sWarn.Render(fmt.Sprintf("%d pickle files", len(p.Pickle))))
 	}
-	if p.Gated == "" {
+	if p.Ref.Source == "url" {
+		// gating is a Hugging Face concept
+	} else if p.Gated == "" {
 		checks = append(checks, sAccent.Render("not gated"))
 	} else {
 		checks = append(checks, sWarn.Render("gated ("+p.Gated+")"))
@@ -202,15 +221,22 @@ func renderError(e *lmget.Error) string {
 	return b.String()
 }
 
-func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot, lock string) string {
+func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot, lock string, width int) string {
 	var b strings.Builder
 	sel := o.Plan.Selected()
 	what := fmt.Sprintf("%d/%d verified", len(sel), len(sel))
+	if o.Plan.HashFrom == lmget.HashFromFirst {
+		what = sWarn.Render("pinned on first download")
+	}
 	took := "in " + fmtDur(o.Elapsed)
 	if o.Fetched == 0 {
 		took = sDim.Render("already complete, nothing downloaded")
 	}
-	fmt.Fprintf(&b, "\n  %s %s  %s  %s  %s\n", sAccent.Render(check), sBold.Render(o.Plan.Ref.Display()), hb(o.Plan.Bytes), what, took)
+	name := o.Plan.Ref.Display()
+	if width > 0 {
+		name = middleTrunc(name, max(30, width-50))
+	}
+	fmt.Fprintf(&b, "\n  %s %s  %s  %s  %s\n", sAccent.Render(check), sBold.Render(name), hb(o.Plan.Bytes), what, took)
 	switch t.Kind {
 	case "hf":
 		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("hf cache"), tilde(o.Path))

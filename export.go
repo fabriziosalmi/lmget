@@ -80,6 +80,10 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 	}
 	switch t.Kind {
 	case "hf":
+		if plan.Ref.Source != "hf" {
+			return "", nil, newErr(ExitUsage, "usage", "the Hugging Face cache only holds Hugging Face repositories").
+				fix("--to dir:PATH", "a plain directory (the default for URLs is the current one)")
+		}
 		return c.exportHF(plan)
 	case "dir":
 		return c.exportDir(plan, t.Path)

@@ -101,13 +101,19 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 	logf := func(format string, a ...any) { fmt.Fprintf(stderr, "lmget: "+format+"\n", a...) }
 	nextPct := map[string]int64{}
 	t0 := time.Now()
+	pinnedOnly := false // direct URL without a published hash
 	emit := func(e lmget.Event) {
 		switch e.Type {
 		case lmget.EvResolve:
 			logf("resolve %s", e.Ref)
 		case lmget.EvPlan:
 			p := e.Plan
-			logf("plan %s@%s license=%s files=%d bytes=%d to_fetch=%d", p.Ref.Display(), p.Commit, orNone(p.License), len(p.Selected()), p.Bytes, p.ToFetch)
+			pinnedOnly = p.HashFrom == lmget.HashFromFirst
+			id := "commit=" + p.Commit
+			if p.Ref.Source == "url" {
+				id = "hash_from=" + p.HashFrom
+			}
+			logf("plan %s %s license=%s files=%d bytes=%d to_fetch=%d", p.Ref.Display(), id, orNone(p.License), len(p.Selected()), p.Bytes, p.ToFetch)
 			skipped := map[string]int{}
 			var reasons []string
 			for _, f := range p.Files {
@@ -127,8 +133,12 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 			if req.DryRun {
 				for _, f := range p.Selected() {
 					h := f.SHA256
-					if h == "" {
+					switch {
+					case h != "":
+					case f.GitSHA1 != "":
 						h = "git:" + f.GitSHA1
+					default:
+						h = "unpinned"
 					}
 					fmt.Fprintf(stdout, "%d\t%s\t%s\n", f.Size, h, f.Path)
 				}
@@ -145,9 +155,12 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 				nextPct[e.File] = (e.Bytes*100/e.Total/10 + 1) * 10
 			}
 		case lmget.EvFileDone:
-			if e.Cached {
+			switch {
+			case e.Cached:
 				logf("cached %s sha256=%s", e.File, e.SHA256)
-			} else {
+			case pinnedOnly:
+				logf("pinned %s sha256=%s (no published hash: recorded on first download)", e.File, e.SHA256)
+			default:
 				logf("verified %s sha256=%s", e.File, e.SHA256)
 			}
 		case lmget.EvExport:
@@ -304,7 +317,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.pending = append(m.pending, strings.TrimRight(renderPlan(msg.out.Plan, m.width, true), "\n")+"\n")
 		default:
 			m.out = msg.out
-			m.pending = append(m.pending, strings.TrimRight(renderSummary(msg.out, m.req.Target, m.store, msg.lock), "\n")+"\n")
+			m.pending = append(m.pending, strings.TrimRight(renderSummary(msg.out, m.req.Target, m.store, msg.lock, m.width), "\n")+"\n")
 		}
 	}
 	return m, nil

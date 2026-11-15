@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -145,9 +146,17 @@ func newTestClient(t *testing.T, srv *httptest.Server, home string) *Client {
 	return c
 }
 
+// fakeSafetensors is a well-formed safetensors file with n payload bytes.
+func fakeSafetensors(n int) []byte {
+	header := []byte(fmt.Sprintf(`{"w":{"dtype":"U8","shape":[%d],"data_offsets":[0,%d]}}`, n, n))
+	b := make([]byte, 8, 8+len(header)+n)
+	binary.LittleEndian.PutUint64(b, uint64(len(header)))
+	return append(append(b, header...), randBytes(n)...)
+}
+
 func modelFiles() []fakeFile {
 	return []fakeFile{
-		{path: "model.safetensors", data: randBytes(3<<20 + 12345), lfs: true},
+		{path: "model.safetensors", data: fakeSafetensors(3<<20 + 12345), lfs: true},
 		{path: "config.json", data: []byte(`{"a":1}`)},
 		{path: "sub/tokenizer.json", data: randBytes(70_000)},
 	}
@@ -155,12 +164,15 @@ func modelFiles() []fakeFile {
 
 func TestParseRef(t *testing.T) {
 	ok := map[string]Ref{
-		"Qwen/Qwen3-0.6B":                      {"hf", "Qwen/Qwen3-0.6B", "main"},
-		"hf:Qwen/Qwen3-0.6B@v1.0":              {"hf", "Qwen/Qwen3-0.6B", "v1.0"},
-		"Qwen/Qwen3-0.6B@refs/pr/1":            {"hf", "Qwen/Qwen3-0.6B", "refs/pr/1"},
-		"https://huggingface.co/Qwen/Q3":       {"hf", "Qwen/Q3", "main"},
-		"https://hf.co/Qwen/Q3/tree/dev":       {"hf", "Qwen/Q3", "dev"},
-		"https://huggingface.co/a/b/blob/c1/x": {"hf", "a/b", "c1"},
+		"Qwen/Qwen3-0.6B":                                              {"hf", "Qwen/Qwen3-0.6B", "main", "", ""},
+		"hf:Qwen/Qwen3-0.6B@v1.0":                                      {"hf", "Qwen/Qwen3-0.6B", "v1.0", "", ""},
+		"Qwen/Qwen3-0.6B@refs/pr/1":                                    {"hf", "Qwen/Qwen3-0.6B", "refs/pr/1", "", ""},
+		"https://huggingface.co/Qwen/Q3":                               {"hf", "Qwen/Q3", "main", "", ""},
+		"https://hf.co/Qwen/Q3/tree/dev":                               {"hf", "Qwen/Q3", "dev", "", ""},
+		"https://huggingface.co/a/b/blob/c1/x":                         {"hf", "a/b", "c1", "x", ""},
+		"https://huggingface.co/a/b/resolve/main/sub/m.gguf":           {"hf", "a/b", "main", "sub/m.gguf", ""},
+		"https://example.com/m/model.gguf":                             {"url", "https://example.com/m/model.gguf", "", "", ""},
+		"https://example.com/m.gguf#sha256=" + strings.Repeat("A", 64): {"url", "https://example.com/m.gguf", "", "", strings.Repeat("a", 64)},
 	}
 	for in, want := range ok {
 		got, err := ParseRef(in)
@@ -169,7 +181,9 @@ func TestParseRef(t *testing.T) {
 		}
 	}
 	bad := []string{"", "../etc", "a/../b", "a/b/c", "Qwen", "a/b@", "a/b@../x", "ollama:llama3",
-		"https://example.com/a/b", "https://huggingface.co/datasets/a/b", "a /b", "-a/b", "x:y/z"}
+		"https://huggingface.co/datasets/a/b", "a /b", "-a/b", "x:y/z",
+		"http://example.com/m.gguf", "https://user:pw@example.com/m.gguf", "https://example.com/m.gguf#md5=00",
+		"https://example.com/m.gguf#sha256=abc", "https://huggingface.co/a/b/resolve/main/../../etc"}
 	for _, in := range bad {
 		if _, err := ParseRef(in); err == nil {
 			t.Errorf("ParseRef(%q) accepted", in)
@@ -188,7 +202,7 @@ func TestPullVerifiesAndExportsHFCache(t *testing.T) {
 	c := newTestClient(t, srv, t.TempDir())
 
 	var types []EventType
-	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "hf"}},
+	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "hf"}},
 		func(e Event) { types = append(types, e.Type) })
 	if err != nil {
 		t.Fatal(err)
@@ -222,7 +236,7 @@ func TestPullVerifiesAndExportsHFCache(t *testing.T) {
 
 	// second pull: everything cached, git-only files through the index
 	served := f.served.Load()
-	out, err = c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "none"}}, nil)
+	out, err = c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +254,7 @@ func TestPullRejectsCorruptBytes(t *testing.T) {
 		srv := httptest.NewServer(f.handler())
 		home := t.TempDir()
 		c := newTestClient(t, srv, home)
-		_, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "none"}}, nil)
+		_, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil)
 		srv.Close()
 		if e := AsError(err); e == nil || e.Code != ExitVerify {
 			t.Fatalf("lfs=%v: got %v, want exit %d", lfs, err, ExitVerify)
@@ -270,13 +284,13 @@ func TestPullResumesWithoutRefetching(t *testing.T) {
 		}
 	}
 	f.onByte.Store(&stopAt)
-	_, err := c.Pull(ctx, Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "none"}}, nil)
+	_, err := c.Pull(ctx, Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil)
 	if e := AsError(err); e.Code != ExitInterrupted {
 		t.Fatalf("got %v, want interrupted", err)
 	}
 	first := f.served.Load()
 	f.onByte.Store(nil)
-	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "none"}}, nil)
+	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +314,7 @@ func TestResolveRejectsUnsafePaths(t *testing.T) {
 		}}
 		srv := httptest.NewServer(f.handler())
 		c := newTestClient(t, srv, t.TempDir())
-		_, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main"}, Selection{})
+		_, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main", "", ""}, Selection{})
 		srv.Close()
 		if err == nil {
 			t.Errorf("path %q accepted", p)
@@ -317,7 +331,7 @@ func TestSelectionSkipsPickleWhenSafetensorsExist(t *testing.T) {
 	srv := httptest.NewServer(f.handler())
 	defer srv.Close()
 	c := newTestClient(t, srv, t.TempDir())
-	p, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main"}, Selection{})
+	p, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main", "", ""}, Selection{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,11 +343,11 @@ func TestSelectionSkipsPickleWhenSafetensorsExist(t *testing.T) {
 			t.Fatal("OpenVINO weights treated as pickle")
 		}
 	}
-	p, _ = c.Resolve(context.Background(), Ref{"hf", "org/m", "main"}, Selection{AllowPickle: true, Include: []string{"pytorch_model.bin"}})
+	p, _ = c.Resolve(context.Background(), Ref{"hf", "org/m", "main", "", ""}, Selection{AllowPickle: true, Include: []string{"pytorch_model.bin"}})
 	if sel := p.Selected(); len(sel) != 1 || sel[0].Path != "pytorch_model.bin" || len(p.Pickle) != 1 {
 		t.Fatalf("include/allow-pickle: %+v", sel)
 	}
-	if _, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main"}, Selection{Include: []string{"["}}); AsError(err).Code != ExitUsage {
+	if _, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main", "", ""}, Selection{Include: []string{"["}}); AsError(err).Code != ExitUsage {
 		t.Fatalf("bad glob: %v", err)
 	}
 }
@@ -343,7 +357,7 @@ func TestErrorsMapToExitCodes(t *testing.T) {
 	for status, want := range cases {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(status) }))
 		c := newTestClient(t, srv, t.TempDir())
-		_, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main"}, Selection{})
+		_, err := c.Resolve(context.Background(), Ref{"hf", "org/m", "main", "", ""}, Selection{})
 		srv.Close()
 		if got := AsError(err).Code; got != want {
 			t.Errorf("HTTP %d: exit %d, want %d", status, got, want)
@@ -361,7 +375,7 @@ func TestExportDirAcceptsIdenticalFilesOnly(t *testing.T) {
 	srv := httptest.NewServer(f.handler())
 	defer srv.Close()
 	dir := t.TempDir()
-	req := Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "dir", Path: dir}}
+	req := Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "dir", Path: dir}}
 	if _, err := newTestClient(t, srv, t.TempDir()).Pull(context.Background(), req, nil); err != nil {
 		t.Fatal(err)
 	}

@@ -33,6 +33,7 @@ type flags struct {
 	lockfile    string
 	update      bool
 	verify      bool
+	toChanged   bool // --to given explicitly
 }
 
 func main() { os.Exit(int(run())) }
@@ -65,6 +66,7 @@ func run() lmget.ExitCode {
 			if len(args) == 0 {
 				return cmd.Help()
 			}
+			f.toChanged = cmd.Flags().Changed("to")
 			return pull(args[0], f.dryRun)
 		},
 	}
@@ -72,7 +74,10 @@ func run() lmget.ExitCode {
 		Use:   "get <model>",
 		Short: "Resolve, download, verify and export a model (same as lmget <model>)",
 		Args:  cobra.ExactArgs(1),
-		RunE:  func(cmd *cobra.Command, args []string) error { return pull(args[0], f.dryRun) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			f.toChanged = cmd.Flags().Changed("to")
+			return pull(args[0], f.dryRun)
+		},
 	}
 	info := &cobra.Command{
 		Use:   "info <model>",
@@ -171,9 +176,24 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	if err != nil {
 		return fail(mode, err)
 	}
-	target, err := lmget.ParseTarget(f.to)
+	to := f.to
+	if ref.Source == "url" && !f.toChanged {
+		to = "dir:." // a single file: next to the user, like curl -O
+	}
+	target, err := lmget.ParseTarget(to)
 	if err != nil {
 		return fail(mode, err)
+	}
+	sel := lmget.Selection{Include: f.include, Exclude: f.exclude, AllowPickle: f.allowPickle}
+	if ref.File != "" { // .../resolve/<rev>/<file>: that file only, recorded as a selection
+		sel.Include = []string{lmget.GlobEscape(ref.File)}
+	}
+	_, statErr := os.Stat(f.lockfile)
+	locking := !dry && (f.lock || statErr == nil)
+	if locking {
+		if err := lmget.Lockable(ref); err != nil {
+			return fail(mode, err)
+		}
 	}
 	c, err := lmget.New(lmget.Options{Conns: f.conns})
 	if err != nil {
@@ -181,11 +201,10 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	sel := lmget.Selection{Include: f.include, Exclude: f.exclude, AllowPickle: f.allowPickle}
 	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry}
 	opts := ui.Opts{Resume: resumeCmd()}
 	// lmget keeps an existing lockfile current, like go get with go.mod.
-	if _, statErr := os.Stat(f.lockfile); f.lock || statErr == nil {
+	if locking {
 		opts.After = func(o *lmget.Outcome) (string, error) {
 			l, err := lmget.ReadLock(f.lockfile)
 			if errors.Is(err, fs.ErrNotExist) {

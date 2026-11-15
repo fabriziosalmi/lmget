@@ -58,6 +58,11 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 	if f.Size == 0 {
 		return nil
 	}
+	if f.noRanges { // no resume possible: one sequential stream from the start
+		cnt.done.Store(0)
+		_, err := c.fetchRange(ctx, f, out, 0, f.Size, cnt, false)
+		return err
+	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
@@ -75,7 +80,7 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 			for i := range todo {
 				off := int64(i) * st.Chunk
 				size := min(st.Chunk, f.Size-off)
-				if err := c.fetchChunk(ctx, f.url, out, off, size, cnt); err != nil {
+				if err := c.fetchChunk(ctx, f, out, off, size, cnt); err != nil {
 					cancel(err)
 					return
 				}
@@ -119,7 +124,7 @@ feed:
 
 // fetchChunk retries one range with backoff. Auth and not-found answers are
 // final; network errors and 5xx are retried.
-func (c *Client) fetchChunk(ctx context.Context, u string, out *os.File, off, size int64, cnt *counters) error {
+func (c *Client) fetchChunk(ctx context.Context, f File, out *os.File, off, size int64, cnt *counters) error {
 	var last error
 	for attempt := range 6 {
 		if attempt > 0 {
@@ -129,13 +134,13 @@ func (c *Client) fetchChunk(ctx context.Context, u string, out *os.File, off, si
 				return ctx.Err()
 			}
 		}
-		got, err := c.fetchRange(ctx, u, out, off, size, cnt)
+		got, err := c.fetchRange(ctx, f, out, off, size, cnt, true)
 		if err == nil {
 			return nil
 		}
 		cnt.done.Add(-got) // these bytes will be written again
 		var e *Error
-		if errors.As(err, &e) && e.Code != ExitNetwork {
+		if errors.As(err, &e) && (e.Code != ExitNetwork || e.Kind == "changed") {
 			return err
 		}
 		if ctx.Err() != nil {
@@ -147,28 +152,39 @@ func (c *Client) fetchChunk(ctx context.Context, u string, out *os.File, off, si
 		fix("", "run the same command again: verified chunks are kept")
 }
 
-func (c *Client) fetchRange(ctx context.Context, u string, out *os.File, off, size int64, cnt *counters) (int64, error) {
+func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size int64, cnt *counters, ranged bool) (int64, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.url, nil)
 	if err != nil {
 		return 0, err
 	}
 	c.authorize(req)
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, off+size-1))
+	if ranged {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, off+size-1))
+		if f.ifRange != "" {
+			req.Header.Set("If-Range", f.ifRange)
+		}
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return 0, newErr(ExitNetwork, "network", "request failed").wrap(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusPartialContent {
+	if ranged && resp.StatusCode != http.StatusPartialContent {
 		if resp.StatusCode == http.StatusOK && off == 0 && resp.ContentLength == size {
 			// server ignored Range but the body is exactly the chunk
+		} else if resp.StatusCode == http.StatusOK && f.ifRange != "" {
+			return 0, newErr(ExitNetwork, "changed", "the file changed on the server during the download").
+				why("its validator no longer matches %s", f.ifRange).
+				fix("", "run the same command again: it starts over with the new version")
 		} else if resp.StatusCode == http.StatusOK || resp.StatusCode >= 500 || resp.StatusCode == 429 {
 			return 0, newErr(ExitNetwork, "network", "unexpected "+resp.Status+" for a ranged request")
 		} else {
 			return 0, fileStatus(resp)
 		}
+	} else if !ranged && resp.StatusCode != http.StatusOK {
+		return 0, fileStatus(resp)
 	}
 	// stall watchdog: no bytes for stallTimeout cancels this attempt
 	stall := time.AfterFunc(stallTimeout, cancel)

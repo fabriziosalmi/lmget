@@ -103,6 +103,9 @@ func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
 	if !hex40.MatchString(commit) {
 		return "", fmt.Errorf("not a commit: %q", commit)
 	}
+	if ref.Source == "url" { // the commit of a URL plan is the sha1 of the URL
+		return filepath.Join(s.root, "refs", "url", commit+".json"), nil
+	}
 	if _, err := validRef(ref.Source, ref.Repo, "main", ref.Repo); err != nil {
 		return "", err
 	}

@@ -11,7 +11,7 @@ import (
 
 func pullTo(t *testing.T, c *Client, repo string, target Target) *Outcome {
 	t.Helper()
-	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", repo, "main"}, Target: target}, nil)
+	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", repo, "main", "", ""}, Target: target}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestRemoveKeepsSharedBlobsAndFreesTheRest(t *testing.T) {
 		t.Fatalf("dedup: %d blobs for 2 models sharing %d files", st.Blobs, len(f.files))
 	}
 
-	r, err := c.Remove(Ref{"hf", "org/a", "main"})
+	r, err := c.Remove(Ref{"hf", "org/a", "main", "", ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestRemoveKeepsSharedBlobsAndFreesTheRest(t *testing.T) {
 	if err := os.Link(c.store.BlobPath(sha(f.files[0].data)), extra); err != nil {
 		t.Fatal(err)
 	}
-	r, err = c.Remove(Ref{"hf", "org/b", "main"})
+	r, err = c.Remove(Ref{"hf", "org/b", "main", "", ""})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestRemoveKeepsSharedBlobsAndFreesTheRest(t *testing.T) {
 	if list, _ := c.List(); len(list) != 0 {
 		t.Fatalf("still listed: %+v", list)
 	}
-	if _, err := c.Remove(Ref{"hf", "org/b", "main"}); AsError(err).Code != ExitNotFound {
+	if _, err := c.Remove(Ref{"hf", "org/b", "main", "", ""}); AsError(err).Code != ExitNotFound {
 		t.Fatalf("removing twice: %v", err)
 	}
 }
@@ -102,7 +102,7 @@ func TestRemoveLeavesFilesItDidNotCreate(t *testing.T) {
 	os.Remove(mine)
 	os.WriteFile(mine, []byte("edited"), 0o644)
 
-	r, err := c.Remove(Ref{"hf", "org/m", "main"})
+	r, err := c.Remove(Ref{"hf", "org/m", "main", "", ""})
 	if err != nil {
 		t.Fatal(err)
 	}

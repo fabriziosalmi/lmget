@@ -9,6 +9,7 @@ import (
 	"hash"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -93,6 +94,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			return nil, err
 		}
 		out.Path = p
+		if plan.Ref.Source == "url" && r.Target.Kind == "dir" && len(plan.Files) == 1 {
+			out.Path = filepath.Join(p, plan.Files[0].Path) // a URL is one file: report the file
+		}
 		e := ev(EvExport)
 		e.Target, e.Path = r.Target.Kind, p
 		emit(e)
@@ -106,8 +110,12 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 
 func (c *Client) getFile(ctx context.Context, f *File, emit func(Event)) (int64, error) {
 	key := f.SHA256
-	if key == "" {
+	switch {
+	case key != "":
+	case f.GitSHA1 != "":
 		key = "git-" + f.GitSHA1
+	default:
+		key = f.tmpKey // direct URL without a known hash
 	}
 	part, state := c.store.tmpPaths(key)
 	e := ev(EvFileStart)
@@ -139,6 +147,9 @@ func (c *Client) getFile(ctx context.Context, f *File, emit func(Event)) (int64,
 		return cnt.fetched.Load(), err
 	}
 	sum, err := c.verify(part, f)
+	if err == nil {
+		err = checkFormat(part, f.Path)
+	}
 	if err != nil {
 		os.Remove(part)
 		os.Remove(state)

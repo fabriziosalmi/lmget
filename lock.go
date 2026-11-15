@@ -145,7 +145,7 @@ func (l *Lock) Write() error {
 // Find returns the entry for ref (same source, repo and revision), or nil.
 func (l *Lock) Find(ref Ref) *LockModel {
 	for i := range l.Models {
-		if r, err := ParseRef(l.Models[i].Ref); err == nil && r == ref {
+		if r, err := ParseRef(l.Models[i].Ref); err == nil && r.String() == ref.String() {
 			return &l.Models[i]
 		}
 	}
@@ -154,6 +154,9 @@ func (l *Lock) Find(ref Ref) *LockModel {
 
 // Upsert records a completed pull. Every selected file must have its sha256.
 func (l *Lock) Upsert(p *Plan, sel Selection, t Target) error {
+	if err := Lockable(p.Ref); err != nil {
+		return err
+	}
 	m := LockModel{
 		Ref: p.Ref.String(), Commit: p.Commit, To: l.targetString(t), License: p.License,
 		Include: sel.Include, Exclude: sel.Exclude, AllowPickle: sel.AllowPickle,
@@ -172,6 +175,18 @@ func (l *Lock) Upsert(p *Plan, sel Selection, t Target) error {
 	return nil
 }
 
+// Lockable reports whether ref may be written to a lockfile. A URL with a
+// query string is refused: signed URLs carry credentials there, and a
+// lockfile ends up in git.
+func Lockable(ref Ref) error {
+	if ref.Source == "url" && strings.Contains(ref.Repo, "?") {
+		return newErr(ExitUsage, "usage", "this URL has a query string and is not written to the lock").
+			why("signed URLs carry credentials in the query, and lmget.lock is meant to be committed").
+			fix("", "download it without --lock, or use a URL without a query string")
+	}
+	return nil
+}
+
 // targetString stores directory targets relative to the lockfile when they
 // are inside its directory, so the project can move.
 func (l *Lock) targetString(t Target) string {
@@ -183,7 +198,9 @@ func (l *Lock) targetString(t Target) string {
 	}
 	base, err := filepath.Abs(filepath.Dir(l.path))
 	if err == nil {
-		if rel, err := filepath.Rel(base, t.Path); err == nil && filepath.IsLocal(rel) {
+		if rel, err := filepath.Rel(base, t.Path); err == nil && rel == "." {
+			return "dir:."
+		} else if err == nil && filepath.IsLocal(rel) {
 			return "dir:./" + filepath.ToSlash(rel)
 		}
 	}

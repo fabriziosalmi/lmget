@@ -16,6 +16,10 @@ type File struct {
 	Cached  bool   `json:"cached"`             // already verified in the store: nothing to fetch
 	Skipped string `json:"skipped,omitempty"`  // reason the file is not selected
 	url     string
+	// direct URLs only
+	ifRange  string // validator sent with every ranged request
+	noRanges bool   // the server ignores Range: one sequential stream
+	tmpKey   string // partial-download key when no hash is known in advance
 }
 
 // Selected reports whether the file will be fetched or exported.
@@ -27,6 +31,7 @@ type Plan struct {
 	Commit   string   `json:"commit"`
 	License  string   `json:"license,omitempty"`
 	Gated    string   `json:"gated,omitempty"`
+	HashFrom string   `json:"hash_from,omitempty"` // direct URLs: user, server or first
 	Files    []File   `json:"files"`
 	Bytes    int64    `json:"bytes"`            // selected files
 	ToFetch  int64    `json:"to_fetch"`         // selected and not cached

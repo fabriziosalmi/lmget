@@ -36,6 +36,12 @@ type hfTreeEntry struct {
 // Resolve turns a Ref into a Plan: commit, license, files with hashes, and
 // what the store already holds. Nothing is downloaded.
 func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, error) {
+	if ref.Source == "url" {
+		return c.resolveURL(ctx, ref, sel)
+	}
+	if ref.File != "" { // one file of the repository
+		sel.Include = []string{GlobEscape(ref.File)}
+	}
 	if ref.Source != "hf" {
 		return nil, newErr(ExitUsage, "unsupported", "source "+quote(ref.Source)+" is not supported yet")
 	}
@@ -100,6 +106,12 @@ func (c *Client) hfFile(ref Ref, commit string, e hfTreeEntry) (File, error) {
 	}
 	f.url = fmt.Sprintf("%s/%s/resolve/%s/%s", c.opt.HFEndpoint, ref.Repo, commit, strings.Join(segs, "/"))
 	return f, nil
+}
+
+// GlobEscape makes a path match itself literally in --include.
+func GlobEscape(p string) string {
+	r := strings.NewReplacer(`\`, `\\`, `*`, `\*`, `?`, `\?`, `[`, `\[`)
+	return r.Replace(p)
 }
 
 func isLocalSlash(p string) bool {

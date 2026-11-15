@@ -16,7 +16,7 @@ func pullAndLock(t *testing.T, f *fakeHF, home string, target Target) (*Client, 
 	srv := httptest.NewServer(f.handler())
 	c := newTestClient(t, srv, home)
 	sel := Selection{}
-	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main"}, Selection: sel, Target: target}, nil)
+	out, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Selection: sel, Target: target}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

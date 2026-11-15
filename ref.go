@@ -8,13 +8,24 @@ import (
 
 // Ref identifies a model at a source. Revision is what the user asked for
 // (a branch, tag or commit); the resolved commit lives in the Plan.
+//
+// For Source "url", Repo is the https URL (without fragment) and Revision is
+// empty. File selects one file of a repository (from a .../resolve/rev/path
+// URL). SHA256 is a hash the user pinned in the reference (url#sha256=...).
 type Ref struct {
 	Source   string `json:"source"`
 	Repo     string `json:"repo"`
 	Revision string `json:"revision"`
+	File     string `json:"file,omitempty"`
+	SHA256   string `json:"sha256,omitempty"`
 }
 
+// String is the canonical form, used as the key in lmget.lock. File and
+// SHA256 are not part of it: the lock keeps them as selection and hashes.
 func (r Ref) String() string {
+	if r.Source == "url" {
+		return r.Repo
+	}
 	s := r.Source + ":" + r.Repo
 	if r.Revision != "" && r.Revision != "main" {
 		s += "@" + r.Revision
@@ -24,8 +35,13 @@ func (r Ref) String() string {
 
 // Display is the short form shown to people: no source prefix for hf.
 func (r Ref) Display() string {
-	if r.Source == "hf" {
-		return strings.TrimPrefix(r.String(), "hf:")
+	switch r.Source {
+	case "hf":
+		d := strings.TrimPrefix(r.String(), "hf:")
+		if r.File != "" {
+			d += " " + r.File
+		}
+		return d
 	}
 	return r.String()
 }
@@ -82,14 +98,38 @@ func ParseRef(s string) (Ref, error) {
 
 func parseURLRef(raw string) (Ref, error) {
 	u, err := url.Parse(raw)
-	if err != nil {
+	if err != nil || u.Host == "" {
 		return Ref{}, newErr(ExitUsage, "usage", "not a valid URL").wrap(err)
 	}
 	host := strings.ToLower(u.Hostname())
-	if host != "huggingface.co" && host != "hf.co" && host != "www.huggingface.co" {
-		return Ref{}, newErr(ExitUsage, "unsupported", "direct URL downloads are not supported yet").
-			why("this build resolves Hugging Face repositories only")
+	if host == "huggingface.co" || host == "hf.co" || host == "www.huggingface.co" {
+		return parseHFURL(u, raw)
 	}
+	if u.Scheme != "https" {
+		return Ref{}, newErr(ExitUsage, "usage", "plain http is not supported").
+			why("without TLS nothing authenticates the first download").
+			fix(strings.Replace(raw, "http://", "https://", 1), "")
+	}
+	if u.User != nil {
+		return Ref{}, newErr(ExitUsage, "usage", "URLs with credentials are not accepted").
+			why("they would end up in logs and in lmget.lock")
+	}
+	r := Ref{Source: "url"}
+	if u.Fragment != "" {
+		h, ok := strings.CutPrefix(u.Fragment, "sha256=")
+		h = strings.ToLower(h)
+		if !ok || !hex64.MatchString(h) {
+			return Ref{}, newErr(ExitUsage, "usage", "unknown URL fragment "+quote("#"+u.Fragment)).
+				fix(strings.SplitN(raw, "#", 2)[0]+"#sha256=<64 hex>", "pin the expected sha256")
+		}
+		r.SHA256 = h
+	}
+	u.Fragment, u.RawFragment = "", ""
+	r.Repo = u.String()
+	return r, nil
+}
+
+func parseHFURL(u *url.URL, raw string) (Ref, error) {
 	parts := strings.Split(strings.Trim(u.EscapedPath(), "/"), "/")
 	if len(parts) > 0 && (parts[0] == "datasets" || parts[0] == "spaces") {
 		return Ref{}, newErr(ExitUsage, "unsupported", "Hugging Face "+parts[0]+" are out of scope").
@@ -99,13 +139,22 @@ func parseURLRef(raw string) (Ref, error) {
 		return Ref{}, newErr(ExitUsage, "usage", "the URL does not point to a repository").
 			fix("lmget https://huggingface.co/Org/Name", "")
 	}
-	rev := "main"
+	rev, file := "main", ""
 	if len(parts) >= 4 && (parts[2] == "tree" || parts[2] == "blob" || parts[2] == "resolve") {
 		if r, err := url.PathUnescape(parts[3]); err == nil {
 			rev = r
 		}
+		if len(parts) > 4 && parts[2] != "tree" { // blob/resolve: one file
+			p, err := url.PathUnescape(strings.Join(parts[4:], "/"))
+			if err != nil || !isLocalSlash(p) {
+				return Ref{}, newErr(ExitUsage, "usage", "not a valid file path in the URL")
+			}
+			file = p
+		}
 	}
-	return validRef("hf", parts[0]+"/"+parts[1], rev, raw)
+	r, err := validRef("hf", parts[0]+"/"+parts[1], rev, raw)
+	r.File = file
+	return r, err
 }
 
 func validRef(src, repo, rev, orig string) (Ref, error) {
