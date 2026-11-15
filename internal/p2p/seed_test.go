@@ -117,7 +117,11 @@ func TestSeederServesALeecher(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	if _, err := s.Add(p, sha, bt.Infohash[:63]+"0"); err == nil {
+	last := "0"
+	if bt.Infohash[63] == '0' {
+		last = "1" // always a different infohash
+	}
+	if _, err := s.Add(p, sha, bt.Infohash[:63]+last); err == nil {
 		t.Fatal("a blob was seeded under an infohash the index does not give")
 	}
 	if _, err := s.Add(p, sha, bt.Infohash); err != nil {

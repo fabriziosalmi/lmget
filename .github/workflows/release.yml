@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOFLAGS: -tags=purego_utp # pure Go uTP in anacrolix: no C++ compiler, as shipped
+
 jobs:
   release:
     runs-on: ubuntu-24.04

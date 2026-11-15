@@ -2,6 +2,9 @@
 # before any tag.
 
 GO       ?= go
+# anacrolix (lmget-node only) would compile libutp in C++ whenever cgo is on,
+# -race included: the pure Go uTP needs no C++ compiler and is what ships.
+export GOFLAGS := -tags=purego_utp
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS  := -s -w -X github.com/fabriziosalmi/lmget.Version=$(VERSION)
 SMOKE    ?= $(CURDIR)/.smoke
