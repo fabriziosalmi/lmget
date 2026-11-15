@@ -114,10 +114,26 @@ type Index struct {
 
 // IndexModel pins one model, as a lock entry does.
 type IndexModel struct {
-	Ref     string     `json:"ref"`
-	Commit  string     `json:"commit"`
-	License string     `json:"license"`
-	Files   []LockFile `json:"files"`
+	Ref     string      `json:"ref"`
+	Commit  string      `json:"commit"`
+	License string      `json:"license"`
+	Files   []IndexFile `json:"files"`
+}
+
+// IndexFile is a locked file plus the BitTorrent v2 infohash of its blob
+// (BlobTorrent), under which the nodes seed it.
+type IndexFile struct {
+	LockFile
+	BTIH2 string `json:"btih2,omitempty"`
+}
+
+// LockFiles returns the files without their torrent identity.
+func (m IndexModel) LockFiles() []LockFile {
+	out := make([]LockFile, len(m.Files))
+	for i, f := range m.Files {
+		out[i] = f.LockFile
+	}
+	return out
 }
 
 // Find returns the entry of ref at commit, or nil.
@@ -161,7 +177,7 @@ func (ix *Index) validate() error {
 		paths := map[string]bool{}
 		for _, f := range m.Files {
 			if !isLocalSlash(f.Path) || paths[f.Path] || !hex64.MatchString(f.SHA256) || f.Size < 0 || f.Size > MaxFileSize ||
-				(f.GitSHA1 != "" && !hex40.MatchString(f.GitSHA1)) {
+				(f.GitSHA1 != "" && !hex40.MatchString(f.GitSHA1)) || (f.BTIH2 != "" && !hex64.MatchString(f.BTIH2)) {
 				return fmt.Errorf("model %s: bad file %s", quote(m.Ref), quote(f.Path))
 			}
 			paths[f.Path] = true

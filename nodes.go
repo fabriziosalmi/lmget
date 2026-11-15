@@ -76,7 +76,7 @@ func (c *Client) nodeFiles(ref Ref, commit string, f File) []File {
 	var lf *LockFile
 	for i := range m.Files {
 		if m.Files[i].Path == f.Path {
-			lf = &m.Files[i]
+			lf = &m.Files[i].LockFile
 		}
 	}
 	switch {

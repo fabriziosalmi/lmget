@@ -89,28 +89,24 @@ func (c *Client) BuildIndex(ctx context.Context, l *Lock, o BuildOptions) (*Inde
 		if len(byPath) != len(lm.Files) {
 			return nil, refuse("the source has files the lock does not list")
 		}
-		// files the source names only by git id: their sha256 in the lock is
-		// checked by downloading them (they are the small ones) and verifying
-		// both hashes, so a lock cannot put a wrong sha256 under the signature
-		var gitOnly []LockFile
+		// every file into the builder's store, pinned to the lock: this
+		// verifies each one against the source (and the small git-id files
+		// against the lock's sha256, so a lock cannot put a wrong hash under
+		// the signature), and gives the bytes the torrent identity needs
+		pin := lm
+		pin.Include = sel.Include
+		if _, err := c.Pull(ctx, Request{Ref: ref, Selection: sel, Target: Target{Kind: "none"}, Pin: &pin}, nil); err != nil {
+			return nil, refuse("the locked files could not be confirmed at the source: %s", AsError(err).Msg)
+		}
+		entry := IndexModel{Ref: ref.String(), Commit: lm.Commit, License: p.License}
 		for _, lf := range lm.Files {
-			if byPath[lf.Path].SHA256 == "" || byPath[lf.Path].GitSHA1 != "" {
-				gitOnly = append(gitOnly, lf)
+			bt, err := NewBlobTorrent(c.store.BlobPath(lf.SHA256), lf.SHA256)
+			if err != nil {
+				return nil, refuse("%s: %v", lf.Path, err)
 			}
+			entry.Files = append(entry.Files, IndexFile{LockFile: lf, BTIH2: bt.Infohash})
 		}
-		if len(gitOnly) > 0 {
-			pin := lm
-			pin.Files, pin.Include = gitOnly, nil
-			gsel := Selection{AllowPickle: true}
-			for _, lf := range gitOnly {
-				pin.Include = append(pin.Include, GlobEscape(lf.Path))
-			}
-			gsel.Include = pin.Include
-			if _, err := c.Pull(ctx, Request{Ref: ref, Selection: gsel, Target: Target{Kind: "none"}, Pin: &pin}, nil); err != nil {
-				return nil, refuse("the locked sha256 of %d small files could not be confirmed: %s", len(gitOnly), AsError(err).Msg)
-			}
-		}
-		ix.Models = append(ix.Models, IndexModel{Ref: ref.String(), Commit: lm.Commit, License: p.License, Files: lm.Files})
+		ix.Models = append(ix.Models, entry)
 	}
 	if err := ix.validate(); err != nil {
 		return nil, newErr(ExitUsage, "index", "the index would not be valid").why("%s", err.Error())

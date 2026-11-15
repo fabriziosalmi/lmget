@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fabriziosalmi/lmget"
+	"github.com/fabriziosalmi/lmget/internal/p2p"
 )
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -24,6 +25,8 @@ func usage() int {
 	fmt.Fprint(os.Stderr, `usage:
   lmget-node mirror               fetch and verify the index, then mirror its models
   lmget-node serve [-listen ADDR] serve the index and its blobs (default 127.0.0.1:8080)
+  lmget-node seed [-port N] [-no-dht]
+                                  seed the mirrored blobs as BitTorrent v2 torrents
 
 The store is $LMGET_HOME; the index comes from $LMGET_INDEX_URL, verified with the
 built-in key or $LMGET_INDEX_KEY.
@@ -59,6 +62,34 @@ func run(args []string) int {
 			}
 		}
 		return code
+	case "seed":
+		fs := flag.NewFlagSet("seed", flag.ContinueOnError)
+		port := fs.Int("port", 0, "BitTorrent listen port (0: any free port)")
+		noDHT := fs.Bool("no-dht", false, "do not announce on the Mainline DHT")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		ix, err := c.Index()
+		if err != nil {
+			return fail(err)
+		}
+		dir, err := os.MkdirTemp("", "lmget-node-seed")
+		if err != nil {
+			return fail(err)
+		}
+		defer os.RemoveAll(dir)
+		s, err := p2p.New(p2p.Config{ListenPort: *port, NoDHT: *noDHT, DataDir: dir})
+		if err != nil {
+			return fail(err)
+		}
+		defer s.Close()
+		n, errs := p2p.SeedIndex(c.Store(), ix, s)
+		for _, e := range errs {
+			fmt.Fprintf(os.Stderr, "lmget-node: not seeded: %s\n", lmget.Printable(e.Error()))
+		}
+		fmt.Fprintf(os.Stderr, "lmget-node: seeding %d blobs on port %d\n", n, s.Client().LocalPort())
+		<-ctx.Done()
+		return 0
 	case "serve":
 		fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 		listen := fs.String("listen", "127.0.0.1:8080", "address to listen on (put a TLS reverse proxy in front)")

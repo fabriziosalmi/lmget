@@ -45,7 +45,7 @@ func (c *Client) MirrorIndex(ctx context.Context, emit func(Event)) ([]MirrorRes
 			for _, f := range m.Files {
 				sel.Include = append(sel.Include, GlobEscape(f.Path))
 			}
-			pin := LockModel{Ref: m.Ref, Commit: m.Commit, To: "none", License: m.License, Include: sel.Include, AllowPickle: true, Files: m.Files}
+			pin := LockModel{Ref: m.Ref, Commit: m.Commit, To: "none", License: m.License, Include: sel.Include, AllowPickle: true, Files: m.LockFiles()}
 			if _, err := c.Pull(ctx, Request{Ref: ref, Selection: sel, Target: Target{Kind: "none"}, Pin: &pin}, emit); err != nil {
 				r.Err = AsError(err).Error()
 			}

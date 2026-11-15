@@ -53,8 +53,10 @@ With a verified index in the store, the nodes are the last origin of a file: aft
 
 Two maintainer tools sit next to the CLI:
 
-- `lmget-index build -lock lmget.lock -sequence N -node https://...` writes the index from a lockfile. Every model is resolved again at its source: it must not be gated, the license the source declares must be on the allowlist (Apache-2.0, MIT, BSD, ISC, CC0, CC-BY-4.0, Unlicense), the source must publish exactly the locked files, and files the source names only by git id are downloaded to confirm their sha256. Sign the output with `minisign -S`.
-- `lmget-node mirror` mirrors the models of the index, pinned to its commits and files (a source that drifted from the index is refused); `lmget-node serve` serves the index and only the blobs it names, with ranges, behind a TLS reverse proxy.
+- `lmget-index build -lock lmget.lock -sequence N -node https://...` writes the index from a lockfile. Every model is resolved again at its source: it must not be gated, the license the source declares must be on the allowlist (Apache-2.0, MIT, BSD, ISC, CC0, CC-BY-4.0, Unlicense), and the source must publish exactly the locked files. The builder then downloads every file into its own store, pinned to the lock (so a lock cannot put a wrong sha256 under the signature), and computes each blob's torrent identity. Sign the output with `minisign -S`.
+- `lmget-node mirror` mirrors the models of the index, pinned to its commits and files (a source that drifted from the index is refused); `lmget-node serve` serves the index and only the blobs it names, with ranges, behind a TLS reverse proxy; `lmget-node seed` seeds the same blobs as BitTorrent v2 torrents and announces them on the Mainline DHT.
+
+Every blob is its own BitTorrent v2 torrent: its name and file are its sha256 and the piece length is fixed at 4 MiB, so its infohash depends only on its content. The index carries that infohash (`btih2`) for every file, so any BitTorrent v2 client can fetch a mirrored blob from the nodes and from other seeders. The `lmget` CLI itself does not include a torrent client: it downloads from the nodes over HTTP and stays small.
 
 ## Lockfile
 

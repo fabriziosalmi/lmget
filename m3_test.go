@@ -323,7 +323,10 @@ func TestMirrorSkipsLicensesOffTheAllowlist(t *testing.T) {
 	ix := sampleIndex(2)
 	ix.Nodes = []string{m.node.URL}
 	ix.Models[0].Ref, ix.Models[0].Commit, ix.Models[0].License = "hf:org/m", commit, "llama3"
-	ix.Models[0].Files = m.lock.Models[0].Files
+	ix.Models[0].Files = nil
+	for _, lf := range m.lock.Models[0].Files {
+		ix.Models[0].Files = append(ix.Models[0].Files, IndexFile{LockFile: lf})
+	}
 	publish(m.idx, m.signer, ix)
 	n := m.client(t, t.TempDir())
 	if _, err := n.UpdateIndex(context.Background()); err != nil {
@@ -335,5 +338,20 @@ func TestMirrorSkipsLicensesOffTheAllowlist(t *testing.T) {
 	}
 	if st := n.Stats(); st.Blobs != 0 {
 		t.Fatalf("%d blobs mirrored for a model off the allowlist", st.Blobs)
+	}
+}
+
+// the index carries the v2 infohash of every blob, as the node will seed it
+func TestBuiltIndexCarriesTorrentIdentities(t *testing.T) {
+	m := setupM3(t)
+	ix, err := m.nodeCli.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range ix.Models[0].Files {
+		bt, err := NewBlobTorrent(m.nodeCli.store.BlobPath(f.SHA256), f.SHA256)
+		if err != nil || f.BTIH2 != bt.Infohash {
+			t.Fatalf("%s: index btih2 %q, blob %v %v", f.Path, f.BTIH2, bt, err)
+		}
 	}
 }

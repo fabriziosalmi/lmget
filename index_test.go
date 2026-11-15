@@ -82,7 +82,7 @@ func sampleIndex(seq int64) Index {
 		Expires: time.Now().Add(30 * 24 * time.Hour).UTC().Truncate(time.Second),
 		Nodes:   []string{"https://node1.example.org"},
 		Models: []IndexModel{{Ref: "hf:org/m", Commit: strings.Repeat("a", 40), License: "apache-2.0",
-			Files: []LockFile{{Path: "model.safetensors", Size: 10, SHA256: strings.Repeat("b", 64)}}}}}
+			Files: []IndexFile{{LockFile: LockFile{Path: "model.safetensors", Size: 10, SHA256: strings.Repeat("b", 64)}}}}}}
 }
 
 // indexServer serves whatever index and signature the test sets.
@@ -177,6 +177,9 @@ func TestIndexRefusesWhatItShouldNot(t *testing.T) {
 	bad = sampleIndex(6)
 	bad.Models[0].Files[0].Path = "../../.bashrc"
 	expect("a path that leaves the model", bad, s.sign)
+	bad = sampleIndex(6)
+	bad.Models[0].Files[0].BTIH2 = "not-an-infohash"
+	expect("a malformed infohash", bad, s.sign)
 	bad = sampleIndex(6)
 	bad.Models[0].Ref = "https://example.org/x?token=1"
 	expect("a ref with a query string", bad, s.sign)
