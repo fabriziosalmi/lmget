@@ -2,3 +2,4 @@
 _internal/
 /bin/
 .DS_Store
+/.smoke/
