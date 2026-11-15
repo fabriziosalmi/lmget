@@ -47,10 +47,16 @@ func sha(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:
 
 func (f *fakeHF) handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/models/org/m/revision/main", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"id": "org/m", "sha": commit, "gated": false, "cardData": map[string]any{"license": "apache-2.0"}})
+	// every repository serves the same files: models share blobs, like real
+	// repos that ship the same tokenizer
+	mux.HandleFunc("GET /api/models/{org}/{name}/revision/{rev...}", func(w http.ResponseWriter, r *http.Request) {
+		if rev := r.PathValue("rev"); rev != "main" && rev != commit {
+			http.NotFound(w, r) // like HF: branches, tags and commits resolve, anything else 404
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"id": r.PathValue("org") + "/" + r.PathValue("name"), "sha": commit, "gated": false, "cardData": map[string]any{"license": "apache-2.0"}})
 	})
-	mux.HandleFunc("/api/models/org/m/tree/"+commit, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/models/{org}/{name}/tree/"+commit, func(w http.ResponseWriter, r *http.Request) {
 		var entries []map[string]any
 		if f.tree != nil {
 			entries = f.tree()
@@ -72,8 +78,9 @@ func (f *fakeHF) handler() http.Handler {
 		}
 		json.NewEncoder(w).Encode(entries[page : page+1])
 	})
-	mux.HandleFunc("/org/m/resolve/"+commit+"/", func(w http.ResponseWriter, r *http.Request) {
-		p := strings.TrimPrefix(r.URL.Path, "/org/m/resolve/"+commit+"/")
+	files := http.NewServeMux()
+	files.HandleFunc("GET /{org}/{name}/resolve/"+commit+"/{path...}", func(w http.ResponseWriter, r *http.Request) {
+		p := r.PathValue("path")
 		for _, ff := range f.files {
 			if ff.path == p {
 				data := ff.data
@@ -87,7 +94,13 @@ func (f *fakeHF) handler() http.Handler {
 		}
 		http.NotFound(w, r)
 	})
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			mux.ServeHTTP(w, r)
+		} else {
+			files.ServeHTTP(w, r)
+		}
+	})
 }
 
 type countingWriter struct {
@@ -338,5 +351,32 @@ func TestErrorsMapToExitCodes(t *testing.T) {
 	}
 	if !errors.Is(AsError(context.Canceled), context.Canceled) && AsError(context.Canceled).Code != ExitInterrupted {
 		t.Error("context.Canceled must map to interrupted")
+	}
+}
+
+// Identical bytes already in the target directory are accepted, different
+// bytes are not overwritten.
+func TestExportDirAcceptsIdenticalFilesOnly(t *testing.T) {
+	f := &fakeHF{files: modelFiles()}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	dir := t.TempDir()
+	req := Request{Ref: Ref{"hf", "org/m", "main"}, Target: Target{Kind: "dir", Path: dir}}
+	if _, err := newTestClient(t, srv, t.TempDir()).Pull(context.Background(), req, nil); err != nil {
+		t.Fatal(err)
+	}
+	// a second, empty store exporting into the same directory
+	if _, err := newTestClient(t, srv, t.TempDir()).Pull(context.Background(), req, nil); err != nil {
+		t.Fatalf("identical files rejected: %v", err)
+	}
+	p := filepath.Join(dir, "config.json")
+	os.Remove(p)
+	os.WriteFile(p, []byte(`{"a":2}`), 0o644) // same size, other bytes
+	_, err := newTestClient(t, srv, t.TempDir()).Pull(context.Background(), req, nil)
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("different bytes were accepted or overwritten: %v", err)
+	}
+	if b, _ := os.ReadFile(p); string(b) != `{"a":2}` {
+		t.Fatal("user file was overwritten")
 	}
 }

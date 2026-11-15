@@ -127,6 +127,32 @@ func (p *Plan) apply(sel Selection, st *Store, storeRoot string) error {
 	return nil
 }
 
+// recount refreshes Cached, Bytes, ToFetch, Pickle and DiskFree after the
+// file list or hashes changed.
+func (p *Plan) recount(st *Store) {
+	all := make(map[string]bool, len(p.Files))
+	for _, f := range p.Files {
+		all[f.Path] = true
+	}
+	p.Bytes, p.ToFetch, p.Pickle = 0, 0, nil
+	for i := range p.Files {
+		f := &p.Files[i]
+		f.Cached = f.SHA256 != "" && st.Has(f.SHA256, f.Size)
+		if !f.Selected() {
+			continue
+		}
+		p.Bytes += f.Size
+		if !f.Cached {
+			p.ToFetch += f.Size
+		}
+		if isPickle(f.Path, all) {
+			p.Pickle = append(p.Pickle, f.Path)
+		}
+	}
+	sort.SliceStable(p.Files, func(i, j int) bool { return p.Files[i].Path < p.Files[j].Path })
+	p.DiskFree = diskFree(st.Root())
+}
+
 // Selected returns the files that will be fetched or exported.
 func (p *Plan) Selected() []File {
 	var out []File

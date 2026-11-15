@@ -3,9 +3,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/signal"
+	"reflect"
 	"strings"
 	"syscall"
 
@@ -26,6 +29,10 @@ type flags struct {
 	json        bool
 	plain       bool
 	conns       int
+	lock        bool
+	lockfile    string
+	update      bool
+	verify      bool
 }
 
 func main() { os.Exit(int(run())) }
@@ -47,6 +54,8 @@ func run() lmget.ExitCode {
 		Example: "  lmget Qwen/Qwen3-0.6B\n" +
 			"  lmget Qwen/Qwen3-0.6B@main --to dir:./models/qwen3\n" +
 			"  lmget info unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\n" +
+			"  lmget Qwen/Qwen3-0.6B --lock          # record it in ./lmget.lock\n" +
+			"  lmget sync                            # reproduce ./lmget.lock exactly\n" +
 			"  lmget Qwen/Qwen3-0.6B --json | jq -c 'select(.type==\"file_done\")'",
 		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
@@ -71,6 +80,39 @@ func run() lmget.ExitCode {
 		Args:  cobra.ExactArgs(1),
 		RunE:  func(cmd *cobra.Command, args []string) error { return pull(args[0], true) },
 	}
+	sync := &cobra.Command{
+		Use:   "sync [model...]",
+		Short: "Reproduce lmget.lock: the pinned commits, verified against the locked sha256",
+		Long: "sync downloads what lmget.lock pins, at the locked commit, and checks every file\n" +
+			"against the sha256 in the lock. When everything is already in the store it does not\n" +
+			"use the network. With --update it resolves each revision again and rewrites the lock.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			code = doSync(f, args)
+			return nil
+		},
+	}
+	ls := &cobra.Command{
+		Use:   "ls",
+		Short: "List the models in the store, their size and where they are exported",
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, args []string) error { code = doLs(f); return nil },
+	}
+	rm := &cobra.Command{
+		Use:   "rm <model>",
+		Short: "Remove a model: its export links, then every blob no other model uses",
+		Long: "rm removes the links lmget created for the model (only while they still point at\n" +
+			"lmget's data), forgets the model, and deletes the blobs no other model references.\n" +
+			"<model>@<commit> removes one commit; without it, every stored commit of the repository.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error { code = doRm(f, args[0]); return nil },
+	}
+	doctor := &cobra.Command{
+		Use:   "doctor",
+		Short: "Check the store, the export targets, the network and the token",
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, args []string) error { code = doDoctor(f); return nil },
+	}
+	doctor.Flags().BoolVar(&f.verify, "verify", false, "re-hash every blob; corrupt ones are moved to quarantine")
 	for _, c := range []*cobra.Command{root, get, info} {
 		fs := c.Flags()
 		fs.StringSliceVar(&f.include, "include", nil, "only files matching these globs (path or file name)")
@@ -79,12 +121,17 @@ func run() lmget.ExitCode {
 		if c != info {
 			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, dir:PATH, none")
 			fs.BoolVar(&f.dryRun, "dry-run", false, "stop after the plan")
-			fs.IntVar(&f.conns, "conns", 8, "parallel connections per file")
+			fs.BoolVar(&f.lock, "lock", false, "record the result in the lockfile, creating it if needed")
 		}
 	}
+	for _, c := range []*cobra.Command{root, get, sync} {
+		c.Flags().IntVar(&f.conns, "conns", 8, "parallel connections per file")
+	}
+	sync.Flags().BoolVar(&f.update, "update", false, "resolve revisions again and rewrite the lock")
 	root.PersistentFlags().BoolVar(&f.json, "json", false, "emit one JSON event per line (schema v1)")
 	root.PersistentFlags().BoolVar(&f.plain, "plain", false, "plain log lines even on a terminal")
-	root.AddCommand(get, info)
+	root.PersistentFlags().StringVar(&f.lockfile, "lockfile", lmget.DefaultLockName, "lockfile path")
+	root.AddCommand(get, info, sync, ls, rm, doctor)
 	root.SetVersionTemplate("lmget {{.Version}}\n")
 
 	if err := root.Execute(); err != nil {
@@ -96,46 +143,182 @@ func run() lmget.ExitCode {
 	return code
 }
 
-func doPull(f flags, arg string, dry bool) lmget.ExitCode {
-	mode := ui.ModePlain
+func outputMode(f flags) ui.Mode {
 	switch {
 	case f.json:
-		mode = ui.ModeJSON
+		return ui.ModeJSON
 	case !f.plain && os.Getenv("TERM") != "dumb" &&
 		term.IsTerminal(int(os.Stdout.Fd())) && term.IsTerminal(int(os.Stderr.Fd())):
-		mode = ui.ModeTTY
+		return ui.ModeTTY
 	}
-	fail := func(err error) lmget.ExitCode {
-		e := lmget.AsError(err)
-		if mode == ui.ModeJSON {
-			fmt.Fprintf(os.Stdout, `{"v":%d,"type":"error","error":{"code":%d,"kind":%q,"message":%q}}`+"\n",
-				lmget.SchemaVersion, e.Code, e.Kind, e.Msg)
-		} else {
-			printErr(e)
-		}
-		return e.Code
+	return ui.ModePlain
+}
+
+func fail(mode ui.Mode, err error) lmget.ExitCode {
+	e := lmget.AsError(err)
+	if mode == ui.ModeJSON {
+		fmt.Fprintf(os.Stdout, `{"v":%d,"type":"error","error":{"code":%d,"kind":%q,"message":%q}}`+"\n",
+			lmget.SchemaVersion, e.Code, e.Kind, e.Msg)
+	} else {
+		printErr(e)
 	}
+	return e.Code
+}
+
+func doPull(f flags, arg string, dry bool) lmget.ExitCode {
+	mode := outputMode(f)
 	ref, err := lmget.ParseRef(arg)
 	if err != nil {
-		return fail(err)
+		return fail(mode, err)
 	}
 	target, err := lmget.ParseTarget(f.to)
 	if err != nil {
-		return fail(err)
+		return fail(mode, err)
 	}
 	c, err := lmget.New(lmget.Options{Conns: f.conns})
 	if err != nil {
-		return fail(err)
+		return fail(mode, err)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	req := lmget.Request{
-		Ref:       ref,
-		Selection: lmget.Selection{Include: f.include, Exclude: f.exclude, AllowPickle: f.allowPickle},
-		Target:    target,
-		DryRun:    dry,
+	sel := lmget.Selection{Include: f.include, Exclude: f.exclude, AllowPickle: f.allowPickle}
+	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry}
+	opts := ui.Opts{Resume: resumeCmd()}
+	// lmget keeps an existing lockfile current, like go get with go.mod.
+	if _, statErr := os.Stat(f.lockfile); f.lock || statErr == nil {
+		opts.After = func(o *lmget.Outcome) (string, error) {
+			l, err := lmget.ReadLock(f.lockfile)
+			if errors.Is(err, fs.ErrNotExist) {
+				l, err = lmget.NewLock(f.lockfile), nil
+			}
+			if err != nil {
+				return "", err
+			}
+			if err := l.Upsert(o.Plan, sel, target); err != nil {
+				return "", err
+			}
+			return f.lockfile, l.Write()
+		}
 	}
-	return ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, resumeCmd())
+	_, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts)
+	return code
+}
+
+func doSync(f flags, args []string) lmget.ExitCode {
+	mode := outputMode(f)
+	l, err := lmget.ReadLock(f.lockfile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: "no " + f.lockfile + " here",
+			Fixes: []lmget.Fix{{Cmd: "lmget get <model> --lock", Note: "creates it"}}})
+	}
+	if err != nil {
+		return fail(mode, err)
+	}
+	var models []*lmget.LockModel
+	if len(args) == 0 {
+		for i := range l.Models {
+			models = append(models, &l.Models[i])
+		}
+	}
+	for _, a := range args {
+		ref, err := lmget.ParseRef(a)
+		if err != nil {
+			return fail(mode, err)
+		}
+		m := l.Find(ref)
+		if m == nil {
+			return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: ref.Display() + " is not in " + f.lockfile,
+				Fixes: []lmget.Fix{{Cmd: "lmget get " + ref.Display() + " --lock", Note: "adds it"}}})
+		}
+		models = append(models, m)
+	}
+	if len(models) == 0 {
+		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: f.lockfile + " lists no models"})
+	}
+	c, err := lmget.New(lmget.Options{Conns: f.conns})
+	if err != nil {
+		return fail(mode, err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if mode == ui.ModeTTY {
+		verb := "sync"
+		if f.update {
+			verb = "update"
+		}
+		lipgloss.Fprintf(os.Stderr, "\n  %s %s  %s\n", sBold.Render(verb), f.lockfile, sDim.Render(fmt.Sprintf("%d models", len(models))))
+	}
+	for _, m := range models {
+		req, err := l.Request(m, f.update)
+		if err != nil {
+			return fail(mode, err)
+		}
+		before := *m
+		opts := ui.Opts{Resume: resumeCmd(), After: func(o *lmget.Outcome) (string, error) {
+			if err := l.Upsert(o.Plan, req.Selection, req.Target); err != nil {
+				return "", err
+			}
+			if after := l.Find(req.Ref); after != nil && reflect.DeepEqual(*after, before) {
+				return "", nil // unchanged: do not rewrite the file
+			}
+			return f.lockfile, l.Write()
+		}}
+		if _, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts); code != lmget.ExitOK {
+			return code
+		}
+	}
+	return lmget.ExitOK
+}
+
+func doLs(f flags) lmget.ExitCode {
+	mode := outputMode(f)
+	c, err := lmget.New(lmget.Options{})
+	if err != nil {
+		return fail(mode, err)
+	}
+	models, err := c.List()
+	if err != nil {
+		return fail(mode, err)
+	}
+	ui.List(mode, os.Stdout, models, c.Stats())
+	return lmget.ExitOK
+}
+
+func doRm(f flags, arg string) lmget.ExitCode {
+	mode := outputMode(f)
+	ref, err := lmget.ParseRef(arg)
+	if err != nil {
+		return fail(mode, err)
+	}
+	c, err := lmget.New(lmget.Options{})
+	if err != nil {
+		return fail(mode, err)
+	}
+	res, err := c.Remove(ref)
+	if err != nil {
+		return fail(mode, err)
+	}
+	note := ""
+	if l, err := lmget.ReadLock(f.lockfile); err == nil {
+		for _, m := range l.Models {
+			if r, err := lmget.ParseRef(m.Ref); err == nil && strings.EqualFold(r.Repo, ref.Repo) {
+				note = "still listed in " + f.lockfile + ": lmget sync will download it again"
+			}
+		}
+	}
+	ui.Removed(mode, os.Stdout, res, note)
+	return lmget.ExitOK
+}
+
+func doDoctor(f flags) lmget.ExitCode {
+	mode := outputMode(f)
+	c, err := lmget.New(lmget.Options{})
+	if err != nil {
+		return fail(mode, err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return ui.Doctor(mode, os.Stdout, c.Doctor(ctx, lmget.DoctorOptions{Verify: f.verify, LockPath: f.lockfile}))
 }
 
 func resumeCmd() string {

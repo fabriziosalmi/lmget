@@ -202,7 +202,7 @@ func renderError(e *lmget.Error) string {
 	return b.String()
 }
 
-func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot string) string {
+func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot, lock string) string {
 	var b strings.Builder
 	sel := o.Plan.Selected()
 	what := fmt.Sprintf("%d/%d verified", len(sel), len(sel))
@@ -219,6 +219,9 @@ func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot string) string {
 		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("dir"), tilde(o.Path))
 	default:
 		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("store"), tilde(storeRoot))
+	}
+	if lock != "" {
+		fmt.Fprintf(&b, "    %s%s %s\n", sLabel.Render("lock"), tilde(lock), sDim.Render("updated"))
 	}
 	return b.String()
 }

@@ -32,9 +32,10 @@ type Options struct {
 }
 
 type Client struct {
-	opt   Options
-	store *Store
-	http  *http.Client
+	opt         Options
+	store       *Store
+	http        *http.Client
+	tokenSource string // where the token came from; never the token itself
 }
 
 func New(o Options) (*Client, error) {
@@ -55,8 +56,9 @@ func New(o Options) (*Client, error) {
 		o.HFEndpoint = "https://huggingface.co"
 	}
 	o.HFEndpoint = strings.TrimRight(o.HFEndpoint, "/")
+	tokenSource := "option"
 	if o.HFToken == "" {
-		o.HFToken = hfToken()
+		o.HFToken, tokenSource = hfToken()
 	}
 	if o.Conns <= 0 {
 		o.Conns = 8
@@ -83,16 +85,17 @@ func New(o Options) (*Client, error) {
 	if err != nil {
 		return nil, newErr(ExitDisk, "disk", "cannot open the store at "+o.Home).wrap(err)
 	}
-	return &Client{opt: o, store: st, http: hc}, nil
+	return &Client{opt: o, store: st, http: hc, tokenSource: tokenSource}, nil
 }
 
 func (c *Client) Store() *Store { return c.store }
 
 // hfToken follows huggingface_hub: $HF_TOKEN, $HF_TOKEN_PATH, $HF_HOME/token,
-// ~/.cache/huggingface/token. The value is never logged or printed.
-func hfToken() string {
+// ~/.cache/huggingface/token. It returns the token and where it was found.
+// The value is never logged or printed.
+func hfToken() (string, string) {
 	if t := strings.TrimSpace(os.Getenv("HF_TOKEN")); t != "" {
-		return t
+		return t, "HF_TOKEN"
 	}
 	var paths []string
 	if p := os.Getenv("HF_TOKEN_PATH"); p != "" {
@@ -107,11 +110,11 @@ func hfToken() string {
 	for _, p := range paths {
 		if b, err := os.ReadFile(p); err == nil {
 			if t := strings.TrimSpace(string(b)); t != "" {
-				return t
+				return t, p
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 	}
-	return ""
+	return "", ""
 }

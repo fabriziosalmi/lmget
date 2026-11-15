@@ -25,6 +25,27 @@ What happens on every run:
 - **Content-addressed.** Files are stored once by sha256 in `~/.lmget` (or `$LMGET_HOME`) and hardlinked into the target, so nothing is copied twice.
 - **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.ckpt`, ...) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory are refused.
 
+## Lockfile
+
+```sh
+lmget Qwen/Qwen3-0.6B --lock     # creates ./lmget.lock, or adds the model to it
+lmget sync                       # reproduce it: same commits, every file checked against the locked sha256
+lmget sync --update              # resolve the revisions again and rewrite the lock
+```
+
+`lmget.lock` pins each model to a commit and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
+
+## Managing the store
+
+```sh
+lmget ls                         # models, sizes, where they are exported
+lmget rm Qwen/Qwen3-0.6B         # remove it and free the blobs no other model uses
+lmget doctor                     # store, export targets, network, token, lockfile
+lmget doctor --verify            # also re-hash every blob in the store
+```
+
+`rm` removes only the links lmget created that still point at its data; files the user replaced, and downloads made by other tools, are left in place. The space reported as freed is measured from the blobs' link counts, so space still held by other hard links is reported separately. `doctor --verify` moves a corrupt blob to `quarantine/` in the store, together with lmget's hard links to it, so the next `get` or `sync` downloads it again. `doctor` never prints the token, only where it was found.
+
 Private and gated models use `HF_TOKEN` or the token saved by `huggingface-cli login`. `HF_ENDPOINT` selects a mirror. The token is sent only to the configured endpoint.
 
 ## Output for scripts and integrations
@@ -46,14 +67,17 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | `file_done` | `file`, `sha256`, `total`, `cached` |
 | `export` | `target`, `path` |
 | `done` | `total`, `fetched`, `elapsed_s`, `path` |
+| `lock` | `path` of the lockfile written after the pull |
 | `error` | `error`: `code`, `kind`, `message`, `why`, `fixes[]` (`cmd`, `note`) |
+
+`sync --json` emits the same events once per model. `ls`, `rm` and `doctor` with `--json` write a single object with `v`, `type` (`list`, `removed`, `doctor`) and `models` plus `store`, `result`, or `checks`.
 
 ## Exit codes
 
 | code | meaning |
 |---|---|
 | 0 | success |
-| 1 | other failure |
+| 1 | other failure; for `doctor`, at least one check failed |
 | 2 | bad reference, flag or unsupported source |
 | 3 | repository, revision or file not found |
 | 4 | private or gated: token missing or not granted |

@@ -1,7 +1,10 @@
 package lmget
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,12 +58,24 @@ func HFCacheDir() string {
 // Export links the selected, verified files of plan into the target and
 // returns the directory that holds them.
 func (c *Client) Export(plan *Plan, t Target) (string, error) {
+	p, links, err := c.export(plan, t)
+	if err != nil {
+		return "", err
+	}
+	if err := c.store.saveManifest(plan, &ExportRecord{Kind: t.Kind, Path: p, Links: links}); err != nil {
+		return "", diskErr(err)
+	}
+	return p, nil
+}
+
+// export returns the target directory and the links it created in this call.
+func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 	for _, f := range plan.Selected() {
 		if !hex64.MatchString(f.SHA256) || !c.store.Has(f.SHA256, f.Size) {
-			return "", newErr(ExitFailure, "export", f.Path+" is not in the store")
+			return "", nil, newErr(ExitFailure, "export", f.Path+" is not in the store")
 		}
 		if !isLocalSlash(f.Path) {
-			return "", newErr(ExitFailure, "export", "unsafe path "+quote(f.Path))
+			return "", nil, newErr(ExitFailure, "export", "unsafe path "+quote(f.Path))
 		}
 	}
 	switch t.Kind {
@@ -69,10 +84,11 @@ func (c *Client) Export(plan *Plan, t Target) (string, error) {
 	case "dir":
 		return c.exportDir(plan, t.Path)
 	}
-	return "", nil
+	return "", nil, nil
 }
 
-func (c *Client) exportHF(plan *Plan) (string, error) {
+func (c *Client) exportHF(plan *Plan) (string, []string, error) {
+	var links []string
 	repoDir := filepath.Join(HFCacheDir(), "models--"+strings.ReplaceAll(plan.Ref.Repo, "/", "--"))
 	snap := filepath.Join(repoDir, "snapshots", plan.Commit)
 	for _, f := range plan.Selected() {
@@ -82,42 +98,45 @@ func (c *Client) exportHF(plan *Plan) (string, error) {
 		}
 		blob := filepath.Join(repoDir, "blobs", etag)
 		if err := os.MkdirAll(filepath.Dir(blob), 0o755); err != nil {
-			return "", diskErr(err)
+			return "", nil, diskErr(err)
 		}
 		if fi, err := os.Stat(blob); err != nil || fi.Size() != f.Size {
 			os.Remove(blob)
 			if err := linkOrSymlink(c.store.BlobPath(f.SHA256), blob); err != nil {
-				return "", diskErr(err)
+				return "", nil, diskErr(err)
 			}
+			links = append(links, blob)
 		}
 		dst := filepath.Join(snap, filepath.FromSlash(f.Path))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return "", diskErr(err)
+			return "", nil, diskErr(err)
 		}
 		rel, err := filepath.Rel(filepath.Dir(dst), blob)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		if cur, err := os.Readlink(dst); err != nil || cur != rel {
 			os.Remove(dst)
 			if err := os.Symlink(rel, dst); err != nil {
-				return "", diskErr(err)
+				return "", nil, diskErr(err)
 			}
+			links = append(links, dst)
 		}
 	}
 	if plan.Ref.Revision != plan.Commit {
 		ref := filepath.Join(repoDir, "refs", filepath.FromSlash(plan.Ref.Revision))
 		if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
-			return "", diskErr(err)
+			return "", nil, diskErr(err)
 		}
 		if err := writeFileAtomic(ref, []byte(plan.Commit)); err != nil {
-			return "", diskErr(err)
+			return "", nil, diskErr(err)
 		}
 	}
-	return snap, nil
+	return snap, links, nil
 }
 
-func (c *Client) exportDir(plan *Plan, root string) (string, error) {
+func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
+	var links []string
 	for _, f := range plan.Selected() {
 		dst := filepath.Join(root, filepath.FromSlash(f.Path))
 		src := c.store.BlobPath(f.SHA256)
@@ -125,18 +144,40 @@ func (c *Client) exportDir(plan *Plan, root string) (string, error) {
 			continue
 		}
 		if _, err := os.Lstat(dst); err == nil {
-			return "", newErr(ExitFailure, "export", dst+" already exists").
+			if hasContent(dst, f.Size, f.SHA256) {
+				continue // identical bytes already there (e.g. from another store): leave them
+			}
+			return "", nil, newErr(ExitFailure, "export", dst+" already exists").
 				why("lmget does not overwrite files it did not create").
 				fix("", "remove it, or export to another directory")
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return "", diskErr(err)
+			return "", nil, diskErr(err)
 		}
 		if err := linkOrSymlink(src, dst); err != nil {
-			return "", diskErr(err)
+			return "", nil, diskErr(err)
 		}
+		links = append(links, dst)
 	}
-	return root, nil
+	return root, links, nil
+}
+
+// hasContent reports whether path is a regular file with exactly these bytes.
+func hasContent(path string, size int64, sum string) bool {
+	fi, err := os.Stat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() != size {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return false
+	}
+	return hex.EncodeToString(h.Sum(nil)) == sum
 }
 
 func same(a, b string) bool {

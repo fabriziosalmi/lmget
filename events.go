@@ -16,6 +16,7 @@ const (
 	EvFileDone  EventType = "file_done"  // File, SHA256, Cached
 	EvExport    EventType = "export"     // Path written for Target
 	EvDone      EventType = "done"       // Bytes fetched from the network, Elapsed
+	EvLock      EventType = "lock"       // Path of the lockfile written after the pull
 	EvError     EventType = "error"      // Error, then the process exits with Error.Code
 )
 

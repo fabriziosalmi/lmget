@@ -17,7 +17,8 @@ type Request struct {
 	Ref       Ref
 	Selection Selection
 	Target    Target
-	DryRun    bool // stop after the plan
+	DryRun    bool       // stop after the plan
+	Pin       *LockModel // reproduce this locked entry: its commit, files and hashes
 }
 
 // Outcome is the result of a successful pull.
@@ -38,7 +39,13 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	e := ev(EvResolve)
 	e.Ref = &r.Ref
 	emit(e)
-	plan, err := c.Resolve(ctx, r.Ref, r.Selection)
+	var plan *Plan
+	var err error
+	if r.Pin != nil {
+		plan, err = c.resolvePinned(ctx, r)
+	} else {
+		plan, err = c.Resolve(ctx, r.Ref, r.Selection)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +84,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			return nil, err
 		}
 	}
-	if err := c.store.saveRef(plan); err != nil {
+	if err := c.store.saveManifest(plan, nil); err != nil {
 		return nil, diskErr(err)
 	}
 	if r.Target.Kind != "" && r.Target.Kind != "none" {

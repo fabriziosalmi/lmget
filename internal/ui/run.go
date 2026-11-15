@@ -23,16 +23,41 @@ const (
 	ModeJSON
 )
 
-// Run executes a pull and renders it. It returns the process exit code.
-// resume is the command line to suggest after an interruption.
-func Run(ctx context.Context, mode Mode, c *lmget.Client, req lmget.Request, stdout, stderr io.Writer, resume string) lmget.ExitCode {
+// Opts are the CLI-side hooks of a run.
+type Opts struct {
+	Resume string // command line suggested after an interruption
+	// After runs once the pull succeeded and before the summary is shown;
+	// it returns the path of a lockfile it wrote, if any.
+	After func(*lmget.Outcome) (string, error)
+}
+
+// Run executes a pull and renders it. It returns the outcome (nil on error)
+// and the process exit code.
+func Run(ctx context.Context, mode Mode, c *lmget.Client, req lmget.Request, stdout, stderr io.Writer, o Opts) (*lmget.Outcome, lmget.ExitCode) {
 	switch mode {
 	case ModeJSON:
-		return runJSON(ctx, c, req, stdout)
+		return runJSON(ctx, c, req, stdout, o)
 	case ModePlain:
-		return runPlain(ctx, c, req, stdout, stderr, resume)
+		return runPlain(ctx, c, req, stdout, stderr, o)
 	}
-	return runTTY(ctx, c, req, stdout, resume)
+	return runTTY(ctx, c, req, stdout, o)
+}
+
+// pull runs the request and the After hook.
+func pull(ctx context.Context, c *lmget.Client, req lmget.Request, o Opts, emit func(lmget.Event)) (*lmget.Outcome, string, error) {
+	out, err := c.Pull(ctx, req, emit)
+	if err != nil || req.DryRun || o.After == nil {
+		return out, "", err
+	}
+	lock, err := o.After(out)
+	if err != nil {
+		return nil, "", err
+	}
+	if lock != "" {
+		e := lmget.Event{V: lmget.SchemaVersion, Type: lmget.EvLock, Time: time.Now().UTC(), Path: lock}
+		emit(e)
+	}
+	return out, lock, nil
 }
 
 func withResume(e *lmget.Error, resume string) *lmget.Error {
@@ -44,7 +69,7 @@ func withResume(e *lmget.Error, resume string) *lmget.Error {
 
 // ---------------------------------------------------------------- json
 
-func runJSON(ctx context.Context, c *lmget.Client, req lmget.Request, w io.Writer) lmget.ExitCode {
+func runJSON(ctx context.Context, c *lmget.Client, req lmget.Request, w io.Writer, o Opts) (*lmget.Outcome, lmget.ExitCode) {
 	var mu sync.Mutex
 	enc := json.NewEncoder(w)
 	last := map[string]time.Time{}
@@ -59,19 +84,20 @@ func runJSON(ctx context.Context, c *lmget.Client, req lmget.Request, w io.Write
 		}
 		enc.Encode(e)
 	}
-	if _, err := c.Pull(ctx, req, emit); err != nil {
+	out, _, err := pull(ctx, c, req, o, emit)
+	if err != nil {
 		le := lmget.AsError(err)
 		emit(lmget.Event{V: lmget.SchemaVersion, Type: lmget.EvError, Time: time.Now().UTC(), Error: le})
-		return le.Code
+		return nil, le.Code
 	}
-	return lmget.ExitOK
+	return out, lmget.ExitOK
 }
 
 // ---------------------------------------------------------------- plain
 
 // runPlain writes stable log lines to stderr and the result path to stdout,
 // so `dir=$(lmget Org/Name)` works in scripts.
-func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, stderr io.Writer, resume string) lmget.ExitCode {
+func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, stderr io.Writer, o Opts) (*lmget.Outcome, lmget.ExitCode) {
 	logf := func(format string, a ...any) { fmt.Fprintf(stderr, "lmget: "+format+"\n", a...) }
 	nextPct := map[string]int64{}
 	t0 := time.Now()
@@ -128,11 +154,13 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 			logf("export %s %s", e.Target, e.Path)
 		case lmget.EvDone:
 			logf("done bytes=%d fetched=%d elapsed=%.1fs", e.Total, e.Fetched, e.Elapsed)
+		case lmget.EvLock:
+			logf("lock %s", e.Path)
 		}
 	}
-	out, err := c.Pull(ctx, req, emit)
+	out, _, err := pull(ctx, c, req, o, emit)
 	if err != nil {
-		le := withResume(lmget.AsError(err), resume)
+		le := withResume(lmget.AsError(err), o.Resume)
 		logf("error: %s", le.Msg)
 		if le.Why != "" {
 			logf("  %s", le.Why)
@@ -140,12 +168,12 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 		for _, f := range le.Fixes {
 			logf("  fix: %s", strings.TrimSpace(f.Cmd+"  "+f.Note))
 		}
-		return le.Code
+		return nil, le.Code
 	}
 	if out.Path != "" {
 		fmt.Fprintln(stdout, out.Path)
 	}
-	return lmget.ExitOK
+	return out, lmget.ExitOK
 }
 
 func orNone(s string) string {
@@ -159,8 +187,9 @@ func orNone(s string) string {
 
 type eventMsg lmget.Event
 type finishedMsg struct {
-	out *lmget.Outcome
-	err error
+	out  *lmget.Outcome
+	lock string
+	err  error
 }
 type tickMsg time.Time
 
@@ -185,6 +214,7 @@ type model struct {
 	code    lmget.ExitCode
 	pending []string // lines to print above the live view, flushed on tick only
 	nameW   int      // column width for file names, from the plan
+	out     *lmget.Outcome
 }
 
 // flush prints queued lines. All printing goes through here, from Update, so
@@ -273,7 +303,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.req.DryRun:
 			m.pending = append(m.pending, strings.TrimRight(renderPlan(msg.out.Plan, m.width, true), "\n")+"\n")
 		default:
-			m.pending = append(m.pending, strings.TrimRight(renderSummary(msg.out, m.req.Target, m.store), "\n")+"\n")
+			m.out = msg.out
+			m.pending = append(m.pending, strings.TrimRight(renderSummary(msg.out, m.req.Target, m.store, msg.lock), "\n")+"\n")
 		}
 	}
 	return m, nil
@@ -316,18 +347,18 @@ func (m *model) View() tea.View {
 	return tea.NewView(b.String())
 }
 
-func runTTY(ctx context.Context, c *lmget.Client, req lmget.Request, out io.Writer, resume string) lmget.ExitCode {
+func runTTY(ctx context.Context, c *lmget.Client, req lmget.Request, out io.Writer, o Opts) (*lmget.Outcome, lmget.ExitCode) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	m := &model{req: req, store: c.Store().Root(), cancel: cancel, resume: resume}
+	m := &model{req: req, store: c.Store().Root(), cancel: cancel, resume: o.Resume}
 	p := tea.NewProgram(m, tea.WithOutput(out), tea.WithContext(context.Background()))
 	go func() {
-		o, err := c.Pull(ctx, req, func(e lmget.Event) { p.Send(eventMsg(e)) })
-		p.Send(finishedMsg{out: o, err: err})
+		res, lock, err := pull(ctx, c, req, o, func(e lmget.Event) { p.Send(eventMsg(e)) })
+		p.Send(finishedMsg{out: res, lock: lock, err: err})
 	}()
 	if _, err := p.Run(); err != nil {
 		cancel()
-		return lmget.ExitFailure
+		return nil, lmget.ExitFailure
 	}
-	return m.code
+	return m.out, m.code
 }
