@@ -26,8 +26,8 @@ What happens on every run:
 - **Verified.** Large files are checked against their sha256 (Git LFS); small files against their git blob id, and their sha256 is recorded. A mismatch discards the partial file and exits with code 5.
 - **Resumable.** Interrupt at any time; the same command resumes from the last completed chunk.
 - **Content-addressed.** Files are stored once by sha256 in `~/.lmget` (or `$LMGET_HOME`) and hardlinked into the target, so nothing is copied twice.
-- **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle (any protocol, or the zip `torch.save` writes) is refused unless its name says so. Refused files exit with code 5.
-- **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.ckpt`, ...) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory are refused.
+- **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle is refused unless its name says so. Pickles are detected by walking their opcodes (protocols 0 to 5); a zip with a `.pkl` entry, as `torch.save` writes, counts as one, and so does a zip lmget cannot read. Refused files exit with code 5.
+- **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.ckpt`, ...) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory, that contain control characters, or that contain invisible code points (which some filesystems drop, so two names could land on one file) are refused. Sizes above 16 TiB are refused.
 
 ## Lockfile
 
@@ -41,9 +41,10 @@ lmget sync --update              # resolve the revisions again and rewrite the l
 
 A lockfile usually arrives with a cloned repository, so lmget treats it as untrusted input:
 
-- `sync` works offline only for files whose path and sha256 an earlier pull already checked against the source; a lock cannot re-label bytes in the store as another model.
-- `dir:` targets must stay inside the lockfile's directory, every exported file is checked again with symlinks resolved, and nothing is ever written through a `.git` directory.
-- A URL entry is bound to its own URL, and lmget only reads and writes a lockfile that is a regular file, not a symlink.
+- `sync` works offline only for files whose path and sha256 an earlier pull already checked against the source, and only with the git blob id that pull recorded for them; a lock cannot re-label bytes in the store as another model, nor name another blob of the Hugging Face cache.
+- `dir:` targets must stay inside the lockfile's directory, every exported file is checked again with symlinks resolved, and nothing is ever written through a `.git` directory, nor through a name that a filesystem folds onto `.git` (such as `.git` with a zero-width character inside).
+- A URL entry is bound to its own URL. A blob in the store stands for that URL only after a download from it verified that binding; otherwise `sync` downloads it again and checks it against the lock. Refs in a lock carry no `#sha256=` fragment or file path (the expected hash belongs in the file entry), and a lock that has one is refused.
+- lmget only reads and writes a lockfile that is a regular file, not a symlink.
 - A lock may list https URLs, and `sync` downloads from them: review the lock of a repository you did not write, as you would review its code.
 
 ## Managing the store
@@ -59,9 +60,9 @@ lmget doctor --verify            # also re-hash every blob in the store
 
 ## Direct URLs
 
-Only https is accepted, and URLs with credentials (`user:pass@`) are refused. The expected sha256 comes from, in order: a `#sha256=` fragment you add, a `Repr-Digest` or `Digest` header from the server, or, when neither exists, the first download, which is then pinned in `lmget.lock` and shown as "pinned on first download". A partial download is bound to the server's `ETag` (or `Last-Modified`) and every ranged request carries `If-Range`: if the file changes on the server, lmget starts over instead of joining two versions. URLs with a query string (signed URLs carry credentials there) are downloaded but never written to `lmget.lock`. lmget sends no token to hosts other than the Hugging Face endpoint.
+Only https is accepted, and URLs with credentials (`user:pass@`) are refused. The expected sha256 comes from, in order: a `#sha256=` fragment you add, a `Repr-Digest` or `Digest` header from the server, or, when neither exists, the first download, which is then pinned in `lmget.lock` and shown as "pinned on first download". A partial download is bound to the server's `ETag` (or `Last-Modified`) and every ranged request carries `If-Range`: if the file changes on the server, lmget starts over instead of joining two versions. URLs with a query string (signed URLs carry credentials there) are downloaded but never written to `lmget.lock`. lmget sends no token to hosts other than the Hugging Face endpoint, and a redirect from https to http is refused.
 
-Private and gated models use `HF_TOKEN` or the token saved by `huggingface-cli login`. `HF_ENDPOINT` selects a mirror. The token is sent only to the configured endpoint.
+Private and gated models use `HF_TOKEN` or the token saved by `huggingface-cli login`. `HF_ENDPOINT` selects a mirror. The token is sent only to the configured endpoint, and is dropped on a redirect to any other host or port.
 
 ## Output for scripts and integrations
 
