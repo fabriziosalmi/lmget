@@ -1,0 +1,4 @@
+# internal design notes and reports, never tracked
+_internal/
+/bin/
+.DS_Store
