@@ -15,6 +15,10 @@ v[0-9]*) ;;
 esac
 
 root=$(cd "$(dirname "$0")/.." && pwd)
+# the exact Go of go.mod, whatever Go runs this script: a newer local Go
+# would build other bytes than the release
+GOTOOLCHAIN=go$(sed -n 's/^go \([0-9.]*\)$/\1/p' "$root/go.mod")
+export GOTOOLCHAIN
 epoch=${SOURCE_DATE_EPOCH:-$(git -C "$root" log -1 --format=%ct)}
 rm -rf "$out"
 mkdir -p "$out"

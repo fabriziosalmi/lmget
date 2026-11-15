@@ -45,4 +45,4 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt \
             --draft --verify-tag --title "lmget $GITHUB_REF_NAME" \
-            --notes "Verify an archive: gh attestation verify <archive> --repo $GITHUB_REPOSITORY"
+            --notes "Verify an archive: gh attestation verify <archive> --repo $GITHUB_REPOSITORY --signer-workflow $GITHUB_REPOSITORY/.github/workflows/release.yml --source-ref refs/tags/$GITHUB_REF_NAME"
