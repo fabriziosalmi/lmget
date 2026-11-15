@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -60,47 +61,61 @@ var blobPath = regexp.MustCompile(`^/blobs/sha256/([0-9a-f]{64})$`)
 // NodeHandler serves GET and HEAD for /index.json, /index.json.minisig and
 // /blobs/sha256/<hex> (with ranges) for the blobs the verified index names.
 func (c *Client) NodeHandler() http.Handler {
-	h := &nodeHandler{c: c}
-	return h
+	return &nodeHandler{c: c}
 }
 
 type nodeHandler struct {
-	c       *Client
-	mu      sync.Mutex
-	stamp   time.Time // mtime of the cached index the set was built from
-	expires time.Time // expiry of that index: the set dies with it
-	allowed map[string]bool
+	c    *Client
+	mu   sync.Mutex
+	snap *nodeSnapshot
 }
 
-// blobs returns the hashes the current verified index names, rebuilt when
-// the cached index file changes and refused once the index expires.
-func (h *nodeHandler) blobs() (map[string]bool, error) {
-	p, _ := h.c.indexPaths()
+// nodeSnapshot is the cached index as verified once: its bytes and
+// signature (served together, so they always match) and the blobs it names
+// with their sizes. It is rebuilt when the cached file changes and dropped
+// when the index expires.
+type nodeSnapshot struct {
+	stamp     time.Time // mtime of the cached index file
+	expires   time.Time
+	data, sig []byte
+	blobs     map[string]int64 // sha256 -> size, models on the license allowlist only
+}
+
+func (h *nodeHandler) snapshot() (*nodeSnapshot, error) {
+	p, ps := h.c.indexPaths()
 	fi, err := os.Stat(p)
 	if err != nil {
 		return nil, err
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.allowed != nil && fi.ModTime().Equal(h.stamp) && time.Now().Before(h.expires) {
-		return h.allowed, nil
+	if s := h.snap; s != nil && fi.ModTime().Equal(s.stamp) && time.Now().Before(s.expires) {
+		return s, nil
 	}
-	h.allowed = nil
-	ix, err := h.c.Index()
+	h.snap = nil
+	data, err := os.ReadFile(p)
 	if err != nil {
 		return nil, err
 	}
-	set := map[string]bool{}
+	sig, err := os.ReadFile(ps)
+	if err != nil {
+		return nil, err
+	}
+	ix, err := h.c.openIndex(data, string(sig), time.Now()) // a pair read mid-update fails here: 503, then fine
+	if err != nil {
+		return nil, err
+	}
+	s := &nodeSnapshot{stamp: fi.ModTime(), expires: ix.Expires, data: data, sig: sig, blobs: map[string]int64{}}
 	for _, m := range ix.Models {
 		if !LicenseAllowed(m.License) { // as mirror and seed
 			continue
 		}
 		for _, f := range m.Files {
-			set[f.SHA256] = true
+			s.blobs[f.SHA256] = f.Size
 		}
 	}
-	h.allowed, h.stamp, h.expires = set, fi.ModTime(), ix.Expires
-	return set, nil
+	h.snap = s
+	return s, nil
 }
 
 func (h *nodeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,19 +124,20 @@ func (h *nodeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	p, ps := h.c.indexPaths()
+	snap, err := h.snapshot()
+	if err != nil { // never serve anything without an index that verifies
+		http.Error(w, "no valid index", http.StatusServiceUnavailable)
+		return
+	}
 	switch r.URL.Path {
 	case "/index.json", "/index.json.minisig":
-		if _, err := h.c.Index(); err != nil { // never serve an index that does not verify
-			http.Error(w, "no valid index", http.StatusServiceUnavailable)
-			return
-		}
-		file := p
+		body, ctype := snap.data, "application/json"
 		if r.URL.Path == "/index.json.minisig" {
-			file = ps
+			body, ctype = snap.sig, "text/plain; charset=utf-8"
 		}
+		w.Header().Set("Content-Type", ctype)
 		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, file)
+		http.ServeContent(w, r, "", snap.stamp, bytes.NewReader(body))
 		return
 	}
 	m := blobPath.FindStringSubmatch(r.URL.Path)
@@ -129,12 +145,8 @@ func (h *nodeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	allowed, err := h.blobs()
-	if err != nil {
-		http.Error(w, "no valid index", http.StatusServiceUnavailable)
-		return
-	}
-	if !allowed[m[1]] {
+	size, ok := snap.blobs[m[1]]
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -145,8 +157,8 @@ func (h *nodeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	fi, err := f.Stat()
-	if err != nil || !fi.Mode().IsRegular() {
-		http.NotFound(w, r)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() != size {
+		http.NotFound(w, r) // not mirrored, or not the signed size: clients would refuse it anyway
 		return
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
