@@ -29,6 +29,7 @@ type flags struct {
 	json        bool
 	plain       bool
 	conns       int
+	noMirror    bool
 	lock        bool
 	lockfile    string
 	update      bool
@@ -132,6 +133,7 @@ func run() lmget.ExitCode {
 	}
 	for _, c := range []*cobra.Command{root, get, sync} {
 		c.Flags().IntVar(&f.conns, "conns", 8, "parallel connections per file")
+		c.Flags().BoolVar(&f.noMirror, "no-mirror", false, "never fall back to ModelScope when Hugging Face fails")
 	}
 	sync.Flags().BoolVar(&f.update, "update", false, "resolve revisions again and rewrite the lock")
 	root.PersistentFlags().BoolVar(&f.json, "json", false, "emit one JSON event per line (schema v1)")
@@ -202,7 +204,7 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 			return fail(mode, err)
 		}
 	}
-	c, err := lmget.New(lmget.Options{Conns: f.conns})
+	c, err := lmget.New(lmget.Options{Conns: f.conns, NoMirror: f.noMirror})
 	if err != nil {
 		return fail(mode, err)
 	}
@@ -257,7 +259,7 @@ func doSync(f flags, args []string) lmget.ExitCode {
 	if len(models) == 0 {
 		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: f.lockfile + " lists no models"})
 	}
-	c, err := lmget.New(lmget.Options{Conns: f.conns})
+	c, err := lmget.New(lmget.Options{Conns: f.conns, NoMirror: f.noMirror})
 	if err != nil {
 		return fail(mode, err)
 	}

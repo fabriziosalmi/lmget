@@ -78,6 +78,12 @@ lmget doctor --verify            # also re-hash every blob in the store
 
 Only https is accepted, and URLs with credentials (`user:pass@`) are refused. The expected sha256 comes from, in order: a `#sha256=` fragment you add, a `Repr-Digest` or `Digest` header from the server, or, when neither exists, the first download, which is then pinned in `lmget.lock` and shown as "pinned on first download". A partial download is bound to the server's `ETag` (or `Last-Modified`) and every ranged request carries `If-Range`: if the file changes on the server, lmget starts over instead of joining two versions. URLs with a query string (signed URLs carry credentials there) are downloaded but never written to `lmget.lock`. lmget sends no token to hosts other than the Hugging Face endpoint, and a redirect from https to http is refused.
 
+## When Hugging Face fails
+
+If a file of a Hugging Face model cannot be downloaded (network errors, 5xx or 429 after the retries, or the file missing), lmget looks for the same repository on ModelScope (`www.modelscope.ai`) and takes that file from there, but only if ModelScope lists the same path with the same size and the same sha256. The bytes are verified against the hash Hugging Face publishes, so ModelScope is never trusted: a copy that differs is refused with exit code 5. The log says which files came from ModelScope (`from=modelscope` in plain output and in `file_done` events).
+
+ModelScope is asked nothing while Hugging Face works, and never for a file Hugging Face refuses (401, 403): a gated model stays gated. `--no-mirror` turns the fallback off. The plan itself always comes from Hugging Face: if Hugging Face cannot be reached at all, there is no fallback.
+
 Private and gated models use `HF_TOKEN` or the token saved by `huggingface-cli login`. `HF_ENDPOINT` selects a mirror. The token is sent only to the configured endpoint, and is dropped on a redirect to any other host or port.
 
 ## Output for scripts and integrations
@@ -96,7 +102,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `url`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free` |
 | `file_start` | `file`, `total` |
 | `progress` | `file`, `bytes`, `total` (at most 4 per second per file) |
-| `file_done` | `file`, `sha256`, `total`, `cached` |
+| `file_done` | `file`, `sha256`, `total`, `cached`, `from` (`modelscope` when the bytes came from the second origin) |
 | `export` | `target`, `path` |
 | `done` | `total`, `fetched`, `elapsed_s`, `path` |
 | `lock` | `path` of the lockfile written after the pull |

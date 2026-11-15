@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,10 +28,14 @@ type Options struct {
 	HFToken    string // default $HF_TOKEN, else the token file of huggingface_hub
 	// OllamaRegistry is the Ollama registry; default https://registry.ollama.ai
 	OllamaRegistry string
-	Conns          int   // parallel connections per file; default 8
-	ChunkSize      int64 // ranged request size; default 16 MiB
-	HTTP           *http.Client
-	UserAgent      string
+	// ModelScopeEndpoint is the second origin for Hugging Face files; default
+	// https://www.modelscope.ai. NoMirror never asks it.
+	ModelScopeEndpoint string
+	NoMirror           bool
+	Conns              int   // parallel connections per file; default 8
+	ChunkSize          int64 // ranged request size; default 16 MiB
+	HTTP               *http.Client
+	UserAgent          string
 }
 
 type Client struct {
@@ -38,6 +43,8 @@ type Client struct {
 	store       *Store
 	http        *http.Client
 	tokenSource string // where the token came from; never the token itself
+	msMu        sync.Mutex
+	msFiles     map[string]map[string]msFile // ModelScope listings, per repository
 }
 
 func New(o Options) (*Client, error) {
@@ -62,6 +69,10 @@ func New(o Options) (*Client, error) {
 		o.OllamaRegistry = "https://registry.ollama.ai"
 	}
 	o.OllamaRegistry = strings.TrimRight(o.OllamaRegistry, "/")
+	if o.ModelScopeEndpoint == "" {
+		o.ModelScopeEndpoint = "https://www.modelscope.ai"
+	}
+	o.ModelScopeEndpoint = strings.TrimRight(o.ModelScopeEndpoint, "/")
 	tokenSource := "option"
 	if o.HFToken == "" {
 		o.HFToken, tokenSource = hfToken()

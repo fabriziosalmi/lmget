@@ -164,6 +164,8 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 				logf("cached %s sha256=%s", e.File, e.SHA256)
 			case pinnedOnly:
 				logf("pinned %s sha256=%s (no published hash: recorded on first download)", e.File, e.SHA256)
+			case e.From != "":
+				logf("verified %s sha256=%s from=%s", e.File, e.SHA256, e.From)
 			default:
 				logf("verified %s sha256=%s", e.File, e.SHA256)
 			}
@@ -310,7 +312,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !e.Cached {
 				m.doneB += e.Total
 				m.fBytes, m.file = 0, ""
-				m.pending = append(m.pending, fmt.Sprintf("  %s %s  %s  %s", sAccent.Render(check), pad(middleTrunc(e.File, 32), m.nameW), padLeft(hb(e.Total), 8), sDim.Render("sha256 "+e.SHA256[:8]+".."+e.SHA256[60:])))
+				line := fmt.Sprintf("  %s %s  %s  %s", sAccent.Render(check), pad(middleTrunc(e.File, 32), m.nameW), padLeft(hb(e.Total), 8), sDim.Render("sha256 "+e.SHA256[:8]+".."+e.SHA256[60:]))
+				if e.From == lmget.MirrorModelScope {
+					line += "  " + sWarn.Render("via ModelScope")
+				}
+				m.pending = append(m.pending, line)
 			}
 		}
 	case finishedMsg:

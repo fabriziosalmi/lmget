@@ -98,7 +98,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			emit(e)
 			continue
 		}
-		n, err := c.getFile(ctx, f, isPickle(f.Path, all), emit)
+		n, err := c.getFile(ctx, plan.Ref, f, isPickle(f.Path, all), emit)
 		out.Fetched += n
 		if err != nil {
 			return nil, err
@@ -139,7 +139,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	return out, nil
 }
 
-func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit func(Event)) (int64, error) {
+func (c *Client) getFile(ctx context.Context, ref Ref, f *File, declaredPickle bool, emit func(Event)) (int64, error) {
 	key := f.SHA256
 	switch {
 	case key != "":
@@ -196,6 +196,14 @@ func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit
 		cnt.done.Store(int64(len(f.data)))
 	} else {
 		err = c.fetch(ctx, *f, part, state, &cnt)
+		if err != nil && c.canMirror(ref, err) {
+			if mf, ok := c.mirrorFile(ctx, ref, *f); ok {
+				cnt.done.Store(0) // fetch counts the chunks already on disk again
+				if merr := c.fetch(ctx, mf, part, state, &cnt); merr == nil {
+					f.From, err = mf.From, nil
+				}
+			}
+		}
 	}
 	close(stop)
 	<-ticked
@@ -205,6 +213,9 @@ func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit
 	sum, err := c.verify(part, f)
 	if err == nil {
 		err = checkFormat(part, f.Path, declaredPickle)
+	}
+	if le, ok := err.(*Error); ok && f.From != "" {
+		le.fix("", "these bytes came from "+f.From+", which serves something other than what Hugging Face publishes")
 	}
 	if err != nil {
 		os.Remove(part)
@@ -217,7 +228,7 @@ func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit
 	os.Remove(state)
 	f.SHA256, f.Cached = sum, true
 	e = ev(EvFileDone)
-	e.File, e.SHA256, e.Total, e.Bytes = f.Path, sum, f.Size, f.Size
+	e.File, e.SHA256, e.Total, e.Bytes, e.From = f.Path, sum, f.Size, f.Size, f.From
 	emit(e)
 	return cnt.fetched.Load(), nil
 }

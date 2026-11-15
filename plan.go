@@ -15,6 +15,7 @@ type File struct {
 	GitSHA1 string `json:"git_sha1,omitempty"` // git blob id, for files the source hashes only with git
 	Cached  bool   `json:"cached"`             // already verified in the store: nothing to fetch
 	Skipped string `json:"skipped,omitempty"`  // reason the file is not selected
+	From    string `json:"from,omitempty"`     // second origin the bytes came from (modelscope)
 	url     string
 	// direct URLs only
 	ifRange  string // validator sent with every ranged request

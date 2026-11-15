@@ -33,6 +33,7 @@ type Event struct {
 	Total   int64     `json:"total,omitempty"`
 	SHA256  string    `json:"sha256,omitempty"`
 	Cached  bool      `json:"cached,omitempty"`
+	From    string    `json:"from,omitempty"` // file_done: second origin used (modelscope)
 	Target  string    `json:"target,omitempty"`
 	Path    string    `json:"path,omitempty"`
 	Fetched int64     `json:"fetched,omitempty"`
