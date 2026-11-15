@@ -29,9 +29,10 @@ import (
 // refuses an index frozen in time. The cached copy is verified again on
 // every read.
 
-// IndexKeys are the minisign public keys lmget trusts for the project index.
-// Empty until the project key is published.
-var IndexKeys = []string{}
+// IndexKeys are the minisign public keys lmget trusts for the project index:
+// the project key, key number 21C7BDA090E969F4 (lmget-index.pub in the
+// repository). Its secret key is kept in Infisical and never on disk here.
+var IndexKeys = []string{"RWT0aemQoL3HIZb5q4xhyeAUFBAtnyetjUH2KFXr0H235qQdXzZhtZrB"}
 
 const (
 	indexMaxBytes = 32 << 20

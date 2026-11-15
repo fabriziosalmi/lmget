@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -199,6 +200,9 @@ func TestIndexRefusesWhatItShouldNot(t *testing.T) {
 
 func TestIndexNeedsAKey(t *testing.T) {
 	t.Setenv("LMGET_INDEX_KEY", "")
+	saved := IndexKeys
+	IndexKeys = nil // a build without the project key
+	t.Cleanup(func() { IndexKeys = saved })
 	hit := false
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hit = true }))
 	defer srv.Close()
@@ -211,5 +215,31 @@ func TestIndexNeedsAKey(t *testing.T) {
 	}
 	if hit {
 		t.Fatal("the index was fetched although no key could verify it")
+	}
+}
+
+// The built-in project key is the one minisign generated (its key number is
+// printed reversed, as a little-endian uint64) and matches lmget-index.pub.
+func TestBuiltInProjectKey(t *testing.T) {
+	if len(IndexKeys) != 1 {
+		t.Fatalf("%d built-in keys", len(IndexKeys))
+	}
+	k, err := ParseMinisignKey(IndexKeys[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var num strings.Builder
+	for i := 7; i >= 0; i-- {
+		fmt.Fprintf(&num, "%02X", k.ID[i])
+	}
+	if num.String() != "21C7BDA090E969F4" {
+		t.Fatalf("key number %s", num.String())
+	}
+	pub, err := os.ReadFile("lmget-index.pub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if k2, err := ParseMinisignKey(string(pub)); err != nil || string(k2.PK) != string(k.PK) || k2.ID != k.ID {
+		t.Fatal("lmget-index.pub is not the built-in key")
 	}
 }
