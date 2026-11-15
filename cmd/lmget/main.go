@@ -369,19 +369,20 @@ var (
 )
 
 func printErr(e *lmget.Error) {
-	lipgloss.Fprintf(os.Stderr, "\n  %s%s\n", sErr.Render("error"), e.Msg)
+	p := lmget.Printable // messages can quote a lockfile or a source
+	lipgloss.Fprintf(os.Stderr, "\n  %s%s\n", sErr.Render("error"), p(e.Msg))
 	if e.Why != "" {
-		lipgloss.Fprintf(os.Stderr, "  %s%s\n", sLabel.Render(""), sDim.Render(e.Why))
+		lipgloss.Fprintf(os.Stderr, "  %s%s\n", sLabel.Render(""), sDim.Render(p(e.Why)))
 	}
 	if e.Cause != "" && e.Cause != e.Msg {
-		lipgloss.Fprintf(os.Stderr, "  %s%s\n", sLabel.Render("cause"), sDim.Render(e.Cause))
+		lipgloss.Fprintf(os.Stderr, "  %s%s\n", sLabel.Render("cause"), sDim.Render(p(e.Cause)))
 	}
 	for i, fx := range e.Fixes {
 		l := ""
 		if i == 0 {
 			l = "fix"
 		}
-		lipgloss.Fprintf(os.Stderr, "  %s%s  %s\n", sLabel.Render(l), sBold.Render(fx.Cmd), sDim.Render(fx.Note))
+		lipgloss.Fprintf(os.Stderr, "  %s%s  %s\n", sLabel.Render(l), sBold.Render(p(fx.Cmd)), sDim.Render(p(fx.Note)))
 	}
 	fmt.Fprintln(os.Stderr)
 }

@@ -126,9 +126,18 @@ func hfToken() (string, string) {
 
 // noDowngrade refuses a redirect from https to plain http, and bounds the
 // chain like net/http does.
+// MaxFileSize bounds a size reported by a source (16 TiB), so arithmetic on
+// sizes cannot overflow.
+const MaxFileSize = int64(1) << 44
+
 func noDowngrade(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
 		return errors.New("stopped after 10 redirects")
+	}
+	// net/http keeps Authorization on a redirect to the same host name on
+	// another port, and to subdomains: the token stays with the exact host.
+	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
+		req.Header.Del("Authorization")
 	}
 	if len(via) > 0 && via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
 		return newErr(ExitNetwork, "network", "refused a redirect from https to "+req.URL.Scheme+"://"+req.URL.Host).

@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"regexp"
 	"strings"
 )
 
@@ -37,7 +36,7 @@ func checkFormat(p, name string, declaredPickle bool) error {
 			fix("", "the file was discarded; report it to the publisher")
 	}
 	ext := strings.ToLower(path.Ext(name))
-	if (looksPickle(f, head, size) || looksOldPickle(f, head, size, ext)) && !declaredPickle {
+	if looksPickle(f, head, size, ext) && !declaredPickle {
 		return bad("its content is a Python pickle, which runs code when loaded")
 	}
 	switch ext {
@@ -57,44 +56,132 @@ func checkFormat(p, name string, declaredPickle bool) error {
 	return nil
 }
 
-// textExt are formats no loader unpickles; old-protocol detection skips them
-// to avoid mistaking a word list for opcodes.
+// textExt are formats no loader unpickles; the opcode walk skips them, so a
+// word list is never read as opcodes.
 var textExt = map[string]bool{".txt": true, ".json": true, ".md": true, ".yaml": true, ".yml": true,
 	".jinja": true, ".html": true, ".csv": true, ".tsv": true, ".cfg": true, ".ini": true, ".toml": true, ".py": true}
 
-var oldPickleGlobal = regexp.MustCompile(`[ci][A-Za-z_][A-Za-z0-9_.]*\n[A-Za-z_][A-Za-z0-9_.]*\n`)
-
-// looksOldPickle recognises protocol 0 and 1 pickles, which have no header:
-// they start with an opcode, end with STOP and, to do harm, name a callable
-// with GLOBAL or INST ("c<module>\n<name>\n").
-func looksOldPickle(f *os.File, head []byte, size int64, ext string) bool {
-	if textExt[ext] || len(head) == 0 || size < 4 || !strings.ContainsRune("(}])ciNISVld", rune(head[0])) {
-		return false
-	}
-	last := make([]byte, 1)
-	if _, err := f.ReadAt(last, size-1); err != nil || last[0] != '.' {
-		return false
-	}
-	buf := make([]byte, min(size, 1<<20))
-	n, _ := f.ReadAt(buf, 0)
-	return oldPickleGlobal.Match(buf[:n])
-}
-
-// looksPickle recognises a raw pickle (protocol 2 to 5 starts with the PROTO
-// opcode 0x80) and the zip archives torch.save writes, which hold data.pkl.
-func looksPickle(f *os.File, head []byte, size int64) bool {
-	if len(head) >= 2 && head[0] == 0x80 && head[1] >= 2 && head[1] <= 5 {
-		return true
-	}
+// looksPickle recognises a pickle of any protocol (0 to 5) by walking its
+// opcodes, and the zip archives torch.save writes. A zip Go cannot read is
+// treated as one: a loader with another zip parser might still open it.
+func looksPickle(f *os.File, head []byte, size int64, ext string) bool {
 	if len(head) >= 4 && string(head[:4]) == "PK\x03\x04" {
 		zr, err := zip.NewReader(f, size)
 		if err != nil {
-			return false
+			return true
 		}
 		for _, zf := range zr.File {
 			if strings.HasSuffix(strings.ToLower(zf.Name), ".pkl") {
 				return true
 			}
+		}
+		return false
+	}
+	if textExt[ext] {
+		return false
+	}
+	if len(head) >= 2 && head[0] == 0x80 && head[1] >= 2 && head[1] <= 5 {
+		return true // a PROTO header: treated as a pickle even if the rest is malformed
+	}
+	return walkPickle(io.NewSectionReader(f, 0, size), size)
+}
+
+// pickle opcode argument kinds
+const (
+	argNone     = iota
+	argLine     // up to and including a newline
+	argTwoLines // GLOBAL and INST: module and name
+	argFixed    // n bytes
+	argLen1     // 1-byte length, then data
+	argLen4     // 4-byte little-endian length, then data
+	argLen8     // 8-byte little-endian length, then data
+)
+
+type pickleOp struct {
+	kind int
+	n    int  // argFixed size
+	code bool // imports or calls code
+}
+
+// pickleOps covers every opcode of protocols 0 to 5 (Python's pickletools).
+var pickleOps = map[byte]pickleOp{
+	'(': {}, '.': {}, '0': {}, '1': {}, '2': {}, 'a': {}, 'b': {}, 'd': {}, 'e': {}, 'l': {},
+	's': {}, 't': {}, 'u': {}, ')': {}, ']': {}, '}': {}, 'N': {},
+	0x85: {}, 0x86: {}, 0x87: {}, 0x88: {}, 0x89: {}, 0x8f: {}, 0x90: {}, 0x91: {}, 0x94: {}, 0x97: {}, 0x98: {},
+	'I': {kind: argLine}, 'L': {kind: argLine}, 'F': {kind: argLine}, 'S': {kind: argLine}, 'V': {kind: argLine},
+	'P': {kind: argLine}, 'p': {kind: argLine}, 'g': {kind: argLine},
+	'c': {kind: argTwoLines, code: true}, 'i': {kind: argTwoLines, code: true},
+	'R': {code: true}, 'o': {code: true}, 0x81: {code: true}, 0x92: {code: true}, 0x93: {code: true}, 'Q': {code: true},
+	'J': {kind: argFixed, n: 4}, 'K': {kind: argFixed, n: 1}, 'M': {kind: argFixed, n: 2}, 'G': {kind: argFixed, n: 8},
+	'h': {kind: argFixed, n: 1}, 'j': {kind: argFixed, n: 4}, 'q': {kind: argFixed, n: 1}, 'r': {kind: argFixed, n: 4},
+	0x80: {kind: argFixed, n: 1}, 0x95: {kind: argFixed, n: 8},
+	0x82: {kind: argFixed, n: 1, code: true}, 0x83: {kind: argFixed, n: 2, code: true}, 0x84: {kind: argFixed, n: 4, code: true},
+	'U': {kind: argLen1}, 'C': {kind: argLen1}, 0x8c: {kind: argLen1}, 0x8a: {kind: argLen1},
+	'T': {kind: argLen4}, 'X': {kind: argLen4}, 'B': {kind: argLen4}, 0x8b: {kind: argLen4},
+	0x8d: {kind: argLen8}, 0x8e: {kind: argLen8}, 0x96: {kind: argLen8},
+}
+
+// walkPickle reports whether r starts with a well-formed opcode stream that
+// reaches STOP and imports or calls code. Bytes after STOP are ignored, as
+// pickle.load ignores them.
+func walkPickle(r *io.SectionReader, size int64) bool {
+	const maxLine = 1 << 16
+	var off int64
+	one := make([]byte, 1)
+	readLine := func() bool {
+		for n := 0; n < maxLine; n++ {
+			if _, err := r.ReadAt(one, off); err != nil {
+				return false
+			}
+			off++
+			if one[0] == '\n' {
+				return true
+			}
+		}
+		return false
+	}
+	code, steps := false, 0
+	for steps < 1<<20 {
+		if _, err := r.ReadAt(one, off); err != nil {
+			return false
+		}
+		op, ok := pickleOps[one[0]]
+		if !ok {
+			return false
+		}
+		off++
+		steps++
+		code = code || op.code
+		var n int64
+		switch op.kind {
+		case argLine:
+			if !readLine() {
+				return false
+			}
+		case argTwoLines:
+			if !readLine() || !readLine() {
+				return false
+			}
+		case argFixed:
+			n = int64(op.n)
+		case argLen1, argLen4, argLen8:
+			w := map[int]int{argLen1: 1, argLen4: 4, argLen8: 8}[op.kind]
+			buf := make([]byte, 8)
+			if _, err := r.ReadAt(buf[:w], off); err != nil {
+				return false
+			}
+			off += int64(w)
+			n = int64(binary.LittleEndian.Uint64(buf))
+			if n < 0 {
+				return false
+			}
+		}
+		if n > size-off {
+			return false
+		}
+		off += n
+		if one[0] == '.' { // STOP
+			return code && steps > 1
 		}
 	}
 	return false

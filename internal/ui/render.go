@@ -29,6 +29,10 @@ const check = "✓"
 
 func hb(n int64) string { return lmget.HumanBytes(n) }
 
+// c strips control characters from any text before it is styled: names,
+// licenses, messages and paths can come from a source or a lockfile.
+func c(s string) string { return lmget.Printable(s) }
+
 func tilde(p string) string {
 	if h, err := os.UserHomeDir(); err == nil && h != "" && strings.HasPrefix(p, h+string(os.PathSeparator)) {
 		return "~" + p[len(h):]
@@ -74,12 +78,12 @@ func padLeft(s string, w int) string {
 func renderPlan(p *lmget.Plan, width int, full bool) string {
 	var b strings.Builder
 	sel := p.Selected()
-	head := []string{sBold.Render(middleTrunc(p.Ref.Display(), max(30, width-40))), sDim.Render(p.Commit[:7])}
+	head := []string{sBold.Render(middleTrunc(c(p.Ref.Display()), max(30, width-40))), sDim.Render(p.Commit[:7])}
 	if p.Ref.Source == "url" {
 		head = head[:1] // a URL has no commit; its id is internal
 	}
 	if p.License != "" {
-		head = append(head, p.License)
+		head = append(head, c(p.License))
 	} else if p.Ref.Source == "url" {
 		head = append(head, sDim.Render("license unknown"))
 	} else {
@@ -155,7 +159,7 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 	} else if p.Gated == "" {
 		checks = append(checks, sAccent.Render("not gated"))
 	} else {
-		checks = append(checks, sWarn.Render("gated ("+p.Gated+")"))
+		checks = append(checks, sWarn.Render("gated ("+c(p.Gated)+")"))
 	}
 	if cached := p.Bytes - p.ToFetch; cached > 0 {
 		checks = append(checks, sAccent.Render(hb(cached)+" cached"))
@@ -200,12 +204,12 @@ func renderError(e *lmget.Error) string {
 	if e.Code == lmget.ExitInterrupted {
 		label = "stopped"
 	}
-	fmt.Fprintf(&b, "\n  %s%s\n", sErr.Width(10).Render(label), e.Msg)
+	fmt.Fprintf(&b, "\n  %s%s\n", sErr.Width(10).Render(label), c(e.Msg))
 	if e.Why != "" {
-		fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(""), sDim.Render(e.Why))
+		fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(""), sDim.Render(c(e.Why)))
 	}
 	if e.Cause != "" && e.Cause != e.Msg {
-		fmt.Fprintf(&b, "  %s%s\n", sLabel.Render("cause"), sDim.Render(e.Cause))
+		fmt.Fprintf(&b, "  %s%s\n", sLabel.Render("cause"), sDim.Render(c(e.Cause)))
 	}
 	for i, f := range e.Fixes {
 		l := ""
@@ -214,11 +218,11 @@ func renderError(e *lmget.Error) string {
 		}
 		switch {
 		case f.Cmd != "" && f.Note != "":
-			fmt.Fprintf(&b, "  %s%s  %s\n", sLabel.Render(l), sBold.Render(f.Cmd), sDim.Render(f.Note))
+			fmt.Fprintf(&b, "  %s%s  %s\n", sLabel.Render(l), sBold.Render(c(f.Cmd)), sDim.Render(c(f.Note)))
 		case f.Cmd != "":
-			fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(l), sBold.Render(f.Cmd))
+			fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(l), sBold.Render(c(f.Cmd)))
 		default:
-			fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(l), f.Note)
+			fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(l), c(f.Note))
 		}
 	}
 	return b.String()
@@ -235,7 +239,7 @@ func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot, lock string, wid
 	if o.Fetched == 0 {
 		took = sDim.Render("already complete, nothing downloaded")
 	}
-	name := o.Plan.Ref.Display()
+	name := c(o.Plan.Ref.Display())
 	if width > 0 {
 		name = middleTrunc(name, max(30, width-50))
 	}

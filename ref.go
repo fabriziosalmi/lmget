@@ -177,4 +177,4 @@ func validRef(src, repo, rev, orig string) (Ref, error) {
 	return Ref{Source: src, Repo: repo, Revision: rev}, nil
 }
 
-func quote(s string) string { return "\"" + s + "\"" }
+func quote(s string) string { return "\"" + printable(s) + "\"" }

@@ -98,7 +98,7 @@ func runJSON(ctx context.Context, c *lmget.Client, req lmget.Request, w io.Write
 // runPlain writes stable log lines to stderr and the result path to stdout,
 // so `dir=$(lmget Org/Name)` works in scripts.
 func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, stderr io.Writer, o Opts) (*lmget.Outcome, lmget.ExitCode) {
-	logf := func(format string, a ...any) { fmt.Fprintf(stderr, "lmget: "+format+"\n", a...) }
+	logf := func(format string, a ...any) { fmt.Fprintln(stderr, clean("lmget: "+fmt.Sprintf(format, a...))) }
 	nextPct := map[string]int64{}
 	t0 := time.Now()
 	pinnedOnly := false // direct URL without a published hash

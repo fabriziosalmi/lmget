@@ -12,6 +12,8 @@ import (
 	"github.com/fabriziosalmi/lmget"
 )
 
+func clean(s string) string { return lmget.Printable(s) }
+
 func writeJSON(w io.Writer, typ string, fields map[string]any) {
 	fields["v"] = lmget.SchemaVersion
 	fields["type"] = typ
@@ -104,8 +106,8 @@ func Removed(mode Mode, w io.Writer, r *lmget.RemoveResult, lockNote string) {
 // Doctor renders lmget doctor and returns the exit code: 1 if any check failed.
 func Doctor(mode Mode, w io.Writer, cs []lmget.Check) lmget.ExitCode {
 	code := lmget.ExitOK
-	for _, c := range cs {
-		if c.Status == "fail" {
+	for _, ch := range cs {
+		if ch.Status == "fail" {
 			code = lmget.ExitFailure
 		}
 	}
@@ -114,24 +116,24 @@ func Doctor(mode Mode, w io.Writer, cs []lmget.Check) lmget.ExitCode {
 		writeJSON(w, "doctor", map[string]any{"checks": cs})
 		return code
 	case ModePlain:
-		for _, c := range cs {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", c.Status, c.Name, c.Detail, c.Fix)
+		for _, ch := range cs {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", ch.Status, ch.Name, clean(ch.Detail), clean(ch.Fix))
 		}
 		return code
 	}
 	var b strings.Builder
 	b.WriteString("\n")
-	for _, c := range cs {
+	for _, ch := range cs {
 		mark := sAccent.Render(check)
-		switch c.Status {
+		switch ch.Status {
 		case "warn":
 			mark = sWarn.Render("!")
 		case "fail":
 			mark = sErr.Render("✗")
 		}
-		fmt.Fprintf(&b, "  %s %s%s\n", mark, sLabel.Render(c.Name), c.Detail)
-		if c.Fix != "" && c.Status != "ok" {
-			fmt.Fprintf(&b, "    %s%s\n", sLabel.Render(""), sDim.Render(c.Fix))
+		fmt.Fprintf(&b, "  %s %s%s\n", mark, sLabel.Render(ch.Name), clean(ch.Detail))
+		if ch.Fix != "" && ch.Status != "ok" {
+			fmt.Fprintf(&b, "    %s%s\n", sLabel.Render(""), sDim.Render(clean(ch.Fix)))
 		}
 	}
 	lipgloss.Fprint(w, b.String()+"\n")

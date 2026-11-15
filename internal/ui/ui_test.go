@@ -106,3 +106,25 @@ func TestWriteJSONCarriesSchemaVersion(t *testing.T) {
 		t.Fatalf("a failed check must exit %d, got %d", lmget.ExitFailure, code)
 	}
 }
+
+// Text from a lockfile or a source must not reach the terminal as control
+// sequences: only lipgloss's own SGR color codes may appear.
+func TestRenderedTextCarriesNoInjectedSequences(t *testing.T) {
+	evil := "x\x1b]0;PWNED\x07\x1b[2J\x1b]52;c;ZXZpbA==\x07y"
+	err := &lmget.Error{Code: lmget.ExitUsage, Msg: "bad " + evil, Why: evil, Cause: evil,
+		Fixes: []lmget.Fix{{Cmd: evil, Note: evil}}}
+	p := samplePlan()
+	p.License, p.Gated = evil, evil
+	for name, out := range map[string]string{
+		"error": renderError(err),
+		"plan":  renderPlan(p, 100, true),
+	} {
+		rest := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(out, "")
+		if strings.ContainsAny(rest, "\x1b\x07") {
+			t.Errorf("%s output still carries control sequences: %q", name, rest)
+		}
+		if !strings.Contains(rest, "PWNED") {
+			t.Errorf("%s output lost the visible text", name)
+		}
+	}
+}

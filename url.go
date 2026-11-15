@@ -71,6 +71,9 @@ func (c *Client) resolveURL(ctx context.Context, ref Ref, sel Selection) (*Plan,
 	default:
 		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(ref.Repo), printable(resp.Status)))
 	}
+	if size > MaxFileSize {
+		return nil, newErr(ExitFailure, "source", fmt.Sprintf("%s reports %d bytes, more than lmget accepts", hostOf(ref.Repo), size))
+	}
 	if size < 0 {
 		return nil, newErr(ExitFailure, "source", hostOf(ref.Repo)+" does not report the file size").
 			why("lmget needs the size to plan, check disk space and verify")

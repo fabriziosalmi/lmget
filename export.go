@@ -212,7 +212,7 @@ func exportContained(root, dir string) error {
 		return diskErr(err)
 	}
 	for _, seg := range strings.Split(filepath.ToSlash(real), "/") {
-		if strings.EqualFold(seg, ".git") {
+		if isGitName(seg) {
 			return refuse("the path goes through a .git directory")
 		}
 	}

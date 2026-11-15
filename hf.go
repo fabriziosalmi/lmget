@@ -10,6 +10,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -56,7 +57,7 @@ func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, er
 	}
 	p := &Plan{Ref: ref, Commit: info.Sha, License: licenseString(info.CardData.License)}
 	if g, ok := info.Gated.(string); ok && g != "" {
-		p.Gated = g
+		p.Gated = printable(g)
 	}
 	next := fmt.Sprintf("%s/api/models/%s/tree/%s?recursive=true", c.opt.HFEndpoint, ref.Repo, info.Sha)
 	seen := map[string]bool{}
@@ -95,7 +96,7 @@ func (c *Client) hfFile(ref Ref, commit string, e hfTreeEntry) (File, error) {
 		return File{}, newErr(ExitFailure, "source", "refusing unsafe file path "+quote(e.Path)+" from "+ref.Display()).
 			why("a path that leaves the model directory could overwrite other files")
 	}
-	if e.Size < 0 || (e.Lfs != nil && e.Lfs.Size != e.Size) {
+	if e.Size < 0 || e.Size > MaxFileSize || (e.Lfs != nil && e.Lfs.Size != e.Size) {
 		return File{}, newErr(ExitFailure, "source", "invalid size for "+e.Path+" from "+ref.Display())
 	}
 	f := File{Path: e.Path, Size: e.Size}
@@ -133,17 +134,47 @@ func isLocalSlash(p string) bool {
 		return false
 	}
 	for _, r := range p {
-		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || r == utf8.RuneError {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) || r == utf8.RuneError || ignorable(r) {
 			return false
 		}
 	}
 	for _, s := range strings.Split(p, "/") {
-		if s == ".." || s == "" || strings.EqualFold(s, ".git") {
+		if s == ".." || s == "" || isGitName(s) {
 			return false
 		}
 	}
 	return true
 }
+
+// ignorable reports code points that some filesystems drop when they compare
+// names (HFS+ folds them away, so ".g\u200cit" opens ".git"). No model file
+// needs them; a name carrying one is refused.
+func ignorable(r rune) bool {
+	switch {
+	case unicode.Is(unicode.Cf, r): // ZWSP, ZWNJ, ZWJ, LRM/RLM, BOM, soft hyphen, ...
+		return true
+	case r == 0x034f, r == 0x115f, r == 0x1160, r == 0x17b4, r == 0x17b5, r == 0x3164, r == 0xffa0:
+		return true
+	case r >= 0x180b && r <= 0x180f, r >= 0xfe00 && r <= 0xfe0f, r >= 0xe0000 && r <= 0xe0fff:
+		return true
+	}
+	return false
+}
+
+// isGitName reports whether a path segment names a git directory once
+// ignorable code points are dropped and case is folded.
+func isGitName(seg string) bool {
+	return strings.EqualFold(strings.Map(func(r rune) rune {
+		if ignorable(r) {
+			return -1
+		}
+		return r
+	}, seg), ".git")
+}
+
+// Printable drops control characters (C0, DEL, C1) from text before it is
+// displayed, so a source, a lockfile or an error cannot drive the terminal.
+func Printable(s string) string { return printable(s) }
 
 // printable drops control characters from text that came from elsewhere
 // (a server's status line, a license field) before it can be displayed.

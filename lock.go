@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/BurntSushi/toml"
 )
@@ -70,15 +71,27 @@ func (l *Lock) Path() string { return l.path }
 // the store or the target. A missing file returns an error matching
 // fs.ErrNotExist.
 func ReadLock(path string) (*Lock, error) {
-	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
-		return nil, lockErr(path, "is a symlink; lmget only reads and writes a regular lockfile")
+	// one open, without following a symlink, then checks on that descriptor:
+	// nothing can be swapped between the check and the read
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		if errors.Is(err, syscall.ELOOP) {
+			return nil, lockErr(path, "is a symlink; lmget only reads and writes a regular lockfile")
+		}
+		return nil, err // fs.ErrNotExist passes through for callers
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > 64<<20 {
+		return nil, lockErr(path, "is not a regular file of a sensible size")
+	}
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
 	}
 	var l Lock
-	md, err := toml.DecodeFile(path, &l)
+	md, err := toml.Decode(string(b), &l)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, err
-		}
 		return nil, lockErr(path, "not valid TOML").wrap(err)
 	}
 	l.path = path
@@ -90,10 +103,14 @@ func ReadLock(path string) (*Lock, error) {
 	}
 	seen := map[string]bool{}
 	for i, m := range l.Models {
-		where := fmt.Sprintf("model %d (%s)", i+1, m.Ref)
+		where := fmt.Sprintf("model %d (%s)", i+1, printable(m.Ref))
 		ref, err := ParseRef(m.Ref)
 		if err != nil {
 			return nil, lockErr(path, where+": "+AsError(err).Msg)
+		}
+		if ref.SHA256 != "" || ref.File != "" {
+			// lmget writes canonical refs; an expected hash belongs in [[model.file]]
+			return nil, lockErr(path, where+": a ref in the lock carries no #sha256= fragment or file path")
 		}
 		if seen[ref.String()] {
 			return nil, lockErr(path, where+": listed twice")
@@ -356,7 +373,7 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 	// A lockfile alone must not be able to re-label stored bytes as another
 	// model (sec-audit finding offline-plan-trusts-lock-repo-commit-file-mapping).
 	if all {
-		if m, err := c.store.loadManifest(r.Ref, pin.Commit); err == nil && boundAll(m, pin.Files) {
+		if m, err := c.store.loadManifest(r.Ref, pin.Commit); err == nil && boundAll(c.store, m, pin.Files) {
 			p := &Plan{Ref: r.Ref, Commit: pin.Commit, License: pin.License, offline: true}
 			for _, f := range pin.Files {
 				p.Files = append(p.Files, File{Path: f.Path, Size: f.Size, SHA256: f.SHA256, GitSHA1: f.GitSHA1, Cached: true})
@@ -406,6 +423,14 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 				f.mustFetch = true
 			}
 		}
+		if r.Ref.Source == "url" {
+			// whatever the hash came from (server, #sha256= fragment, first
+			// download), the stored blob stands for this URL only when a real
+			// download of it verified that binding before
+			if m, err := c.store.loadManifest(r.Ref, pin.Commit); err != nil || m.Verified[f.Path] != lf.SHA256 {
+				f.mustFetch = true
+			}
+		}
 		// verify will now check the lock's sha256 too, also for git-only files
 		f.SHA256 = lf.SHA256
 		delete(want, f.Path)
@@ -417,14 +442,21 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 	return p, nil
 }
 
-// boundAll reports whether every locked file is a verified binding of m.
-func boundAll(m *Manifest, files []LockFile) bool {
+// boundAll reports whether every locked file is a verified binding of m, and
+// a locked git id (used as the blob name in the HF cache) maps to the same
+// sha256 through the index that only verified downloads write.
+func boundAll(st *Store, m *Manifest, files []LockFile) bool {
 	if m == nil || len(m.Verified) == 0 {
 		return false
 	}
 	for _, f := range files {
 		if m.Verified[f.Path] != f.SHA256 {
 			return false
+		}
+		if f.GitSHA1 != "" {
+			if s, ok := st.LookupGit(f.GitSHA1); !ok || s != f.SHA256 {
+				return false
+			}
 		}
 	}
 	return true
