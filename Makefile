@@ -6,7 +6,7 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 LDFLAGS  := -s -w -X github.com/fabriziosalmi/lmget.Version=$(VERSION)
 SMOKE    ?= $(CURDIR)/.smoke
 
-.PHONY: all build vet test race lint smoke ci clean
+.PHONY: all build vet test race lint smoke ci release-snapshot clean
 
 all: build
 
@@ -44,5 +44,10 @@ smoke: build
 
 ci: vet race build lint smoke
 
+# The release archives as GitHub Actions builds them (reproducible), without
+# publishing anything: compare dist/checksums.txt with the release's.
+release-snapshot:
+	./scripts/release-build.sh $(or $(RELEASE),v0.0.0) dist
+
 clean:
-	rm -rf bin $(SMOKE)
+	rm -rf bin dist $(SMOKE)

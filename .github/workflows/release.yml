@@ -1,0 +1,42 @@
+name: release
+
+# A pushed tag v* builds the archives, attests their build provenance
+# (SLSA, signed through Sigstore) and creates a DRAFT release. A person
+# publishes it after reading it.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write      # create the draft release
+      id-token: write      # sign the provenance
+      attestations: write  # store the attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: tests with the race detector
+        run: go test -race -count=1 ./...
+      - name: build the archives
+        run: ./scripts/release-build.sh "$GITHUB_REF_NAME" dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/checksums.txt
+      - name: draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt \
+            --draft --verify-tag --title "lmget $GITHUB_REF_NAME" \
+            --notes "Verify an archive: gh attestation verify <archive> --repo $GITHUB_REPOSITORY"
