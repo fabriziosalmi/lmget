@@ -19,6 +19,10 @@ type fetchState struct {
 	Size  int64  `json:"size"`
 	Chunk int64  `json:"chunk"`
 	Done  []bool `json:"done"`
+	// Origin wrote these chunks ("" the source, "modelscope", "node:<host>"):
+	// a fetch from another origin starts again, so bytes an untrusted origin
+	// left are never completed by another one and blamed on it
+	Origin string `json:"origin,omitempty"`
 }
 
 type counters struct {
@@ -31,13 +35,13 @@ const stallTimeout = 60 * time.Second
 // fetch downloads url into part with parallel ranged requests and resumes
 // from state. It does not verify: the caller hashes the finished file.
 func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt *counters) error {
-	st := fetchState{Size: f.Size, Chunk: c.opt.ChunkSize}
+	st := fetchState{Size: f.Size, Chunk: c.opt.ChunkSize, Origin: f.From}
 	if _, err := os.Stat(part); err != nil {
 		os.Remove(statePath) // a state without its partial file describes nothing
 	}
 	if b, err := os.ReadFile(statePath); err == nil {
 		var old fetchState
-		if json.Unmarshal(b, &old) == nil && old.Size == f.Size && old.Chunk > 0 {
+		if json.Unmarshal(b, &old) == nil && old.Size == f.Size && old.Chunk > 0 && old.Origin == f.From {
 			st = old
 		}
 	}
