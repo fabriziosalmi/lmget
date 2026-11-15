@@ -2,6 +2,7 @@ package lmget
 
 import (
 	"strings"
+	"time"
 )
 
 // The nodes of the signed index are the last origin of a file: lmget asks
@@ -97,4 +98,23 @@ func (c *Client) nodeFiles(ref Ref, commit string, f File) []File {
 		out = append(out, nf)
 	}
 	return out
+}
+
+// nodeDownFor is how long a node that failed is skipped by the same client:
+// retrying a dead node costs every following file its full retry sequence.
+const nodeDownFor = 10 * time.Minute
+
+func (c *Client) markNodeDown(origin string) {
+	c.nodeMu.Lock()
+	defer c.nodeMu.Unlock()
+	if c.nodeDown == nil {
+		c.nodeDown = map[string]time.Time{}
+	}
+	c.nodeDown[origin] = time.Now().Add(nodeDownFor)
+}
+
+func (c *Client) nodeIsDown(origin string) bool {
+	c.nodeMu.Lock()
+	defer c.nodeMu.Unlock()
+	return time.Now().Before(c.nodeDown[origin])
 }

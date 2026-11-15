@@ -137,7 +137,7 @@ func (c *Client) fetchChunk(ctx context.Context, f File, out *os.File, off, size
 	for attempt := range 6 {
 		if attempt > 0 {
 			select {
-			case <-time.After(time.Duration(1<<(attempt-1)) * 500 * time.Millisecond):
+			case <-time.After(time.Duration(1<<(attempt-1)) * c.retryBase):
 			case <-ctx.Done():
 				return ctx.Err()
 			}

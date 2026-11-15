@@ -56,6 +56,9 @@ type Client struct {
 	msFiles     map[string]map[string]msFile // ModelScope listings, per repository
 	ociMu       sync.Mutex
 	ociTokens   map[string]ociToken // pull tokens, per OCI repository
+	nodeMu      sync.Mutex
+	nodeDown    map[string]time.Time // index nodes that failed, until when they are skipped
+	retryBase   time.Duration        // first retry wait of a chunk, doubled each time
 }
 
 func New(o Options) (*Client, error) {
@@ -127,7 +130,7 @@ func New(o Options) (*Client, error) {
 	if err != nil {
 		return nil, newErr(ExitDisk, "disk", "cannot open the store at "+o.Home).wrap(err)
 	}
-	return &Client{opt: o, store: st, http: hc, tokenSource: tokenSource}, nil
+	return &Client{opt: o, store: st, http: hc, tokenSource: tokenSource, retryBase: 500 * time.Millisecond}, nil
 }
 
 func (c *Client) Store() *Store { return c.store }

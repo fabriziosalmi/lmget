@@ -214,13 +214,20 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 		}
 		if err != nil && sourceDown(err) { // last: the nodes of the signed index
 			for _, nf := range c.nodeFiles(ref, commit, *f) {
+				if c.nodeIsDown(nf.From) {
+					continue
+				}
 				cnt.done.Store(0)
 				if nerr := c.fetch(ctx, nf, part, state, &cnt); nerr != nil {
-					continue
+					if AsError(nerr).Code == ExitNetwork && ctx.Err() == nil {
+						c.markNodeDown(nf.From) // unreachable or failing: not for every file again
+					}
+					continue // a 404 is this file only: the node may not have mirrored it yet
 				}
 				if _, verr := c.verify(part, &nf); verr != nil {
 					os.Remove(part) // this node served other bytes: try the next one
 					os.Remove(state)
+					c.markNodeDown(nf.From)
 					continue
 				}
 				f.SHA256, f.From, err = nf.SHA256, nf.From, nil
