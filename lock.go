@@ -444,6 +444,11 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 		at.Revision = pin.Commit
 		p, err = c.Resolve(ctx, at, r.Selection)
 	}
+	if err != nil && sourceDown(err) { // the signed index stands in for an unreachable source
+		if _, m := c.indexEntry(r.Ref, pin.Commit); m != nil {
+			p, err = c.planFromIndex(r.Ref, m, r.Selection)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

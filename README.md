@@ -45,6 +45,17 @@ Ollama models are exported by default to Ollama's models directory (`$OLLAMA_MOD
 
 The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ollama model from the manifest an earlier pull verified for that same name, and fetches missing layers by digest even after the tag has moved; without such a manifest in the store, the tag must still point at the locked one, or `sync` stops with exit code 5. Only public models are supported, and no token is sent to the registry.
 
+## Signed index and nodes
+
+The project keeps a signed index of models it mirrors: for each, the reference, the commit and every file with its size and sha256, and the nodes that serve those files by hash. `lmget index` fetches it, verifies its minisign signature against the project key built into lmget (not published yet; `LMGET_INDEX_URL` and `LMGET_INDEX_KEY` point lmget at another index), refuses an index older than the one it has or past its expiry date, and keeps it in the store.
+
+With a verified index in the store, the nodes are the last origin of a file: after the source (and, for Hugging Face, ModelScope) failed. When the source cannot be reached at all, or no longer has the model, the plan of an indexed model comes from the index, because its file list is signed. Access refusals (gated, private) are never routed to the nodes, and every byte is verified against the signed hash.
+
+Two maintainer tools sit next to the CLI:
+
+- `lmget-index build -lock lmget.lock -sequence N -node https://...` writes the index from a lockfile. Every model is resolved again at its source: it must not be gated, the license the source declares must be on the allowlist (Apache-2.0, MIT, BSD, ISC, CC0, CC-BY-4.0, Unlicense), the source must publish exactly the locked files, and files the source names only by git id are downloaded to confirm their sha256. Sign the output with `minisign -S`.
+- `lmget-node mirror` mirrors the models of the index, pinned to its commits and files (a source that drifted from the index is refused); `lmget-node serve` serves the index and only the blobs it names, with ranges, behind a TLS reverse proxy.
+
 ## Lockfile
 
 ```sh

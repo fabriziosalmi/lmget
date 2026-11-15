@@ -47,6 +47,11 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		plan, err = c.resolvePinned(ctx, r)
 	} else {
 		plan, err = c.Resolve(ctx, r.Ref, r.Selection)
+		if err != nil && sourceDown(err) {
+			if _, m := c.indexEntry(r.Ref, ""); m != nil {
+				plan, err = c.planFromIndex(r.Ref, m, r.Selection)
+			}
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -98,7 +103,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			emit(e)
 			continue
 		}
-		n, err := c.getFile(ctx, plan.Ref, f, isPickle(f.Path, all), emit)
+		n, err := c.getFile(ctx, plan.Ref, plan.Commit, f, isPickle(f.Path, all), emit)
 		out.Fetched += n
 		if err != nil {
 			return nil, err
@@ -139,7 +144,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	return out, nil
 }
 
-func (c *Client) getFile(ctx context.Context, ref Ref, f *File, declaredPickle bool, emit func(Event)) (int64, error) {
+func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, declaredPickle bool, emit func(Event)) (int64, error) {
 	key := f.SHA256
 	switch {
 	case key != "":
@@ -195,13 +200,31 @@ func (c *Client) getFile(ctx context.Context, ref Ref, f *File, declaredPickle b
 		err = writeFileAtomic(part, f.data)
 		cnt.done.Store(int64(len(f.data)))
 	} else {
-		err = c.fetch(ctx, *f, part, state, &cnt)
+		err = noOrigin() // a plan from the index has no source URL: only nodes
+		if f.url != "" {
+			err = c.fetch(ctx, *f, part, state, &cnt)
+		}
 		if err != nil && c.canMirror(ref, err) {
 			if mf, ok := c.mirrorFile(ctx, ref, *f); ok {
 				cnt.done.Store(0) // fetch counts the chunks already on disk again
 				if merr := c.fetch(ctx, mf, part, state, &cnt); merr == nil {
 					f.From, err = mf.From, nil
 				}
+			}
+		}
+		if err != nil && sourceDown(err) { // last: the nodes of the signed index
+			for _, nf := range c.nodeFiles(ref, commit, *f) {
+				cnt.done.Store(0)
+				if nerr := c.fetch(ctx, nf, part, state, &cnt); nerr != nil {
+					continue
+				}
+				if _, verr := c.verify(part, &nf); verr != nil {
+					os.Remove(part) // this node served other bytes: try the next one
+					os.Remove(state)
+					continue
+				}
+				f.SHA256, f.From, err = nf.SHA256, nf.From, nil
+				break
 			}
 		}
 	}

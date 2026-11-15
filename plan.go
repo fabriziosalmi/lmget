@@ -46,7 +46,10 @@ type Plan struct {
 	ToFetch  int64    `json:"to_fetch"`         // selected and not cached
 	Pickle   []string `json:"pickle,omitempty"` // selected files in a pickle format
 	DiskFree int64    `json:"disk_free"`
-	offline  bool     // built from a lockfile and verified bindings, without the source
+	// FromIndex: the source was unreachable, the files and hashes come from
+	// the signed index, and the bytes from its nodes
+	FromIndex bool `json:"from_index,omitempty"`
+	offline   bool // built from a lockfile and verified bindings, without the source
 }
 
 // Selection filters the files of a repository.
