@@ -105,7 +105,7 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 	} else {
 		head = append(head, sWarn.Render("no license"))
 	}
-	count := fmt.Sprintf("%d files", len(sel))
+	count := nfiles(len(sel), "")
 	if len(sel) == 1 {
 		count = "1 file"
 	}
@@ -140,7 +140,7 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 		for _, f := range files[len(shown):] {
 			n += f.Size
 		}
-		label := fmt.Sprintf("+ %d more files", rest)
+		label := "+ " + nfiles(rest, "more ")
 		if rest == 1 {
 			label = "+ 1 more file"
 		}
@@ -168,7 +168,7 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 	if len(p.Pickle) == 0 {
 		checks = append(checks, sAccent.Render("no pickle"))
 	} else {
-		checks = append(checks, sWarn.Render(fmt.Sprintf("%d pickle files", len(p.Pickle))))
+		checks = append(checks, sWarn.Render(nfiles(len(p.Pickle), "pickle ")))
 	}
 	if p.Ref.Source == "url" {
 		// gating is a Hugging Face concept
@@ -201,7 +201,7 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 	}
 	sort.Strings(reasons)
 	for _, r := range reasons {
-		line := fmt.Sprintf("%d files (%s)", len(skipped[r]), r)
+		line := fmt.Sprintf("%s (%s)", nfiles(len(skipped[r]), ""), r)
 		if len(skipped[r]) == 1 {
 			line = fmt.Sprintf("%s (%s)", path.Base(skipped[r][0]), r)
 		}
@@ -296,4 +296,12 @@ func bar(frac float64, w int) string {
 	frac = max(0, min(1, frac))
 	full := int(frac * float64(w))
 	return sAccent.Render(strings.Repeat("━", full)) + sDim.Render(strings.Repeat("━", w-full))
+}
+
+// nfiles counts files in English: "1 pickle file", "3 more files".
+func nfiles(n int, kind string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %sfile", kind)
+	}
+	return fmt.Sprintf("%d %sfiles", n, kind)
 }

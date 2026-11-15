@@ -65,9 +65,9 @@ func List(mode Mode, w io.Writer, models []lmget.Installed, st lmget.StoreStats)
 	for _, m := range models {
 		state := sDim.Render(exportLabel(m.Exports))
 		if m.Missing > 0 {
-			state = sWarn.Render(fmt.Sprintf("%d files missing", m.Missing))
+			state = sWarn.Render(nfiles(m.Missing, "") + " missing")
 		}
-		files := fmt.Sprintf("%d files", m.Files)
+		files := nfiles(m.Files, "")
 		if m.Files == 1 {
 			files = "1 file"
 		}

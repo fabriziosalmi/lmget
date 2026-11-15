@@ -129,10 +129,10 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 				}
 			}
 			for _, r := range reasons {
-				logf("skip %d files (%s)", skipped[r], r)
+				logf("skip %s (%s)", nfiles(skipped[r], ""), r)
 			}
 			if len(p.Pickle) > 0 {
-				logf("warning: %d pickle files selected: %s", len(p.Pickle), strings.Join(p.Pickle, ", "))
+				logf("warning: %s selected: %s", nfiles(len(p.Pickle), "pickle "), strings.Join(p.Pickle, ", "))
 			}
 			if req.DryRun {
 				for _, f := range p.Selected() {
