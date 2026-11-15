@@ -116,8 +116,8 @@ func ReadLock(path string) (*Lock, error) {
 			return nil, lockErr(path, where+": listed twice")
 		}
 		seen[ref.String()] = true
-		if !hex40.MatchString(m.Commit) {
-			return nil, lockErr(path, where+": commit is not a 40-character hex id")
+		if !validCommit(ref, m.Commit) {
+			return nil, lockErr(path, where+": commit is not a valid id (40 hex characters, 64 for Ollama)")
 		}
 		if err := lockTargetSyntax(m.To); err != nil {
 			return nil, lockErr(path, where+": "+err.Error())
@@ -134,6 +134,10 @@ func ReadLock(path string) (*Lock, error) {
 			if m.Commit != urlID(ref.Repo) || len(m.Files) != 1 {
 				return nil, lockErr(path, where+": a URL entry needs commit "+urlID(ref.Repo)+" and exactly one file")
 			}
+		}
+		if ref.Source == "ollama" && !hasManifestFile(m) {
+			// the manifest is the model's identity: its file must be the commit
+			return nil, lockErr(path, where+": an Ollama entry needs the file "+OllamaManifestFile+" with sha256 equal to the commit")
 		}
 		files := map[string]bool{}
 		for _, f := range m.Files {
@@ -231,7 +235,7 @@ func Lockable(ref Ref) error {
 // repository: it must not be able to send files anywhere else.
 func lockTargetSyntax(to string) error {
 	switch {
-	case to == "hf" || to == "none":
+	case to == "hf" || to == "none" || to == "ollama":
 		return nil
 	case strings.HasPrefix(to, "dir:"):
 		p := strings.TrimPrefix(to[4:], "./")
@@ -382,9 +386,15 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 			return p, nil
 		}
 	}
-	at := r.Ref
-	at.Revision = pin.Commit
-	p, err := c.Resolve(ctx, at, r.Selection)
+	var p *Plan
+	var err error
+	if r.Ref.Source == "ollama" {
+		p, err = c.resolveOllamaPinned(ctx, r.Ref, pin.Commit, r.Selection)
+	} else {
+		at := r.Ref
+		at.Revision = pin.Commit
+		p, err = c.Resolve(ctx, at, r.Selection)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -460,6 +470,15 @@ func boundAll(st *Store, m *Manifest, files []LockFile) bool {
 		}
 	}
 	return true
+}
+
+func hasManifestFile(m LockModel) bool {
+	for _, f := range m.Files {
+		if f.Path == OllamaManifestFile && f.SHA256 == m.Commit {
+			return true
+		}
+	}
+	return false
 }
 
 // LockPathFor returns the lockfile path in dir.

@@ -105,8 +105,16 @@ type Manifest struct {
 	Updated  time.Time         `json:"updated"`
 }
 
+// validCommit: a git commit, or for Ollama the sha256 of the manifest.
+func validCommit(ref Ref, commit string) bool {
+	if ref.Source == "ollama" {
+		return hex64.MatchString(commit)
+	}
+	return hex40.MatchString(commit)
+}
+
 func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
-	if !hex40.MatchString(commit) {
+	if !validCommit(ref, commit) {
 		return "", fmt.Errorf("not a commit: %q", commit)
 	}
 	if ref.Source == "url" { // the commit of a URL plan is the sha1 of the URL

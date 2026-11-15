@@ -14,6 +14,7 @@ import (
 // Target is where a pulled model is made visible.
 //
 //	hf        the Hugging Face cache (transformers, mlx-lm and huggingface_hub read it)
+//	ollama    Ollama's models directory (ollama run reads it)
 //	dir:PATH  a plain directory with the repository's file names
 //	none      store only
 type Target struct {
@@ -27,6 +28,8 @@ func ParseTarget(s string) (Target, error) {
 		return Target{Kind: "hf"}, nil
 	case s == "none":
 		return Target{Kind: "none"}, nil
+	case s == "ollama":
+		return Target{Kind: "ollama"}, nil
 	case strings.HasPrefix(s, "dir:") && len(s) > 4:
 		p, err := filepath.Abs(s[4:])
 		if err != nil {
@@ -36,6 +39,7 @@ func ParseTarget(s string) (Target, error) {
 	}
 	return Target{}, newErr(ExitUsage, "usage", "unknown target "+quote(s)).
 		fix("--to hf", "Hugging Face cache (default)").
+		fix("--to ollama", "Ollama's models directory (Ollama models)").
 		fix("--to dir:./models/name", "plain directory").
 		fix("--to none", "store only")
 }
@@ -91,6 +95,8 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 		return c.exportHF(plan)
 	case "dir":
 		return c.exportDir(plan, t.Path)
+	case "ollama":
+		return c.exportOllama(plan)
 	}
 	return "", nil, nil
 }

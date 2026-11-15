@@ -187,7 +187,7 @@ func TestParseRef(t *testing.T) {
 			t.Errorf("ParseRef(%q) = %+v, %v; want %+v", in, got, err, want)
 		}
 	}
-	bad := []string{"", "../etc", "a/../b", "a/b/c", "Qwen", "a/b@", "a/b@../x", "ollama:llama3",
+	bad := []string{"", "../etc", "a/../b", "a/b/c", "Qwen", "a/b@", "a/b@../x", "civitai:123",
 		"https://huggingface.co/datasets/a/b", "a /b", "-a/b", "x:y/z",
 		"http://example.com/m.gguf", "https://user:pw@example.com/m.gguf", "https://example.com/m.gguf#md5=00",
 		"https://example.com/m.gguf#sha256=abc", "https://huggingface.co/a/b/resolve/main/../../etc"}

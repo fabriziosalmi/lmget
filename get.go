@@ -27,6 +27,7 @@ type Outcome struct {
 	Plan    *Plan
 	Path    string // export path ("" for dry runs or Target none)
 	Fetched int64  // bytes received from the network in this run
+	RunAs   string // Ollama export: the name for ollama run
 	Elapsed time.Duration
 }
 
@@ -119,6 +120,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			return nil, err
 		}
 		out.Path = p
+		if r.Target.Kind == "ollama" {
+			out.RunAs = c.OllamaName(plan.Ref)
+		}
 		if plan.Ref.Source == "url" && r.Target.Kind == "dir" && len(plan.Files) == 1 {
 			out.Path = filepath.Join(p, plan.Files[0].Path) // a URL is one file: report the file
 		}
@@ -185,7 +189,12 @@ func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit
 			}
 		}
 	}()
-	err = c.fetch(ctx, *f, part, state, &cnt)
+	if f.data != nil {
+		err = writeFileAtomic(part, f.data)
+		cnt.done.Store(int64(len(f.data)))
+	} else {
+		err = c.fetch(ctx, *f, part, state, &cnt)
+	}
 	close(stop)
 	<-ticked
 	if err != nil {

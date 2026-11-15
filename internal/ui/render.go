@@ -250,6 +250,9 @@ func renderSummary(o *lmget.Outcome, t lmget.Target, storeRoot, lock string, wid
 		fmt.Fprintf(&b, "    %s%s %s\n", sLabel.Render("load as"), sBold.Render(quote(o.Plan.Ref.Repo)), sDim.Render("with transformers or mlx-lm"))
 	case "dir":
 		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("dir"), tilde(o.Path))
+	case "ollama":
+		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("ollama"), tilde(o.Path))
+		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("run as"), sBold.Render("ollama run "+c(o.RunAs)))
 	default:
 		fmt.Fprintf(&b, "    %s%s\n", sLabel.Render("store"), tilde(storeRoot))
 	}

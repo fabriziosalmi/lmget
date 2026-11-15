@@ -56,6 +56,7 @@ func run() lmget.ExitCode {
 		Example: "  lmget Qwen/Qwen3-0.6B\n" +
 			"  lmget Qwen/Qwen3-0.6B@main --to dir:./models/qwen3\n" +
 			"  lmget info unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\n" +
+			"  lmget ollama:smollm2:135m              # into Ollama, ready for ollama run\n" +
 			"  lmget Qwen/Qwen3-0.6B --lock          # record it in ./lmget.lock\n" +
 			"  lmget sync                            # reproduce ./lmget.lock exactly\n" +
 			"  lmget Qwen/Qwen3-0.6B --json | jq -c 'select(.type==\"file_done\")'",
@@ -125,7 +126,7 @@ func run() lmget.ExitCode {
 		fs.StringSliceVar(&f.exclude, "exclude", nil, "skip files matching these globs")
 		fs.BoolVar(&f.allowPickle, "allow-pickle", false, "keep pickle weights (.bin, .pt, ...) even when safetensors exist")
 		if c != info {
-			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, dir:PATH, none")
+			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, ollama, dir:PATH, none (Ollama models default to ollama)")
 			fs.BoolVar(&f.dryRun, "dry-run", false, "stop after the plan")
 			fs.BoolVar(&f.lock, "lock", false, "record the result in the lockfile, creating it if needed")
 		}
@@ -178,8 +179,11 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 		return fail(mode, err)
 	}
 	to := f.to
-	if ref.Source == "url" && !f.toChanged {
+	switch {
+	case ref.Source == "url" && !f.toChanged:
 		to = "dir:." // a single file: next to the user, like curl -O
+	case ref.Source == "ollama" && !f.toChanged:
+		to = "ollama" // where ollama run looks
 	}
 	target, err := lmget.ParseTarget(to)
 	if err != nil {

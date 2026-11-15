@@ -128,3 +128,18 @@ func TestRenderedTextCarriesNoInjectedSequences(t *testing.T) {
 		}
 	}
 }
+
+func TestSummaryOfAnOllamaExportSaysHowToRunIt(t *testing.T) {
+	p := &lmget.Plan{Ref: lmget.Ref{Source: "ollama", Repo: "library/smollm2", Revision: "135m"}, Commit: strings.Repeat("9", 64),
+		Files: []lmget.File{{Path: "model.gguf", Size: 10}}, Bytes: 10, DiskFree: -1}
+	o := &lmget.Outcome{Plan: p, Path: "/x/.ollama/models", Fetched: 10, RunAs: "smollm2:135m"}
+	out := ansi.ReplaceAllString(renderSummary(o, lmget.Target{Kind: "ollama"}, "/s", "", 100), "")
+	if !strings.Contains(out, "ollama:smollm2:135m") || !strings.Contains(out, "ollama run smollm2:135m") {
+		t.Fatalf("summary:\n%s", out)
+	}
+	var b bytes.Buffer
+	List(ModePlain, &b, []lmget.Installed{{Ref: p.Ref, Commit: p.Commit}}, lmget.StoreStats{})
+	if !strings.HasPrefix(b.String(), "ollama:smollm2:135m\t") {
+		t.Fatalf("ls: %q", b.String())
+	}
+}

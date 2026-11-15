@@ -38,8 +38,11 @@ type hfTreeEntry struct {
 // Resolve turns a Ref into a Plan: commit, license, files with hashes, and
 // what the store already holds. Nothing is downloaded.
 func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, error) {
-	if ref.Source == "url" {
+	switch ref.Source {
+	case "url":
 		return c.resolveURL(ctx, ref, sel)
+	case "ollama":
+		return c.resolveOllama(ctx, ref, sel)
 	}
 	if ref.File != "" { // one file of the repository
 		sel.Include = []string{GlobEscape(ref.File)}

@@ -1,0 +1,312 @@
+package lmget
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+)
+
+// The Ollama registry speaks the Docker registry v2 protocol: a manifest per
+// tag, and blobs addressed by their sha256 digest. A model's commit is the
+// sha256 of its manifest, and every layer is a file of the plan named after
+// its media type. The manifest itself is the file OllamaManifestFile, so the
+// store keeps it, the lock pins it, and an export can be rebuilt offline.
+
+// OllamaManifestFile is the plan file that holds the registry manifest.
+const OllamaManifestFile = "manifest.json"
+
+const (
+	ollamaManifestType = "application/vnd.docker.distribution.manifest.v2+json"
+	ollamaLayerPrefix  = "application/vnd.ollama.image."
+	ollamaMaxManifest  = 4 << 20
+	ollamaMaxLayers    = 1000
+)
+
+var (
+	ollamaTagRe    = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
+	ollamaTypeRe   = regexp.MustCompile(`^[a-z][a-z0-9.-]{0,39}$`)
+	ollamaDigestRe = regexp.MustCompile(`^sha256:([0-9a-f]{64})$`)
+	// file names for the layer types runtimes know; other types keep their name
+	ollamaLayerNames = map[string]string{
+		"model": "model.gguf", "projector": "projector.gguf", "adapter": "adapter.gguf",
+		"params": "params.json", "messages": "messages.json",
+	}
+)
+
+type ollamaDescriptor struct {
+	MediaType string `json:"mediaType"`
+	Digest    string `json:"digest"`
+	Size      int64  `json:"size"`
+}
+
+type ollamaManifest struct {
+	SchemaVersion int                `json:"schemaVersion"`
+	MediaType     string             `json:"mediaType"`
+	Config        ollamaDescriptor   `json:"config"`
+	Layers        []ollamaDescriptor `json:"layers"`
+}
+
+// parseOllamaRef reads "name", "name:tag", "namespace/name[:tag]". Names
+// without a namespace are in "library", as in Ollama.
+func parseOllamaRef(in, orig string) (Ref, error) {
+	name, tag := in, "latest"
+	if i := strings.LastIndex(in, ":"); i >= 0 {
+		name, tag = in[:i], in[i+1:]
+	}
+	if !strings.Contains(name, "/") {
+		name = "library/" + name
+	}
+	r, err := validRef("ollama", name, "main", orig)
+	if err != nil {
+		return Ref{}, newErr(ExitUsage, "usage", "not an Ollama model name: "+quote(orig)).
+			why("expected name, name:tag or namespace/name:tag").
+			fix("lmget ollama:qwen3:0.6b", "")
+	}
+	if !ollamaTagRe.MatchString(tag) {
+		return Ref{}, newErr(ExitUsage, "usage", "not a valid Ollama tag: "+quote(tag)).
+			fix("lmget ollama:"+strings.TrimPrefix(name, "library/")+":latest", "")
+	}
+	r.Revision = tag
+	return r, nil
+}
+
+// parseOllamaURL reads https://ollama.com/<namespace>/<name>[:tag].
+func parseOllamaURL(u *url.URL, raw string) (Ref, error) {
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) != 2 || u.RawQuery != "" || u.Fragment != "" {
+		return Ref{}, newErr(ExitUsage, "usage", "the URL does not point to an Ollama model").
+			fix("lmget https://ollama.com/library/qwen3:0.6b", "")
+	}
+	return parseOllamaRef(parts[0]+"/"+parts[1], raw)
+}
+
+// OllamaName is the name Ollama shows for the model of this plan
+// (ollama run <name>).
+func (c *Client) OllamaName(r Ref) string {
+	host := hostOf(c.opt.OllamaRegistry)
+	name := r.Repo + ":" + r.Revision
+	if host == "registry.ollama.ai" {
+		return strings.TrimPrefix(name, "library/")
+	}
+	return host + "/" + name
+}
+
+func (c *Client) resolveOllama(ctx context.Context, ref Ref, sel Selection) (*Plan, error) {
+	u := fmt.Sprintf("%s/v2/%s/manifests/%s", c.opt.OllamaRegistry, ref.Repo, url.PathEscape(ref.Revision))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authorize(req) // user agent only: the token is for the HF endpoint
+	req.Header.Set("Accept", ollamaManifestType)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, newErr(ExitNetwork, "network", "cannot reach "+hostOf(c.opt.OllamaRegistry)).
+			wrap(err).fix("lmget doctor", "check connectivity")
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case 200:
+	case 404:
+		return nil, newErr(ExitNotFound, "not_found", ref.Display()+" was not found").
+			why("no such model or tag in the Ollama registry").
+			fix("", "check the name at https://ollama.com/"+ref.Repo)
+	case 401, 403:
+		return nil, newErr(ExitAuth, "auth", ref.Display()+" is not public").
+			why("lmget downloads public Ollama models only")
+	case 429:
+		return nil, newErr(ExitNetwork, "network", "rate limited by "+hostOf(c.opt.OllamaRegistry)).
+			fix("", "wait a minute and run again")
+	default:
+		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(c.opt.OllamaRegistry), printable(resp.Status)))
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, ollamaMaxManifest+1))
+	if err != nil {
+		return nil, newErr(ExitNetwork, "network", "the manifest of "+ref.Display()+" did not arrive").wrap(err)
+	}
+	if len(body) > ollamaMaxManifest {
+		return nil, newErr(ExitFailure, "source", "the manifest of "+ref.Display()+" is larger than 4 MiB")
+	}
+	sum := sha256.Sum256(body)
+	return c.ollamaPlan(ref, body, hex.EncodeToString(sum[:]), sel)
+}
+
+// ollamaPlan builds the plan of a manifest whose sha256 is commit.
+func (c *Client) ollamaPlan(ref Ref, body []byte, commit string, sel Selection) (*Plan, error) {
+	bad := func(format string, a ...any) error {
+		return newErr(ExitFailure, "source", "unexpected manifest for "+ref.Display()).why(format, a...)
+	}
+	var m ollamaManifest
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, bad("not valid JSON: %v", err)
+	}
+	if m.SchemaVersion != 2 || m.MediaType != ollamaManifestType {
+		return nil, bad("schema %d, media type %q", m.SchemaVersion, printable(m.MediaType))
+	}
+	if len(m.Layers) == 0 || len(m.Layers) > ollamaMaxLayers {
+		return nil, bad("%d layers", len(m.Layers))
+	}
+	p := &Plan{Ref: ref, Commit: commit}
+	p.Files = append(p.Files, File{Path: OllamaManifestFile, Size: int64(len(body)), SHA256: commit, data: body})
+	used := map[string]int{OllamaManifestFile: 1}
+	add := func(d ollamaDescriptor, name string) error {
+		mm := ollamaDigestRe.FindStringSubmatch(d.Digest)
+		if mm == nil {
+			return bad("invalid digest %q", printable(d.Digest))
+		}
+		if d.Size < 0 || d.Size > MaxFileSize {
+			return bad("invalid size %d for %s", d.Size, mm[1][:12])
+		}
+		if n := used[name]; n > 0 { // a second license is license-2
+			ext := path.Ext(name)
+			name = fmt.Sprintf("%s-%d%s", strings.TrimSuffix(name, ext), n+1, ext)
+		}
+		used[name]++
+		p.Files = append(p.Files, File{Path: name, Size: d.Size, SHA256: mm[1],
+			url: fmt.Sprintf("%s/v2/%s/blobs/sha256:%s", c.opt.OllamaRegistry, ref.Repo, mm[1])})
+		return nil
+	}
+	if err := add(m.Config, "config.json"); err != nil {
+		return nil, err
+	}
+	for _, l := range m.Layers {
+		typ, ok := strings.CutPrefix(l.MediaType, ollamaLayerPrefix)
+		if !ok || !ollamaTypeRe.MatchString(typ) {
+			return nil, bad("unknown layer type %q", printable(l.MediaType))
+		}
+		name := typ
+		if n, ok := ollamaLayerNames[typ]; ok {
+			name = n
+		}
+		if err := add(l, name); err != nil {
+			return nil, err
+		}
+	}
+	if err := p.apply(sel, c.store, c.store.Root()); err != nil {
+		return nil, err
+	}
+	// the manifest always comes along: it is what identifies the model
+	for i := range p.Files {
+		if p.Files[i].Path == OllamaManifestFile {
+			p.Files[i].Skipped = ""
+		}
+	}
+	p.recount(c.store)
+	return p, nil
+}
+
+// resolveOllamaPinned builds the plan of a locked Ollama entry. The registry
+// serves manifests by tag only, so a manifest a pull verified for this exact
+// model is read from the store; otherwise the tag must still point at it.
+func (c *Client) resolveOllamaPinned(ctx context.Context, ref Ref, commit string, sel Selection) (*Plan, error) {
+	if m, err := c.store.loadManifest(ref, commit); err == nil && m.Verified[OllamaManifestFile] == commit {
+		if b, err := os.ReadFile(c.store.BlobPath(commit)); err == nil {
+			if s := sha256.Sum256(b); hex.EncodeToString(s[:]) == commit {
+				return c.ollamaPlan(ref, b, commit, sel)
+			}
+		}
+	}
+	p, err := c.resolveOllama(ctx, ref, sel)
+	if err != nil {
+		return nil, err
+	}
+	if p.Commit != commit {
+		return nil, newErr(ExitVerify, "lock", "the source does not match the lock for "+ref.Display()).
+			why("the tag now points at manifest %s, the lock has %s", p.Commit[:12], commit[:12]).
+			fix("lmget sync --update "+ref.Display(), "accept what the source publishes now")
+	}
+	return p, nil
+}
+
+// OllamaModelsDir follows Ollama: $OLLAMA_MODELS, else ~/.ollama/models.
+func OllamaModelsDir() string {
+	if p := os.Getenv("OLLAMA_MODELS"); p != "" {
+		return p
+	}
+	h, _ := os.UserHomeDir()
+	return filepath.Join(h, ".ollama", "models")
+}
+
+// exportOllama links the layers into Ollama's blobs directory and writes the
+// manifest as the tag file, so ollama list and ollama run find the model
+// without downloading anything.
+func (c *Client) exportOllama(plan *Plan) (string, []string, error) {
+	root := OllamaModelsDir()
+	if plan.Ref.Source != "ollama" {
+		return root, nil, newErr(ExitUsage, "usage", "the Ollama export holds Ollama models only").
+			fix("--to dir:PATH", "a plain directory")
+	}
+	for _, f := range plan.Files {
+		if !f.Selected() {
+			return root, nil, newErr(ExitUsage, "usage", "the Ollama export needs every layer, "+f.Path+" is not selected").
+				fix("", "drop --include and --exclude, or export to --to dir:PATH")
+		}
+	}
+	body, err := os.ReadFile(c.store.BlobPath(plan.Commit))
+	if err != nil {
+		return root, nil, newErr(ExitFailure, "export", "the manifest is not in the store")
+	}
+	if s := sha256.Sum256(body); hex.EncodeToString(s[:]) != plan.Commit {
+		return root, nil, newErr(ExitVerify, "verify", "the stored manifest does not match its hash").
+			fix("lmget doctor --verify", "")
+	}
+	var links []string
+	for _, f := range plan.Files {
+		if f.Path == OllamaManifestFile {
+			continue
+		}
+		blob := filepath.Join(root, "blobs", "sha256-"+f.SHA256)
+		if err := os.MkdirAll(filepath.Dir(blob), 0o755); err != nil {
+			return root, links, diskErr(err)
+		}
+		storeBlob := c.store.BlobPath(f.SHA256)
+		fi, err := os.Lstat(blob)
+		switch {
+		case err != nil: // absent
+			if err := linkOrSymlink(storeBlob, blob); err != nil {
+				return root, links, diskErr(err)
+			}
+			links = append(links, blob)
+		case same(storeBlob, blob): // ours from an earlier run
+			links = append(links, blob)
+		case fi.Mode().IsRegular() && hasContent(blob, f.Size, f.SHA256):
+			// Ollama's own download, with the right bytes: leave it to Ollama
+		default: // wrong bytes, wrong size or not a file: serve the verified ones
+			os.Remove(blob)
+			if err := linkOrSymlink(storeBlob, blob); err != nil {
+				return root, links, diskErr(err)
+			}
+			links = append(links, blob)
+		}
+	}
+	// a copy, not a link: whoever rewrites the tag file must not change the store
+	tag := filepath.Join(root, "manifests", hostOf(c.opt.OllamaRegistry), filepath.FromSlash(plan.Ref.Repo), plan.Ref.Revision)
+	if err := os.MkdirAll(filepath.Dir(tag), 0o755); err != nil {
+		return root, links, diskErr(err)
+	}
+	// identical bytes already there are Ollama's own pull (or an earlier
+	// export, already recorded): only a tag written now is added
+	if !hasContent(tag, int64(len(body)), plan.Commit) {
+		if err := writeFileAtomic(tag, body); err != nil {
+			return root, links, diskErr(err)
+		}
+		if err := os.Chmod(tag, 0o644); err != nil {
+			return root, links, diskErr(err)
+		}
+		links = append(links, tag)
+	}
+	return root, links, nil
+}

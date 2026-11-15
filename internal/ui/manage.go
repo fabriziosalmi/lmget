@@ -14,6 +14,14 @@ import (
 
 func clean(s string) string { return lmget.Printable(s) }
 
+// listName: the repository for Hugging Face and URLs, ollama:name:tag for Ollama.
+func listName(r lmget.Ref) string {
+	if r.Source == "ollama" {
+		return clean(r.Display())
+	}
+	return clean(r.Repo)
+}
+
 func writeJSON(w io.Writer, typ string, fields map[string]any) {
 	fields["v"] = lmget.SchemaVersion
 	fields["type"] = typ
@@ -44,7 +52,7 @@ func List(mode Mode, w io.Writer, models []lmget.Installed, st lmget.StoreStats)
 		return
 	case ModePlain:
 		for _, m := range models {
-			fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%s\n", m.Ref.Repo, m.Commit, m.Bytes, m.Files, m.Missing, exportLabel(m.Exports))
+			fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%s\n", listName(m.Ref), m.Commit, m.Bytes, m.Files, m.Missing, exportLabel(m.Exports))
 		}
 		return
 	}
@@ -52,7 +60,7 @@ func List(mode Mode, w io.Writer, models []lmget.Installed, st lmget.StoreStats)
 	b.WriteString("\n")
 	nameW := 0
 	for _, m := range models {
-		nameW = max(nameW, min(48, lipgloss.Width(m.Ref.Repo)))
+		nameW = max(nameW, min(48, lipgloss.Width(listName(m.Ref))))
 	}
 	for _, m := range models {
 		state := sDim.Render(exportLabel(m.Exports))
@@ -63,7 +71,7 @@ func List(mode Mode, w io.Writer, models []lmget.Installed, st lmget.StoreStats)
 		if m.Files == 1 {
 			files = "1 file"
 		}
-		fmt.Fprintf(&b, "  %s  %s  %s  %s  %s\n", pad(middleTrunc(m.Ref.Repo, 48), nameW), sDim.Render(m.Commit[:7]),
+		fmt.Fprintf(&b, "  %s  %s  %s  %s  %s\n", pad(middleTrunc(listName(m.Ref), 48), nameW), sDim.Render(m.Commit[:7]),
 			padLeft(hb(m.Bytes), 8), padLeft(files, 9), state)
 	}
 	if len(models) == 0 {

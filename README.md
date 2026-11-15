@@ -4,7 +4,7 @@ Get open models from their sources, verified.
 
 lmget resolves a model, shows what it is about to download, fetches it with resumable parallel requests, checks every file against the hash the source publishes, and links it where your tools already look for it.
 
-Status: early development. Sources in this build: Hugging Face, and direct https URLs.
+Status: early development. Sources in this build: Hugging Face, the Ollama registry, and direct https URLs.
 
 ## Usage
 
@@ -18,6 +18,7 @@ lmget unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'
 lmget https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf   # one file
 lmget https://example.org/models/tiny.gguf     # any https URL, saved in the current directory
 lmget 'https://example.org/models/tiny.gguf#sha256=<64 hex>'   # with the hash you expect
+lmget ollama:smollm2:135m                      # into Ollama: ollama run smollm2:135m
 ```
 
 What happens on every run:
@@ -29,6 +30,21 @@ What happens on every run:
 - **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle is refused unless its name says so. Pickles are detected by walking their opcodes (protocols 0 to 5); a zip with a `.pkl` entry, as `torch.save` writes, counts as one, and so does a zip lmget cannot read. Refused files exit with code 5.
 - **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.ckpt`, ...) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory, that contain control characters, or that contain invisible code points (which some filesystems drop, so two names could land on one file) are refused. Sizes above 16 TiB are refused.
 
+## Ollama
+
+```sh
+lmget ollama:qwen3:0.6b                        # name[:tag], tag latest by default
+lmget ollama:huihui_ai/qwen3-abliterated:0.6b  # namespace/name:tag
+lmget https://ollama.com/library/qwen3:0.6b    # URLs work too
+lmget ollama:qwen3:0.6b --to dir:./models/qwen3
+```
+
+lmget reads the manifest of the tag from `registry.ollama.ai` and identifies the model by the sha256 of that manifest, which is the commit shown in the plan and pinned in `lmget.lock`. Every layer is a file of the plan, named after its type (`model.gguf`, `template`, `system`, `params.json`, `license`, ...), and verified against the sha256 digest the manifest gives for it; `manifest.json` itself is always part of the download. The model layer must be a GGUF file.
+
+Ollama models are exported by default to Ollama's models directory (`$OLLAMA_MODELS`, else `~/.ollama/models`): the layers are linked as `blobs/sha256-<digest>` (hard links on the same disk) and the manifest is written as the tag file, as a copy: a tool that rewrites the tag file cannot change the store. The Ollama export needs every layer, so `--include` and `--exclude` work only with `--to dir:` or `--to none`. `lmget rm ollama:<name>:<tag>` removes only what lmget wrote: blobs and tag files that Ollama downloaded itself are left in place.
+
+The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ollama model from the manifest an earlier pull verified for that same name, and fetches missing layers by digest even after the tag has moved; without such a manifest in the store, the tag must still point at the locked one, or `sync` stops with exit code 5. Only public models are supported, and no token is sent to the registry.
+
 ## Lockfile
 
 ```sh
@@ -37,7 +53,7 @@ lmget sync                       # reproduce it: same commits, every file checke
 lmget sync --update              # resolve the revisions again and rewrite the lock
 ```
 
-`lmget.lock` pins each model to a commit and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
+`lmget.lock` pins each model to a commit (for Ollama, the sha256 of its manifest) and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
 
 A lockfile usually arrives with a cloned repository, so lmget treats it as untrusted input:
 
@@ -77,7 +93,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | type | fields |
 |---|---|
 | `resolve` | `ref` |
-| `plan` | `plan`: `ref`, `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free` |
+| `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `url`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free` |
 | `file_start` | `file`, `total` |
 | `progress` | `file`, `bytes`, `total` (at most 4 per second per file) |
 | `file_done` | `file`, `sha256`, `total`, `cached` |

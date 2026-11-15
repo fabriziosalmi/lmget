@@ -41,7 +41,7 @@ func (c *Client) List() ([]Installed, error) {
 	var out []Installed
 	for path, m := range ms {
 		in := Installed{Ref: m.Plan.Ref, Commit: m.Plan.Commit, Exports: m.Exports, Updated: m.Updated, manifest: path}
-		if in.Ref.Source != "url" {
+		if in.Ref.Source == "hf" { // an Ollama model keeps its tag: rm works by tag
 			in.Ref.Revision = "main"
 		}
 		in.Ref.File, in.Ref.SHA256 = "", ""
@@ -121,7 +121,8 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		if in.Ref.Source != ref.Source || !strings.EqualFold(in.Ref.Repo, ref.Repo) {
 			continue
 		}
-		if ref.Revision == "main" || ref.Revision == "" || (len(ref.Revision) >= 7 && strings.HasPrefix(in.Commit, ref.Revision)) {
+		byTag := ref.Source == "ollama" && in.Ref.Revision == ref.Revision
+		if byTag || ref.Revision == "main" || ref.Revision == "" || (len(ref.Revision) >= 7 && strings.HasPrefix(in.Commit, ref.Revision)) {
 			hit = append(hit, in)
 		}
 	}
@@ -138,7 +139,7 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		owned := c.blobInodes(m.Plan)
 		var failed []string
 		for _, ex := range m.Exports {
-			n, f := c.unlinkExport(ex, owned)
+			n, f := c.unlinkExport(ex, owned, m.Plan)
 			res.Links += n
 			failed = append(failed, f...)
 		}
@@ -151,7 +152,11 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 			return nil, diskErr(err)
 		}
 		removeEmptyUp(filepath.Dir(in.manifest), filepath.Join(c.store.Root(), "refs"))
-		res.Models = append(res.Models, in.Ref.Repo+"@"+in.Commit[:7])
+		name := in.Ref.Repo
+		if in.Ref.Source == "ollama" {
+			name = in.Ref.Display()
+		}
+		res.Models = append(res.Models, name+"@"+in.Commit[:7])
 	}
 	gc, err := c.gc()
 	if err != nil {
@@ -190,7 +195,7 @@ func (c *Client) blobInodes(p *Plan) map[inode]bool {
 // link to one of the model's blobs, or a symlink into the store or into the
 // cache's own blobs directory. Anything else (replaced or edited by the user,
 // or by another tool) is left alone.
-func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool) (int, []string) {
+func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan) (int, []string) {
 	var failed []string
 	sep := string(os.PathSeparator)
 	storeBlobs := filepath.Join(c.store.Root(), "blobs", "sha256") + sep
@@ -222,6 +227,10 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool) (int, []str
 			}
 		} else if in, ok := inodeOf(fi); ok && fi.Mode().IsRegular() {
 			mine = owned[in]
+			if !mine && ex.Kind == "ollama" && plan.Ref.Source == "ollama" {
+				// the tag file is a copy of the manifest, whose sha256 is the commit
+				mine = hasContent(l, fi.Size(), plan.Commit)
+			}
 		}
 		if !mine {
 			continue

@@ -23,8 +23,15 @@ type Ref struct {
 // String is the canonical form, used as the key in lmget.lock. File and
 // SHA256 are not part of it: the lock keeps them as selection and hashes.
 func (r Ref) String() string {
-	if r.Source == "url" {
+	switch r.Source {
+	case "url":
 		return r.Repo
+	case "ollama": // Ollama's own spelling: name:tag, library/ implied
+		s := "ollama:" + strings.TrimPrefix(r.Repo, "library/")
+		if r.Revision != "" && r.Revision != "latest" {
+			s += ":" + r.Revision
+		}
+		return s
 	}
 	s := r.Source + ":" + r.Repo
 	if r.Revision != "" && r.Revision != "main" {
@@ -53,7 +60,6 @@ var (
 
 // planned sources: parsed so the error can say "not yet" instead of "unknown"
 var plannedSources = map[string]string{
-	"ollama":     "Ollama registry",
 	"ms":         "ModelScope",
 	"modelscope": "ModelScope",
 	"civitai":    "Civitai",
@@ -62,8 +68,9 @@ var plannedSources = map[string]string{
 	"sha256":     "content addresses",
 }
 
-// ParseRef accepts "Org/Name", "Org/Name@rev", "hf:Org/Name[@rev]" and
-// Hugging Face URLs (https://huggingface.co/Org/Name[/tree/rev]).
+// ParseRef accepts "Org/Name", "Org/Name@rev", "hf:Org/Name[@rev]",
+// Hugging Face URLs (https://huggingface.co/Org/Name[/tree/rev]),
+// "ollama:name[:tag]" and Ollama URLs (https://ollama.com/library/name:tag).
 // Repo and revision are validated before anything builds a path or URL from them.
 func ParseRef(s string) (Ref, error) {
 	in := strings.TrimSpace(s)
@@ -81,6 +88,8 @@ func ParseRef(s string) (Ref, error) {
 	switch src {
 	case "hf", "huggingface":
 		src = "hf"
+	case "ollama":
+		return parseOllamaRef(in, s)
 	default:
 		if name, ok := plannedSources[src]; ok {
 			return Ref{}, newErr(ExitUsage, "unsupported", name+" is not supported yet").
@@ -104,6 +113,9 @@ func parseURLRef(raw string) (Ref, error) {
 	host := strings.ToLower(u.Hostname())
 	if host == "huggingface.co" || host == "hf.co" || host == "www.huggingface.co" {
 		return parseHFURL(u, raw)
+	}
+	if host == "ollama.com" || host == "www.ollama.com" {
+		return parseOllamaURL(u, raw)
 	}
 	if u.Scheme != "https" {
 		return Ref{}, newErr(ExitUsage, "usage", "plain http is not supported").

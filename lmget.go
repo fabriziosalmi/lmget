@@ -1,7 +1,7 @@
 // Package lmget resolves open models at their sources, downloads them with
 // resumable ranged requests, verifies every byte against the hash the source
 // publishes, keeps them in a content-addressed store and exports them to the
-// layouts runtimes read (Hugging Face cache, plain directory).
+// layouts runtimes read (Hugging Face cache, Ollama, plain directory).
 //
 // The CLI is a thin renderer over Pull: everything it shows, --json included,
 // is the same Event stream a library user receives.
@@ -25,10 +25,12 @@ type Options struct {
 	Home       string // store root; default $LMGET_HOME, else ~/.lmget
 	HFEndpoint string // default $HF_ENDPOINT, else https://huggingface.co
 	HFToken    string // default $HF_TOKEN, else the token file of huggingface_hub
-	Conns      int    // parallel connections per file; default 8
-	ChunkSize  int64  // ranged request size; default 16 MiB
-	HTTP       *http.Client
-	UserAgent  string
+	// OllamaRegistry is the Ollama registry; default https://registry.ollama.ai
+	OllamaRegistry string
+	Conns          int   // parallel connections per file; default 8
+	ChunkSize      int64 // ranged request size; default 16 MiB
+	HTTP           *http.Client
+	UserAgent      string
 }
 
 type Client struct {
@@ -56,6 +58,10 @@ func New(o Options) (*Client, error) {
 		o.HFEndpoint = "https://huggingface.co"
 	}
 	o.HFEndpoint = strings.TrimRight(o.HFEndpoint, "/")
+	if o.OllamaRegistry == "" {
+		o.OllamaRegistry = "https://registry.ollama.ai"
+	}
+	o.OllamaRegistry = strings.TrimRight(o.OllamaRegistry, "/")
 	tokenSource := "option"
 	if o.HFToken == "" {
 		o.HFToken, tokenSource = hfToken()
