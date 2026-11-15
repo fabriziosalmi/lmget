@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -170,18 +169,7 @@ func (c *Client) ollamaPlan(ref Ref, body []byte, commit string, sel Selection) 
 		if d.Size < 0 || d.Size > MaxFileSize {
 			return bad("invalid size %d for %s", d.Size, mm[1][:12])
 		}
-		if used[name] > 0 { // a second license is license-2, or the next free name
-			ext := path.Ext(name)
-			stem := strings.TrimSuffix(name, ext)
-			for k := used[name] + 1; ; k++ {
-				if cand := fmt.Sprintf("%s-%d%s", stem, k, ext); used[cand] == 0 {
-					used[name]++
-					name = cand
-					break
-				}
-			}
-		}
-		used[name]++
+		name = uniqueName(used, name) // a second license is license-2, or the next free name
 		p.Files = append(p.Files, File{Path: name, Size: d.Size, SHA256: mm[1],
 			url: fmt.Sprintf("%s/v2/%s/blobs/sha256:%s", c.opt.OllamaRegistry, ref.Repo, mm[1])})
 		return nil

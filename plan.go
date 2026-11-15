@@ -27,6 +27,8 @@ type File struct {
 	// data: the bytes are already known (an Ollama manifest read while
 	// resolving); they go through the same verify, check and commit
 	data []byte
+	// ociRepo: the blob is on an OCI registry and needs its pull token
+	ociRepo string
 }
 
 // Selected reports whether the file will be fetched or exported.

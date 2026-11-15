@@ -26,6 +26,14 @@ func (r Ref) String() string {
 	switch r.Source {
 	case "url":
 		return r.Repo
+	case "oci":
+		switch {
+		case strings.HasPrefix(r.Revision, "sha256:"):
+			return "oci://" + r.Repo + "@" + r.Revision
+		case r.Revision != "" && r.Revision != "latest":
+			return "oci://" + r.Repo + ":" + r.Revision
+		}
+		return "oci://" + r.Repo
 	case "ollama": // Ollama's own spelling: name:tag, library/ implied
 		s := "ollama:" + strings.TrimPrefix(r.Repo, "library/")
 		if r.Revision != "" && r.Revision != "latest" {
@@ -63,7 +71,6 @@ var plannedSources = map[string]string{
 	"ms":         "ModelScope",
 	"modelscope": "ModelScope",
 	"civitai":    "Civitai",
-	"oci":        "OCI registries",
 	"magnet":     "BitTorrent magnet links",
 	"sha256":     "content addresses",
 }
@@ -77,6 +84,9 @@ func ParseRef(s string) (Ref, error) {
 	if in == "" {
 		return Ref{}, newErr(ExitUsage, "usage", "no model given").
 			fix("lmget Qwen/Qwen3-0.6B", "a Hugging Face repo, optionally @revision")
+	}
+	if strings.HasPrefix(strings.ToLower(in), "oci://") {
+		return parseOCIRef("oci://" + in[len("oci://"):])
 	}
 	if strings.HasPrefix(in, "https://") || strings.HasPrefix(in, "http://") {
 		return parseURLRef(in)

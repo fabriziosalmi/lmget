@@ -16,7 +16,7 @@ func clean(s string) string { return lmget.Printable(s) }
 
 // listName: the repository for Hugging Face and URLs, ollama:name:tag for Ollama.
 func listName(r lmget.Ref) string {
-	if r.Source == "ollama" {
+	if r.Source == "ollama" || r.Source == "oci" {
 		return clean(r.Display())
 	}
 	return clean(r.Repo)

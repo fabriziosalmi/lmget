@@ -122,7 +122,7 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		if in.Ref.Source != ref.Source || !strings.EqualFold(in.Ref.Repo, ref.Repo) {
 			continue
 		}
-		byTag := ref.Source == "ollama" && in.Ref.Revision == ref.Revision
+		byTag := (ref.Source == "ollama" || ref.Source == "oci") && in.Ref.Revision == ref.Revision
 		if byTag || ref.Revision == "main" || ref.Revision == "" || (len(ref.Revision) >= 7 && strings.HasPrefix(in.Commit, ref.Revision)) {
 			hit = append(hit, in)
 		}
@@ -176,7 +176,7 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		}
 		removeEmptyUp(filepath.Dir(in.manifest), filepath.Join(c.store.Root(), "refs"))
 		name := in.Ref.Repo
-		if in.Ref.Source == "ollama" {
+		if in.Ref.Source == "ollama" || in.Ref.Source == "oci" {
 			name = in.Ref.Display()
 		}
 		res.Models = append(res.Models, name+"@"+in.Commit[:7])

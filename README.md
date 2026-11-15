@@ -4,7 +4,7 @@ Get open models from their sources, verified.
 
 lmget resolves a model, shows what it is about to download, fetches it with resumable parallel requests, checks every file against the hash the source publishes, and links it where your tools already look for it.
 
-Status: early development. Sources in this build: Hugging Face, the Ollama registry, and direct https URLs.
+Status: early development. Sources in this build: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries (Docker Hub's `ai/` models, ghcr.io, ...), and direct https URLs.
 
 ## Usage
 
@@ -77,6 +77,16 @@ lmget doctor --verify            # also re-hash every blob in the store
 ## Direct URLs
 
 Only https is accepted, and URLs with credentials (`user:pass@`) are refused. The expected sha256 comes from, in order: a `#sha256=` fragment you add, a `Repr-Digest` or `Digest` header from the server, or, when neither exists, the first download, which is then pinned in `lmget.lock` and shown as "pinned on first download". A partial download is bound to the server's `ETag` (or `Last-Modified`) and every ranged request carries `If-Range`: if the file changes on the server, lmget starts over instead of joining two versions. URLs with a query string (signed URLs carry credentials there) are downloaded but never written to `lmget.lock`. lmget sends no token to hosts other than the Hugging Face endpoint, and a redirect from https to http is refused.
+
+## OCI registries
+
+```sh
+lmget oci://docker.io/ai/smollm2               # Docker Hub's ai/ models, tag latest by default
+lmget oci://docker.io/ai/smollm2:360M-Q4_K_M
+lmget oci://ghcr.io/org/model@sha256:<64 hex>  # pinned by manifest digest
+```
+
+lmget reads the model's manifest (OCI or Docker), checks it against the registry's `Docker-Content-Digest`, and pins its digest as the commit; `sync` asks for that exact digest, so it reproduces the model even after the tag moved. Every layer is verified against its sha256 digest. Files are named after the manifest's `org.cncf.model.filepath` annotation (CNCF model spec) or, for Docker's AI artifacts, after their type (`model.gguf`, `license`). The model is exported to `dir:./<name>` by default. Anonymous pull tokens are renewed while a download runs; only public images are supported, and multi-platform indexes are refused (pin a manifest with `@sha256:`).
 
 ## When Hugging Face fails
 

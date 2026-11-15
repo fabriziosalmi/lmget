@@ -127,7 +127,7 @@ type Manifest struct {
 
 // validCommit: a git commit, or for Ollama the sha256 of the manifest.
 func validCommit(ref Ref, commit string) bool {
-	if ref.Source == "ollama" {
+	if ref.Source == "ollama" || ref.Source == "oci" {
 		return hex64.MatchString(commit)
 	}
 	return hex40.MatchString(commit)
@@ -139,6 +139,12 @@ func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
 	}
 	if ref.Source == "url" { // the commit of a URL plan is the sha1 of the URL
 		return filepath.Join(s.root, "refs", "url", commit+".json"), nil
+	}
+	if ref.Source == "oci" { // host/path/...: validated segment by segment
+		if !validOCIRepo(ref.Repo) {
+			return "", fmt.Errorf("not an OCI repository: %q", ref.Repo)
+		}
+		return filepath.Join(s.root, "refs", "oci", filepath.FromSlash(ref.Repo), commit+".json"), nil
 	}
 	if _, err := validRef(ref.Source, ref.Repo, "main", ref.Repo); err != nil {
 		return "", err

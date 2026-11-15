@@ -43,6 +43,8 @@ func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, er
 		return c.resolveURL(ctx, ref, sel)
 	case "ollama":
 		return c.resolveOllama(ctx, ref, sel)
+	case "oci":
+		return c.resolveOCI(ctx, ref, sel)
 	}
 	if ref.File != "" { // one file of the repository
 		sel.Include = []string{GlobEscape(ref.File)}

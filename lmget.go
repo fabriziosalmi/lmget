@@ -45,6 +45,8 @@ type Client struct {
 	tokenSource string // where the token came from; never the token itself
 	msMu        sync.Mutex
 	msFiles     map[string]map[string]msFile // ModelScope listings, per repository
+	ociMu       sync.Mutex
+	ociTokens   map[string]ociToken // pull tokens, per OCI repository
 }
 
 func New(o Options) (*Client, error) {

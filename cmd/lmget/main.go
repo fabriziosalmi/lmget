@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
@@ -185,6 +186,8 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 		to = "dir:." // a single file: next to the user, like curl -O
 	case ref.Source == "ollama" && !f.toChanged:
 		to = "ollama" // where ollama run looks
+	case ref.Source == "oci" && !f.toChanged:
+		to = "dir:./" + path.Base(ref.Repo) // no runtime reads OCI models from a cache lmget knows
 	}
 	target, err := lmget.ParseTarget(to)
 	if err != nil {

@@ -137,7 +137,7 @@ func ReadLock(path string) (*Lock, error) {
 				return nil, lockErr(path, where+": a URL entry needs commit "+urlID(ref.Repo)+" and exactly one file")
 			}
 		}
-		if ref.Source == "ollama" && !hasManifestFile(m) {
+		if (ref.Source == "ollama" || ref.Source == "oci") && !hasManifestFile(m) {
 			// the manifest is the model's identity: its file must be the commit
 			return nil, lockErr(path, where+": an Ollama entry needs the file "+OllamaManifestFile+" with sha256 equal to the commit")
 		}

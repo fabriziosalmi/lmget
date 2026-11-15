@@ -163,19 +163,35 @@ func (c *Client) fetchChunk(ctx context.Context, f File, out *os.File, off, size
 func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size int64, cnt *counters, ranged bool) (int64, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.url, nil)
-	if err != nil {
-		return 0, err
-	}
-	c.authorize(req)
-	if ranged {
-		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, off+size-1))
-		if f.ifRange != "" {
-			req.Header.Set("If-Range", f.ifRange)
+	build := func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.url, nil)
+		if err != nil {
+			return nil, err
 		}
+		c.authorize(req)
+		if ranged {
+			req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, off+size-1))
+			if f.ifRange != "" {
+				req.Header.Set("If-Range", f.ifRange)
+			}
+		}
+		return req, nil
 	}
-	resp, err := c.http.Do(req)
+	var resp *http.Response
+	var err error
+	if f.ociRepo != "" { // a registry blob: with a pull token, renewed when it expires
+		resp, err = c.ociDo(ctx, f.ociRepo, build)
+	} else {
+		var req *http.Request
+		if req, err = build(); err != nil {
+			return 0, err
+		}
+		resp, err = c.http.Do(req)
+	}
 	if err != nil {
+		if le, ok := err.(*Error); ok {
+			return 0, le
+		}
 		return 0, newErr(ExitNetwork, "network", "request failed").wrap(err)
 	}
 	defer resp.Body.Close()
