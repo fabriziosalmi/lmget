@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -130,6 +131,28 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		return nil, newErr(ExitNotFound, "not_found", ref.Display()+" is not in the store").
 			fix("lmget ls", "list what is stored")
 	}
+	// links that models not being removed still record: an export directory,
+	// the HF cache and Ollama's blobs directory are shared, and a link two
+	// records list belongs to both
+	removing := map[string]bool{}
+	for _, in := range hit {
+		removing[in.manifest] = true
+	}
+	keep := map[string]bool{}
+	for _, in := range all {
+		if removing[in.manifest] {
+			continue
+		}
+		m, err := readManifest(in.manifest)
+		if err != nil {
+			return nil, err
+		}
+		for _, ex := range m.Exports {
+			for _, l := range ex.Links {
+				keep[filepath.Clean(l)] = true
+			}
+		}
+	}
 	res := &RemoveResult{}
 	for _, in := range hit {
 		m, err := readManifest(in.manifest)
@@ -139,7 +162,7 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 		owned := c.blobInodes(m.Plan)
 		var failed []string
 		for _, ex := range m.Exports {
-			n, f := c.unlinkExport(ex, owned, m.Plan)
+			n, f := c.unlinkExport(ex, owned, m.Plan, keep)
 			res.Links += n
 			failed = append(failed, f...)
 		}
@@ -194,27 +217,45 @@ func (c *Client) blobInodes(p *Plan) map[inode]bool {
 // unlinkExport removes the recorded links that are still lmget's: a hard
 // link to one of the model's blobs, or a symlink into the store or into the
 // cache's own blobs directory. Anything else (replaced or edited by the user,
-// or by another tool) is left alone.
-func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan) (int, []string) {
+// or by another tool) is left alone, and so is a link another record lists
+// (keep). Blob links in a shared, digest-named directory (the HF cache's
+// blobs, Ollama's blobs) go last, and only when nothing left there names
+// them: no remaining snapshot symlink, no remaining Ollama tag file.
+func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan, keep map[string]bool) (int, []string) {
 	var failed []string
 	sep := string(os.PathSeparator)
 	storeBlobs := filepath.Join(c.store.Root(), "blobs", "sha256") + sep
 	// top: the export's own directory. stop: empty directories are pruned up
 	// to here and never above (the HF cache root, or the export directory).
-	var top, stop, repoBlobs string
+	var top, stop, repoBlobs, sharedBlobs string
 	switch ex.Kind {
 	case "hf": // ex.Path is <cache>/models--org--name/snapshots/<commit>
 		top = filepath.Dir(filepath.Dir(ex.Path))
 		stop = filepath.Dir(top)
 		repoBlobs = filepath.Join(top, "blobs") + sep
+		sharedBlobs = repoBlobs
+	case "ollama": // ex.Path is Ollama's models directory
+		top, stop = ex.Path, ex.Path
+		sharedBlobs = filepath.Join(ex.Path, "blobs") + sep
 	default:
 		top, stop = ex.Path, ex.Path
 	}
-	n := 0
+	var own, blobs []string
 	for _, l := range ex.Links {
+		if sharedBlobs != "" && strings.HasPrefix(filepath.Clean(l), sharedBlobs) {
+			blobs = append(blobs, l)
+		} else {
+			own = append(own, l)
+		}
+	}
+	n := 0
+	remove := func(l string, inUse map[string]bool) {
+		if keep[filepath.Clean(l)] || inUse[filepath.Base(l)] {
+			return // another model still uses it
+		}
 		fi, err := os.Lstat(l)
 		if err != nil {
-			continue
+			return
 		}
 		mine := false
 		if fi.Mode()&os.ModeSymlink != 0 {
@@ -233,14 +274,27 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan)
 			}
 		}
 		if !mine {
-			continue
+			return
 		}
 		if err := os.Remove(l); err != nil && !os.IsNotExist(err) {
 			failed = append(failed, l)
-			continue
+			return
 		}
 		n++
 		removeEmptyUp(filepath.Dir(l), stop)
+	}
+	for _, l := range own {
+		remove(l, nil)
+	}
+	var inUse map[string]bool
+	switch ex.Kind {
+	case "hf":
+		inUse = snapshotTargets(filepath.Join(top, "snapshots"))
+	case "ollama":
+		inUse = ollamaTagBlobs(filepath.Join(ex.Path, "manifests"))
+	}
+	for _, l := range blobs {
+		remove(l, inUse)
 	}
 	if ex.Kind == "hf" { // refs/<revision> pointing at a snapshot that no longer exists
 		commit := filepath.Base(ex.Path)
@@ -259,6 +313,50 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan)
 		}
 	}
 	return n, failed
+}
+
+// snapshotTargets returns the blob names the snapshot symlinks left in an HF
+// repository directory point to.
+func snapshotTargets(snapshots string) map[string]bool {
+	out := map[string]bool{}
+	filepath.WalkDir(snapshots, func(p string, d os.DirEntry, err error) error {
+		if err == nil && d.Type()&os.ModeSymlink != 0 {
+			if t, err := os.Readlink(p); err == nil {
+				out[filepath.Base(t)] = true
+			}
+		}
+		return nil
+	})
+	return out
+}
+
+// ollamaTagBlobs returns the blob file names (sha256-<hex>) that the tag
+// files left in Ollama's manifests directory name, whoever wrote them.
+func ollamaTagBlobs(manifests string) map[string]bool {
+	out := map[string]bool{}
+	filepath.WalkDir(manifests, func(p string, d os.DirEntry, err error) error {
+		if err != nil || !d.Type().IsRegular() {
+			return nil
+		}
+		if fi, err := d.Info(); err != nil || fi.Size() > ollamaMaxManifest {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil
+		}
+		var m ollamaManifest
+		if json.Unmarshal(b, &m) != nil {
+			return nil
+		}
+		for _, l := range append([]ollamaDescriptor{m.Config}, m.Layers...) {
+			if mm := ollamaDigestRe.FindStringSubmatch(l.Digest); mm != nil {
+				out["sha256-"+mm[1]] = true
+			}
+		}
+		return nil
+	})
+	return out
 }
 
 // removeEmptyUp removes dir and its parents while they are empty, stopping

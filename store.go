@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -77,14 +78,33 @@ func (s *Store) commit(part, sha256, gitOID string) error {
 	if err := os.Chmod(part, 0o444); err != nil {
 		return err
 	}
-	if err := os.Rename(part, dst); err != nil {
-		return err
+	// a blob already there keeps its inode: hard-link exports made from it
+	// stay recognisably lmget's, and nothing replaces bytes under them
+	err := os.Link(part, dst)
+	switch {
+	case err == nil:
+		os.Remove(part)
+	case errors.Is(err, fs.ErrExist) && sameSize(part, dst) && s.Has(sha256, fileSize(dst)):
+		os.Remove(part)
+	default: // no hard links on this filesystem, or a broken blob: replace it
+		if err := os.Rename(part, dst); err != nil {
+			return err
+		}
 	}
 	if gitOID != "" && hex40.MatchString(gitOID) {
 		return writeFileAtomic(filepath.Join(s.root, "index", "git-sha1", gitOID), []byte(sha256))
 	}
 	return nil
 }
+
+func fileSize(p string) int64 {
+	if fi, err := os.Stat(p); err == nil {
+		return fi.Size()
+	}
+	return -1
+}
+
+func sameSize(a, b string) bool { return fileSize(a) >= 0 && fileSize(a) == fileSize(b) }
 
 // ExportRecord lists the links lmget created for one export. rm removes
 // exactly these, and only while they still point at lmget's data.
@@ -295,12 +315,24 @@ var errBusy = newErr(ExitFailure, "busy", "another lmget is using the store").
 // writeFileAtomic writes through a fresh temporary file (O_EXCL, random
 // name, never a symlink someone placed in advance) and renames it over path.
 // The rename replaces a symlink at path itself, never its target.
-func writeFileAtomic(path string, b []byte) error {
+func writeFileAtomic(path string, b []byte) error { return writeFileAtomicMode(path, b, 0) }
+
+// writeFileAtomicMode is writeFileAtomic with the file mode set on the
+// temporary file before the rename (0 keeps CreateTemp's 0600).
+func writeFileAtomicMode(path string, b []byte, mode os.FileMode) error {
 	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp*")
 	if err != nil {
 		return err
 	}
 	tmp := f.Name()
+	if mode != 0 {
+		err = f.Chmod(mode)
+	}
+	if err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
 	if _, err = f.Write(b); err == nil {
 		err = f.Sync()
 	}

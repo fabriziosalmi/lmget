@@ -76,6 +76,8 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		return nil, diskErr(err)
 	}
 	defer unlock()
+	// what the store holds was read before the lock: an rm may have run since
+	plan.recount(c.store)
 	// recorded before downloading: gc must not reclaim the files of a pull
 	// that is interrupted half way
 	if err := c.store.saveManifest(plan, nil, nil); err != nil {
@@ -115,7 +117,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		return nil, diskErr(err)
 	}
 	if r.Target.Kind != "" && r.Target.Kind != "none" {
-		p, err := c.Export(plan, r.Target)
+		p, err := c.export2(plan, r.Target)
 		if err != nil {
 			return nil, err
 		}

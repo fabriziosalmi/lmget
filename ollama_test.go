@@ -472,9 +472,10 @@ func TestOllamaRemoveLeavesOllamasOwnFiles(t *testing.T) {
 	if b, err := os.ReadFile(tag); err != nil || !bytes.Equal(b, man) {
 		t.Fatal("rm deleted the tag file Ollama wrote itself")
 	}
-	ents, _ := os.ReadDir(filepath.Join(models, "blobs"))
-	if len(ents) != 1 {
-		t.Fatalf("%d blobs left, want only Ollama's own", len(ents))
+	// Ollama's own tag names every layer of this model: removing the links
+	// lmget made would leave Ollama's model without its blobs
+	if m := missing(tagBlobs(t, models, tag)); len(m) > 0 {
+		t.Fatalf("rm deleted blobs Ollama's own tag still names: %v", m)
 	}
 
 	// without Ollama's own tag, rm removes the tag lmget wrote, and keeps the root

@@ -170,9 +170,16 @@ func (c *Client) ollamaPlan(ref Ref, body []byte, commit string, sel Selection) 
 		if d.Size < 0 || d.Size > MaxFileSize {
 			return bad("invalid size %d for %s", d.Size, mm[1][:12])
 		}
-		if n := used[name]; n > 0 { // a second license is license-2
+		if used[name] > 0 { // a second license is license-2, or the next free name
 			ext := path.Ext(name)
-			name = fmt.Sprintf("%s-%d%s", strings.TrimSuffix(name, ext), n+1, ext)
+			stem := strings.TrimSuffix(name, ext)
+			for k := used[name] + 1; ; k++ {
+				if cand := fmt.Sprintf("%s-%d%s", stem, k, ext); used[cand] == 0 {
+					used[name]++
+					name = cand
+					break
+				}
+			}
 		}
 		used[name]++
 		p.Files = append(p.Files, File{Path: name, Size: d.Size, SHA256: mm[1],
@@ -263,6 +270,22 @@ func (c *Client) exportOllama(plan *Plan) (string, []string, error) {
 		return root, nil, newErr(ExitVerify, "verify", "the stored manifest does not match its hash").
 			fix("lmget doctor --verify", "")
 	}
+	// a plan built from a lock holds only the locked files: the tag must not
+	// name a layer this export does not link
+	var m ollamaManifest
+	if err := json.Unmarshal(body, &m); err != nil {
+		return root, nil, newErr(ExitFailure, "export", "the stored manifest is not valid JSON").wrap(err)
+	}
+	have := map[string]bool{}
+	for _, f := range plan.Files {
+		have[f.SHA256] = true
+	}
+	for _, d := range append([]ollamaDescriptor{m.Config}, m.Layers...) {
+		if mm := ollamaDigestRe.FindStringSubmatch(d.Digest); mm == nil || !have[mm[1]] {
+			return root, nil, newErr(ExitUsage, "usage", "the Ollama export needs every layer, "+printable(d.Digest)+" is not in the plan").
+				fix("", "add the missing layers to the lock, or run lmget sync --update")
+		}
+	}
 	var links []string
 	for _, f := range plan.Files {
 		if f.Path == OllamaManifestFile {
@@ -300,10 +323,7 @@ func (c *Client) exportOllama(plan *Plan) (string, []string, error) {
 	// identical bytes already there are Ollama's own pull (or an earlier
 	// export, already recorded): only a tag written now is added
 	if !hasContent(tag, int64(len(body)), plan.Commit) {
-		if err := writeFileAtomic(tag, body); err != nil {
-			return root, links, diskErr(err)
-		}
-		if err := os.Chmod(tag, 0o644); err != nil {
+		if err := writeFileAtomicMode(tag, body, 0o644); err != nil {
 			return root, links, diskErr(err)
 		}
 		links = append(links, tag)

@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"os/signal"
-	"reflect"
 	"strings"
 	"syscall"
 
@@ -214,17 +213,13 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	// lmget keeps an existing lockfile current, like go get with go.mod.
 	if locking {
 		opts.After = func(o *lmget.Outcome) (string, error) {
-			l, err := lmget.ReadLock(f.lockfile)
-			if errors.Is(err, fs.ErrNotExist) {
-				l, err = lmget.NewLock(f.lockfile), nil
-			}
+			_, err := lmget.UpdateLock(f.lockfile, true, func(l *lmget.Lock) (bool, error) {
+				return true, l.Upsert(o.Plan, sel, target)
+			})
 			if err != nil {
 				return "", err
 			}
-			if err := l.Upsert(o.Plan, sel, target); err != nil {
-				return "", err
-			}
-			return f.lockfile, l.Write()
+			return f.lockfile, nil
 		}
 	}
 	_, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts)
@@ -282,18 +277,13 @@ func doSync(f flags, args []string) lmget.ExitCode {
 		}
 		before := *m
 		opts := ui.Opts{Resume: resumeCmd(), After: func(o *lmget.Outcome) (string, error) {
-			// re-read: another lmget may have changed the lock while we downloaded
-			cur, err := lmget.ReadLock(f.lockfile)
-			if err != nil {
+			// another lmget may have changed this entry while we downloaded:
+			// then its version is newer than the one this sync started from
+			wrote, err := lmget.UpdateLockEntry(f.lockfile, before, o.Plan, req.Selection, req.Target)
+			if err != nil || !wrote {
 				return "", err
 			}
-			if err := cur.Upsert(o.Plan, req.Selection, req.Target); err != nil {
-				return "", err
-			}
-			if after := cur.Find(req.Ref); after != nil && reflect.DeepEqual(*after, before) {
-				return "", nil // unchanged: do not rewrite the file
-			}
-			return f.lockfile, cur.Write()
+			return f.lockfile, nil
 		}}
 		if _, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts); code != lmget.ExitOK {
 			return code

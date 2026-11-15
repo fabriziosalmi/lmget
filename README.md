@@ -41,7 +41,7 @@ lmget ollama:qwen3:0.6b --to dir:./models/qwen3
 
 lmget reads the manifest of the tag from `registry.ollama.ai` and identifies the model by the sha256 of that manifest, which is the commit shown in the plan and pinned in `lmget.lock`. Every layer is a file of the plan, named after its type (`model.gguf`, `template`, `system`, `params.json`, `license`, ...), and verified against the sha256 digest the manifest gives for it; `manifest.json` itself is always part of the download. The model layer must be a GGUF file.
 
-Ollama models are exported by default to Ollama's models directory (`$OLLAMA_MODELS`, else `~/.ollama/models`): the layers are linked as `blobs/sha256-<digest>` (hard links on the same disk) and the manifest is written as the tag file, as a copy: a tool that rewrites the tag file cannot change the store. The Ollama export needs every layer, so `--include` and `--exclude` work only with `--to dir:` or `--to none`. `lmget rm ollama:<name>:<tag>` removes only what lmget wrote: blobs and tag files that Ollama downloaded itself are left in place.
+Ollama models are exported by default to Ollama's models directory (`$OLLAMA_MODELS`, else `~/.ollama/models`): the layers are linked as `blobs/sha256-<digest>` (hard links on the same disk) and the manifest is written as the tag file, as a copy: a tool that rewrites the tag file cannot change the store. The Ollama export needs every layer, so `--include` and `--exclude` work only with `--to dir:` or `--to none`. `lmget rm ollama:<name>:<tag>` removes only what lmget wrote: blobs and tag files that Ollama downloaded itself are left in place, and so is a layer that another tag still names, whoever wrote that tag.
 
 The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ollama model from the manifest an earlier pull verified for that same name, and fetches missing layers by digest even after the tag has moved; without such a manifest in the store, the tag must still point at the locked one, or `sync` stops with exit code 5. Only public models are supported, and no token is sent to the registry.
 
@@ -53,7 +53,7 @@ lmget sync                       # reproduce it: same commits, every file checke
 lmget sync --update              # resolve the revisions again and rewrite the lock
 ```
 
-`lmget.lock` pins each model to a commit (for Ollama, the sha256 of its manifest) and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
+`lmget.lock` pins each model to a commit (for Ollama, the sha256 of its manifest) and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. Concurrent lmget runs update it one at a time, and `sync` never writes over an entry that another run changed while it was downloading. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
 
 A lockfile usually arrives with a cloned repository, so lmget treats it as untrusted input:
 
@@ -72,7 +72,7 @@ lmget doctor                     # store, export targets, network, token, lockfi
 lmget doctor --verify            # also re-hash every blob in the store
 ```
 
-`rm` removes only the links lmget created that still point at its data; files the user replaced, and downloads made by other tools, are left in place. The space reported as freed is measured from the blobs' link counts, so space still held by other hard links is reported separately. `doctor --verify` moves a corrupt blob to `quarantine/` in the store, together with lmget's hard links to it, so the next `get` or `sync` downloads it again. `doctor` never prints the token, only where it was found.
+`rm` removes only the links lmget created that still point at its data; files the user replaced, downloads made by other tools, and shared files another model still uses (a blob another commit's snapshot links to, a file another model exported to the same directory) are left in place. The space reported as freed is measured from the blobs' link counts, so space still held by other hard links is reported separately. `doctor --verify` moves a corrupt blob to `quarantine/` in the store, together with lmget's hard links to it, so the next `get` or `sync` downloads it again. `doctor` never prints the token, only where it was found.
 
 ## Direct URLs
 

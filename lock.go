@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"syscall"
@@ -179,6 +181,53 @@ func (l *Lock) Write() error {
 		return newErr(ExitDisk, "disk", "cannot write "+l.path).wrap(err)
 	}
 	return nil
+}
+
+// UpdateLock runs fn on the lockfile at path while holding an exclusive
+// advisory lock on its directory, and writes the lock when fn reports a
+// change. The directory, not the file, is locked: Write replaces the file by
+// rename, so a lock on its inode would not exclude the next writer. With
+// create, a missing lockfile starts empty. Every read-modify-write of
+// lmget.lock goes through here, so two lmget runs cannot lose each other's
+// updates.
+func UpdateLock(path string, create bool, fn func(*Lock) (bool, error)) (bool, error) {
+	d, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return false, err
+	}
+	defer d.Close()
+	if err := syscall.Flock(int(d.Fd()), syscall.LOCK_EX); err != nil {
+		return false, err
+	}
+	defer syscall.Flock(int(d.Fd()), syscall.LOCK_UN)
+	l, err := ReadLock(path)
+	if create && errors.Is(err, fs.ErrNotExist) {
+		l, err = NewLock(path), nil
+	}
+	if err != nil {
+		return false, err
+	}
+	changed, err := fn(l)
+	if err != nil || !changed {
+		return false, err
+	}
+	return true, l.Write()
+}
+
+// UpdateLockEntry records the pull that reproduced an entry of the lock,
+// which read as before when the sync started. If another lmget changed that
+// entry meanwhile, its newer version is kept and nothing is written. It
+// reports whether the lockfile was rewritten.
+func UpdateLockEntry(path string, before LockModel, p *Plan, sel Selection, t Target) (bool, error) {
+	return UpdateLock(path, false, func(cur *Lock) (bool, error) {
+		if now := cur.Find(p.Ref); now == nil || !reflect.DeepEqual(*now, before) {
+			return false, nil
+		}
+		if err := cur.Upsert(p, sel, t); err != nil {
+			return false, err
+		}
+		return !reflect.DeepEqual(*cur.Find(p.Ref), before), nil
+	})
 }
 
 // Find returns the entry for ref (same source, repo and revision), or nil.

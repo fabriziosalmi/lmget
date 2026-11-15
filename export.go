@@ -61,8 +61,19 @@ func HFCacheDir() string {
 }
 
 // Export links the selected, verified files of plan into the target and
-// returns the directory that holds them.
+// returns the directory that holds them. It holds the store lock shared, as
+// a pull does, so rm and doctor --verify cannot run meanwhile.
 func (c *Client) Export(plan *Plan, t Target) (string, error) {
+	unlock, err := c.store.flock(".lock", false, true)
+	if err != nil {
+		return "", diskErr(err)
+	}
+	defer unlock()
+	return c.export2(plan, t)
+}
+
+// export2 exports and records the links; the caller holds the store lock.
+func (c *Client) export2(plan *Plan, t Target) (string, error) {
 	p, links, err := c.export(plan, t)
 	// links made before a failure are recorded too, or rm would never see them
 	if len(links) > 0 || err == nil {
