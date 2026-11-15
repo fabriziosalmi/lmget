@@ -105,7 +105,7 @@ func TestURLPinnedOnFirstDownloadThenSyncsOffline(t *testing.T) {
 	if b, _ := os.ReadFile(out.Path); !bytes.Equal(b, data) {
 		t.Fatal("content mismatch")
 	}
-	l := NewLock(filepath.Join(t.TempDir(), DefaultLockName))
+	l := NewLock(filepath.Join(dir, DefaultLockName)) // the project directory, as in real use
 	if err := l.Upsert(out.Plan, Selection{}, Target{Kind: "dir", Path: dir}); err != nil {
 		t.Fatal(err)
 	}

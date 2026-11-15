@@ -32,7 +32,8 @@ type fakeFile struct {
 
 type fakeHF struct {
 	files  []fakeFile
-	served atomic.Int64 // bytes served by resolve
+	byRepo map[string][]fakeFile // optional: files for a given "org/name"
+	served atomic.Int64          // bytes served by resolve
 	onByte atomic.Pointer[func(total int64)]
 	tree   func() []map[string]any // override
 }
@@ -48,8 +49,14 @@ func sha(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:
 
 func (f *fakeHF) handler() http.Handler {
 	mux := http.NewServeMux()
-	// every repository serves the same files: models share blobs, like real
-	// repos that ship the same tokenizer
+	// every repository serves the same files (models share blobs, like real
+	// repos that ship the same tokenizer), unless byRepo says otherwise
+	filesOf := func(r *http.Request) []fakeFile {
+		if fs, ok := f.byRepo[r.PathValue("org")+"/"+r.PathValue("name")]; ok {
+			return fs
+		}
+		return f.files
+	}
 	mux.HandleFunc("GET /api/models/{org}/{name}/revision/{rev...}", func(w http.ResponseWriter, r *http.Request) {
 		if rev := r.PathValue("rev"); rev != "main" && rev != commit {
 			http.NotFound(w, r) // like HF: branches, tags and commits resolve, anything else 404
@@ -62,7 +69,7 @@ func (f *fakeHF) handler() http.Handler {
 		if f.tree != nil {
 			entries = f.tree()
 		} else {
-			for _, ff := range f.files {
+			for _, ff := range filesOf(r) {
 				e := map[string]any{"type": "file", "path": ff.path, "size": len(ff.data), "oid": gitID(ff.data)}
 				if ff.lfs {
 					e["lfs"] = map[string]any{"oid": sha(ff.data), "size": len(ff.data)}
@@ -82,7 +89,7 @@ func (f *fakeHF) handler() http.Handler {
 	files := http.NewServeMux()
 	files.HandleFunc("GET /{org}/{name}/resolve/"+commit+"/{path...}", func(w http.ResponseWriter, r *http.Request) {
 		p := r.PathValue("path")
-		for _, ff := range f.files {
+		for _, ff := range filesOf(r) {
 			if ff.path == p {
 				data := ff.data
 				if ff.corrupt {
@@ -262,7 +269,9 @@ func TestPullRejectsCorruptBytes(t *testing.T) {
 		if c.store.Has(sha(files[0].data), int64(len(files[0].data))) {
 			t.Fatal("corrupt file reached the store")
 		}
-		left, _ := filepath.Glob(filepath.Join(home, "tmp", "*"))
+		left, _ := filepath.Glob(filepath.Join(home, "tmp", "*.part"))
+		state, _ := filepath.Glob(filepath.Join(home, "tmp", "*.state"))
+		left = append(left, state...)
 		if len(left) != 0 {
 			t.Fatalf("partial files left behind: %v", left)
 		}
@@ -363,8 +372,11 @@ func TestErrorsMapToExitCodes(t *testing.T) {
 			t.Errorf("HTTP %d: exit %d, want %d", status, got, want)
 		}
 	}
-	if !errors.Is(AsError(context.Canceled), context.Canceled) && AsError(context.Canceled).Code != ExitInterrupted {
+	if AsError(context.Canceled).Code != ExitInterrupted {
 		t.Error("context.Canceled must map to interrupted")
+	}
+	if e := newErr(ExitDisk, "disk", "cannot write").wrap(errors.New("no space left on device")); e.Cause != "no space left on device" {
+		t.Errorf("the cause is not carried: %+v", e)
 	}
 }
 

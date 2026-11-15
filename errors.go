@@ -36,6 +36,7 @@ type Error struct {
 	Msg   string   `json:"message"`
 	Why   string   `json:"why,omitempty"`
 	Fixes []Fix    `json:"fixes,omitempty"`
+	Cause string   `json:"cause,omitempty"` // the underlying error, for diagnosis
 	Err   error    `json:"-"`
 }
 
@@ -64,6 +65,9 @@ func (e *Error) fix(cmd, note string) *Error {
 
 func (e *Error) wrap(err error) *Error {
 	e.Err = err
+	if err != nil {
+		e.Cause = err.Error()
+	}
 	return e
 }
 
@@ -80,5 +84,5 @@ func AsError(err error) *Error {
 		return newErr(ExitInterrupted, "interrupted", "verified progress is kept on disk").
 			fix("", "run the same command again to resume")
 	}
-	return &Error{Code: ExitFailure, Kind: "failure", Msg: err.Error(), Err: err}
+	return &Error{Code: ExitFailure, Kind: "failure", Msg: err.Error(), Err: err, Cause: err.Error()}
 }

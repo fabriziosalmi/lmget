@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,7 +34,7 @@ type StoreStats struct {
 
 // List returns the models recorded in the store, sorted by repository.
 func (c *Client) List() ([]Installed, error) {
-	ms, err := c.store.Manifests()
+	ms, _, err := c.store.Manifests()
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +107,11 @@ type RemoveResult struct {
 // blob no other model references. Revision "main" removes every recorded
 // commit of the repository; otherwise it must be a commit or a prefix of one.
 func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
+	unlock, err := c.store.flock(".lock", true, false) // no pull may run meanwhile
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	all, err := c.List()
 	if err != nil {
 		return nil, err
@@ -130,8 +136,16 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 			return nil, err
 		}
 		owned := c.blobInodes(m.Plan)
+		var failed []string
 		for _, ex := range m.Exports {
-			res.Links += c.unlinkExport(ex, owned)
+			n, f := c.unlinkExport(ex, owned)
+			res.Links += n
+			failed = append(failed, f...)
+		}
+		if len(failed) > 0 { // keep the manifest: it is the only record of these links
+			return nil, newErr(ExitDisk, "disk", fmt.Sprintf("could not remove %d export links of %s", len(failed), in.Ref.Display())).
+				why("for example %s; the model stays recorded so nothing is forgotten", failed[0]).
+				fix("", "fix the permissions and run lmget rm again")
 		}
 		if err := os.Remove(in.manifest); err != nil {
 			return nil, diskErr(err)
@@ -176,7 +190,8 @@ func (c *Client) blobInodes(p *Plan) map[inode]bool {
 // link to one of the model's blobs, or a symlink into the store or into the
 // cache's own blobs directory. Anything else (replaced or edited by the user,
 // or by another tool) is left alone.
-func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool) int {
+func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool) (int, []string) {
+	var failed []string
 	sep := string(os.PathSeparator)
 	storeBlobs := filepath.Join(c.store.Root(), "blobs", "sha256") + sep
 	// top: the export's own directory. stop: empty directories are pruned up
@@ -208,10 +223,15 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool) int {
 		} else if in, ok := inodeOf(fi); ok && fi.Mode().IsRegular() {
 			mine = owned[in]
 		}
-		if mine && os.Remove(l) == nil {
-			n++
-			removeEmptyUp(filepath.Dir(l), stop)
+		if !mine {
+			continue
 		}
+		if err := os.Remove(l); err != nil && !os.IsNotExist(err) {
+			failed = append(failed, l)
+			continue
+		}
+		n++
+		removeEmptyUp(filepath.Dir(l), stop)
 	}
 	if ex.Kind == "hf" { // refs/<revision> pointing at a snapshot that no longer exists
 		commit := filepath.Base(ex.Path)
@@ -229,7 +249,7 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool) int {
 			removeEmptyUp(top, stop)
 		}
 	}
-	return n
+	return n, failed
 }
 
 // removeEmptyUp removes dir and its parents while they are empty, stopping
@@ -253,14 +273,24 @@ type gcResult struct {
 // gc deletes blobs that no manifest references, and their git index entries.
 func (c *Client) gc() (gcResult, error) {
 	var r gcResult
-	ms, err := c.store.Manifests()
+	ms, bad, err := c.store.Manifests()
 	if err != nil {
 		return r, err
+	}
+	if len(bad) > 0 {
+		return r, newErr(ExitFailure, "store", fmt.Sprintf("%d manifests cannot be read: no blob was deleted", len(bad))).
+			why("an unreadable manifest still owns its files, e.g. %s", bad[0]).
+			fix("lmget doctor", "lists them")
 	}
 	keep := map[string]bool{}
 	for _, m := range ms {
 		for _, f := range m.Plan.Selected() {
 			keep[f.SHA256] = true
+			if f.GitSHA1 != "" { // downloaded before the manifest learned its sha256
+				if s, ok := c.store.LookupGit(f.GitSHA1); ok {
+					keep[s] = true
+				}
+			}
 		}
 	}
 	dir := filepath.Join(c.store.Root(), "blobs", "sha256")

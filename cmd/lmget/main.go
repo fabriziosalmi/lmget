@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -162,8 +163,8 @@ func outputMode(f flags) ui.Mode {
 func fail(mode ui.Mode, err error) lmget.ExitCode {
 	e := lmget.AsError(err)
 	if mode == ui.ModeJSON {
-		fmt.Fprintf(os.Stdout, `{"v":%d,"type":"error","error":{"code":%d,"kind":%q,"message":%q}}`+"\n",
-			lmget.SchemaVersion, e.Code, e.Kind, e.Msg)
+		b, _ := json.Marshal(map[string]any{"v": lmget.SchemaVersion, "type": "error", "error": e})
+		fmt.Fprintln(os.Stdout, string(b))
 	} else {
 		printErr(e)
 	}
@@ -192,6 +193,9 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	locking := !dry && (f.lock || statErr == nil)
 	if locking {
 		if err := lmget.Lockable(ref); err != nil {
+			return fail(mode, err)
+		}
+		if err := lmget.LockableTarget(f.lockfile, target); err != nil {
 			return fail(mode, err)
 		}
 	}
@@ -274,13 +278,18 @@ func doSync(f flags, args []string) lmget.ExitCode {
 		}
 		before := *m
 		opts := ui.Opts{Resume: resumeCmd(), After: func(o *lmget.Outcome) (string, error) {
-			if err := l.Upsert(o.Plan, req.Selection, req.Target); err != nil {
+			// re-read: another lmget may have changed the lock while we downloaded
+			cur, err := lmget.ReadLock(f.lockfile)
+			if err != nil {
 				return "", err
 			}
-			if after := l.Find(req.Ref); after != nil && reflect.DeepEqual(*after, before) {
+			if err := cur.Upsert(o.Plan, req.Selection, req.Target); err != nil {
+				return "", err
+			}
+			if after := cur.Find(req.Ref); after != nil && reflect.DeepEqual(*after, before) {
 				return "", nil // unchanged: do not rewrite the file
 			}
-			return f.lockfile, l.Write()
+			return f.lockfile, cur.Write()
 		}}
 		if _, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts); code != lmget.ExitOK {
 			return code
@@ -363,6 +372,9 @@ func printErr(e *lmget.Error) {
 	lipgloss.Fprintf(os.Stderr, "\n  %s%s\n", sErr.Render("error"), e.Msg)
 	if e.Why != "" {
 		lipgloss.Fprintf(os.Stderr, "  %s%s\n", sLabel.Render(""), sDim.Render(e.Why))
+	}
+	if e.Cause != "" && e.Cause != e.Msg {
+		lipgloss.Fprintf(os.Stderr, "  %s%s\n", sLabel.Render("cause"), sDim.Render(e.Cause))
 	}
 	for i, fx := range e.Fixes {
 		l := ""

@@ -178,6 +178,9 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 		if le.Why != "" {
 			logf("  %s", le.Why)
 		}
+		if le.Cause != "" && le.Cause != le.Msg {
+			logf("  cause: %s", le.Cause)
+		}
 		for _, f := range le.Fixes {
 			logf("  fix: %s", strings.TrimSpace(f.Cmd+"  "+f.Note))
 		}

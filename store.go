@@ -2,11 +2,13 @@ package lmget
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -119,6 +121,11 @@ func (s *Store) saveManifest(p *Plan, rec *ExportRecord) error {
 	if err != nil {
 		return err
 	}
+	unlock, err := s.flock("refs/.lock", true, true) // read, merge, write: one writer at a time
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	m := Manifest{Plan: p}
 	if old, err := readManifest(path); err == nil {
 		for _, e := range old.Exports {
@@ -174,23 +181,54 @@ func readManifest(path string) (*Manifest, error) {
 	return &m, nil
 }
 
-// Manifests returns every model recorded in the store, with its file path.
-func (s *Store) Manifests() (map[string]*Manifest, error) {
-	out := map[string]*Manifest{}
+// Manifests returns every model recorded in the store, keyed by file path,
+// and the manifests that could not be read. Callers that delete data must
+// stop when bad is not empty: an unreadable manifest still owns its blobs.
+func (s *Store) Manifests() (ok map[string]*Manifest, bad []string, err error) {
+	ok = map[string]*Manifest{}
 	root := filepath.Join(s.root, "refs")
-	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".json") {
 			return err
 		}
 		m, err := readManifest(p)
 		if err != nil {
-			return nil // unreadable manifests are reported by doctor, not fatal here
+			bad = append(bad, p)
+			return nil
 		}
-		out[p] = m
+		ok[p] = m
 		return nil
 	})
-	return out, err
+	return ok, bad, err
 }
+
+// flock takes an advisory lock on name inside the store. exclusive=false is
+// shared. With wait=false a busy lock returns errBusy at once.
+func (s *Store) flock(name string, exclusive, wait bool) (func(), error) {
+	f, err := os.OpenFile(filepath.Join(s.root, name), os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	how := syscall.LOCK_SH
+	if exclusive {
+		how = syscall.LOCK_EX
+	}
+	if !wait {
+		how |= syscall.LOCK_NB
+	}
+	if err := syscall.Flock(int(f.Fd()), how); err != nil {
+		f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, errBusy
+		}
+		return nil, err
+	}
+	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+}
+
+var errBusy = newErr(ExitFailure, "busy", "another lmget is using the store").
+	why("a download or sync is running in another process").
+	fix("", "run this again when it has finished")
 
 func writeFileAtomic(path string, b []byte) error {
 	tmp := fmt.Sprintf("%s.tmp%d", path, os.Getpid())

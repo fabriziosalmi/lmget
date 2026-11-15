@@ -32,6 +32,9 @@ const stallTimeout = 60 * time.Second
 // from state. It does not verify: the caller hashes the finished file.
 func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt *counters) error {
 	st := fetchState{Size: f.Size, Chunk: c.opt.ChunkSize}
+	if _, err := os.Stat(part); err != nil {
+		os.Remove(statePath) // a state without its partial file describes nothing
+	}
 	if b, err := os.ReadFile(statePath); err == nil {
 		var old fetchState
 		if json.Unmarshal(b, &old) == nil && old.Size == f.Size && old.Chunk > 0 {
@@ -60,8 +63,13 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 	}
 	if f.noRanges { // no resume possible: one sequential stream from the start
 		cnt.done.Store(0)
-		_, err := c.fetchRange(ctx, f, out, 0, f.Size, cnt, false)
-		return err
+		if _, err := c.fetchRange(ctx, f, out, 0, f.Size, cnt, false); err != nil {
+			return err
+		}
+		if err := out.Sync(); err != nil {
+			return diskErr(err)
+		}
+		return nil
 	}
 
 	ctx, cancel := context.WithCancelCause(ctx)

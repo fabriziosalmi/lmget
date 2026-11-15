@@ -204,6 +204,9 @@ func renderError(e *lmget.Error) string {
 	if e.Why != "" {
 		fmt.Fprintf(&b, "  %s%s\n", sLabel.Render(""), sDim.Render(e.Why))
 	}
+	if e.Cause != "" && e.Cause != e.Msg {
+		fmt.Fprintf(&b, "  %s%s\n", sLabel.Render("cause"), sDim.Render(e.Cause))
+	}
 	for i, f := range e.Fixes {
 		l := ""
 		if i == 0 {

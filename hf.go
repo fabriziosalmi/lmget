@@ -58,7 +58,13 @@ func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, er
 		p.Gated = g
 	}
 	next := fmt.Sprintf("%s/api/models/%s/tree/%s?recursive=true", c.opt.HFEndpoint, ref.Repo, info.Sha)
+	seen := map[string]bool{}
 	for next != "" {
+		if seen[next] || len(seen) >= maxTreePages {
+			return nil, newErr(ExitFailure, "source", "the file listing of "+ref.Display()+" does not end").
+				why("pagination repeated a page or exceeded %d pages", maxTreePages)
+		}
+		seen[next] = true
 		var page []hfTreeEntry
 		var link string
 		if err := c.hfJSON(ctx, next, ref, &page, &link); err != nil {
@@ -87,6 +93,9 @@ func (c *Client) hfFile(ref Ref, commit string, e hfTreeEntry) (File, error) {
 	if clean != e.Path || !isLocalSlash(clean) {
 		return File{}, newErr(ExitFailure, "source", "refusing unsafe file path "+quote(e.Path)+" from "+ref.Display()).
 			why("a path that leaves the model directory could overwrite other files")
+	}
+	if e.Size < 0 || (e.Lfs != nil && e.Lfs.Size != e.Size) {
+		return File{}, newErr(ExitFailure, "source", "invalid size for "+e.Path+" from "+ref.Display())
 	}
 	f := File{Path: e.Path, Size: e.Size}
 	if e.Lfs != nil {
@@ -168,6 +177,10 @@ func (c *Client) hfStatus(resp *http.Response, ref Ref) error {
 		return nil
 	case resp.StatusCode == 401:
 		e := newErr(ExitAuth, "auth", ref.Display()+" needs a Hugging Face token")
+		if strings.HasPrefix(c.tokenSource, "unreadable:") {
+			return e.why("the token file %s exists but cannot be read", strings.TrimPrefix(c.tokenSource, "unreadable:")).
+				fix("", "fix its permissions, or export HF_TOKEN")
+		}
 		if c.opt.HFToken == "" {
 			return e.why("the repository is private or gated, and no token is configured").
 				fix("export HF_TOKEN=...", "a read token from https://huggingface.co/settings/tokens")
@@ -189,6 +202,9 @@ func (c *Client) hfStatus(resp *http.Response, ref Ref) error {
 		return newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", c.opt.HFEndpoint, resp.Status))
 	}
 }
+
+// maxTreePages bounds the file listing: HF returns 1000 entries per page.
+const maxTreePages = 1000
 
 var linkNext = regexp.MustCompile(`<([^>]+)>;\s*rel="next"`)
 

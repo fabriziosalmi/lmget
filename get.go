@@ -51,7 +51,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		return nil, err
 	}
 	e = ev(EvPlan)
-	e.Plan = plan
+	snapshot := *plan // the pull goes on updating plan; listeners get their own copy
+	snapshot.Files = append([]File(nil), plan.Files...)
+	e.Plan = &snapshot
 	emit(e)
 	out := &Outcome{Plan: plan}
 	if r.DryRun {
@@ -68,6 +70,20 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			why("need %s, %s free at %s", HumanBytes(plan.ToFetch+margin), HumanBytes(plan.DiskFree), c.store.Root()).
 			fix("", "free space, or set LMGET_HOME to a larger disk")
 	}
+	unlock, err := c.store.flock(".lock", false, true) // shared: rm and verify wait for us
+	if err != nil {
+		return nil, diskErr(err)
+	}
+	defer unlock()
+	// recorded before downloading: gc must not reclaim the files of a pull
+	// that is interrupted half way
+	if err := c.store.saveManifest(plan, nil); err != nil {
+		return nil, diskErr(err)
+	}
+	all := make(map[string]bool, len(plan.Files))
+	for _, f := range plan.Files {
+		all[f.Path] = true
+	}
 	for i := range plan.Files {
 		f := &plan.Files[i]
 		if !f.Selected() {
@@ -79,7 +95,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			emit(e)
 			continue
 		}
-		n, err := c.getFile(ctx, f, emit)
+		n, err := c.getFile(ctx, f, isPickle(f.Path, all), emit)
 		out.Fetched += n
 		if err != nil {
 			return nil, err
@@ -108,7 +124,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	return out, nil
 }
 
-func (c *Client) getFile(ctx context.Context, f *File, emit func(Event)) (int64, error) {
+func (c *Client) getFile(ctx context.Context, f *File, declaredPickle bool, emit func(Event)) (int64, error) {
 	key := f.SHA256
 	switch {
 	case key != "":
@@ -118,6 +134,26 @@ func (c *Client) getFile(ctx context.Context, f *File, emit func(Event)) (int64,
 		key = f.tmpKey // direct URL without a known hash
 	}
 	part, state := c.store.tmpPaths(key)
+	// one process per file: a second pull of the same file waits, then finds it stored
+	unlock, err := c.store.flock("tmp/"+key+".lock", true, true)
+	if err != nil {
+		return 0, diskErr(err)
+	}
+	// the lock file stays: removing it would let a waiting process and a new
+	// one lock two different inodes and download at the same time
+	defer unlock()
+	if f.SHA256 == "" && f.GitSHA1 != "" {
+		if s, ok := c.store.LookupGit(f.GitSHA1); ok {
+			f.SHA256 = s
+		}
+	}
+	if f.SHA256 != "" && c.store.Has(f.SHA256, f.Size) {
+		f.Cached = true
+		e := ev(EvFileDone)
+		e.File, e.SHA256, e.Cached, e.Total = f.Path, f.SHA256, true, f.Size
+		emit(e)
+		return 0, nil
+	}
 	e := ev(EvFileStart)
 	e.File, e.Total = f.Path, f.Size
 	emit(e)
@@ -140,7 +176,7 @@ func (c *Client) getFile(ctx context.Context, f *File, emit func(Event)) (int64,
 			}
 		}
 	}()
-	err := c.fetch(ctx, *f, part, state, &cnt)
+	err = c.fetch(ctx, *f, part, state, &cnt)
 	close(stop)
 	<-ticked
 	if err != nil {
@@ -148,7 +184,7 @@ func (c *Client) getFile(ctx context.Context, f *File, emit func(Event)) (int64,
 	}
 	sum, err := c.verify(part, f)
 	if err == nil {
-		err = checkFormat(part, f.Path)
+		err = checkFormat(part, f.Path, declaredPickle)
 	}
 	if err != nil {
 		os.Remove(part)

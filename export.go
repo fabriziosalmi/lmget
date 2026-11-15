@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // Target is where a pulled model is made visible.
@@ -59,11 +60,14 @@ func HFCacheDir() string {
 // returns the directory that holds them.
 func (c *Client) Export(plan *Plan, t Target) (string, error) {
 	p, links, err := c.export(plan, t)
+	// links made before a failure are recorded too, or rm would never see them
+	if len(links) > 0 || err == nil {
+		if serr := c.store.saveManifest(plan, &ExportRecord{Kind: t.Kind, Path: p, Links: links}); serr != nil && err == nil {
+			err = diskErr(serr)
+		}
+	}
 	if err != nil {
 		return "", err
-	}
-	if err := c.store.saveManifest(plan, &ExportRecord{Kind: t.Kind, Path: p, Links: links}); err != nil {
-		return "", diskErr(err)
 	}
 	return p, nil
 }
@@ -102,38 +106,55 @@ func (c *Client) exportHF(plan *Plan) (string, []string, error) {
 		}
 		blob := filepath.Join(repoDir, "blobs", etag)
 		if err := os.MkdirAll(filepath.Dir(blob), 0o755); err != nil {
-			return "", nil, diskErr(err)
+			return snap, links, diskErr(err)
 		}
-		if fi, err := os.Stat(blob); err != nil || fi.Size() != f.Size {
-			os.Remove(blob)
-			if err := linkOrSymlink(c.store.BlobPath(f.SHA256), blob); err != nil {
-				return "", nil, diskErr(err)
+		storeBlob := c.store.BlobPath(f.SHA256)
+		mine := true
+		fi, err := os.Lstat(blob)
+		switch {
+		case err != nil: // absent
+			if err := linkOrSymlink(storeBlob, blob); err != nil {
+				return snap, links, diskErr(err)
 			}
+		case same(storeBlob, blob): // ours from an earlier run
+		case fi.Mode().IsRegular() && hasContent(blob, f.Size, f.SHA256):
+			mine = false // huggingface_hub's own download, with the right bytes
+		default: // wrong bytes, wrong size or not a file: serve the verified ones
+			os.Remove(blob)
+			if err := linkOrSymlink(storeBlob, blob); err != nil {
+				return snap, links, diskErr(err)
+			}
+		}
+		if mine {
 			links = append(links, blob)
 		}
 		dst := filepath.Join(snap, filepath.FromSlash(f.Path))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return "", nil, diskErr(err)
+			return snap, links, diskErr(err)
 		}
 		rel, err := filepath.Rel(filepath.Dir(dst), blob)
 		if err != nil {
-			return "", nil, err
+			return snap, links, err
 		}
+		created := false
 		if cur, err := os.Readlink(dst); err != nil || cur != rel {
 			os.Remove(dst)
 			if err := os.Symlink(rel, dst); err != nil {
-				return "", nil, diskErr(err)
+				return snap, links, diskErr(err)
 			}
+			created = true
+		}
+		if created || mine {
 			links = append(links, dst)
 		}
 	}
 	if plan.Ref.Revision != plan.Commit {
 		ref := filepath.Join(repoDir, "refs", filepath.FromSlash(plan.Ref.Revision))
 		if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
-			return "", nil, diskErr(err)
+			return snap, links, diskErr(err)
 		}
 		if err := writeFileAtomic(ref, []byte(plan.Commit)); err != nil {
-			return "", nil, diskErr(err)
+			return snap, links, diskErr(err)
 		}
 	}
 	return snap, links, nil
@@ -145,21 +166,22 @@ func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
 		dst := filepath.Join(root, filepath.FromSlash(f.Path))
 		src := c.store.BlobPath(f.SHA256)
 		if same(src, dst) {
+			links = append(links, dst) // ours from an earlier run: keep it recorded
 			continue
 		}
 		if _, err := os.Lstat(dst); err == nil {
 			if hasContent(dst, f.Size, f.SHA256) {
 				continue // identical bytes already there (e.g. from another store): leave them
 			}
-			return "", nil, newErr(ExitFailure, "export", dst+" already exists").
+			return root, links, newErr(ExitFailure, "export", dst+" already exists").
 				why("lmget does not overwrite files it did not create").
 				fix("", "remove it, or export to another directory")
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return "", nil, diskErr(err)
+			return root, links, diskErr(err)
 		}
 		if err := linkOrSymlink(src, dst); err != nil {
-			return "", nil, diskErr(err)
+			return root, links, diskErr(err)
 		}
 		links = append(links, dst)
 	}
@@ -200,11 +222,15 @@ func same(a, b string) bool {
 // linkOrSymlink hardlinks (zero copy, survives store cleanup) and falls back
 // to an absolute symlink across filesystems.
 func linkOrSymlink(src, dst string) error {
-	if err := os.Link(src, dst); err == nil {
+	err := os.Link(src, dst)
+	if err == nil {
 		return nil
-	} else if !errors.Is(err, os.ErrExist) {
-		return os.Symlink(src, dst)
-	} else {
-		return err
 	}
+	// only when a hard link is impossible here; a missing source is an error,
+	// not a reason to leave a dangling symlink
+	if errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.EPERM) || errors.Is(err, syscall.EMLINK) ||
+		errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.EOPNOTSUPP) {
+		return os.Symlink(src, dst)
+	}
+	return err
 }

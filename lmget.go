@@ -70,8 +70,13 @@ func New(o Options) (*Client, error) {
 		o.UserAgent = "lmget/" + Version
 	}
 	hc := o.HTTP
+	if hc != nil && hc.CheckRedirect == nil { // a copy: never change the caller's client
+		cp := *hc
+		cp.CheckRedirect = noDowngrade
+		hc = &cp
+	}
 	if hc == nil {
-		hc = &http.Client{Transport: &http.Transport{
+		hc = &http.Client{CheckRedirect: noDowngrade, Transport: &http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 			ForceAttemptHTTP2:     true,
@@ -113,8 +118,21 @@ func hfToken() (string, string) {
 				return t, p
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
-			continue
+			return "", "unreadable:" + p // exists but cannot be read: say so, do not pretend there is none
 		}
 	}
 	return "", ""
+}
+
+// noDowngrade refuses a redirect from https to plain http, and bounds the
+// chain like net/http does.
+func noDowngrade(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if len(via) > 0 && via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+		return newErr(ExitNetwork, "network", "refused a redirect from https to "+req.URL.Scheme+"://"+req.URL.Host).
+			why("a downgrade would let anyone on the path change the bytes")
+	}
+	return nil
 }

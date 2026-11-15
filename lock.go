@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -97,8 +99,8 @@ func ReadLock(path string) (*Lock, error) {
 		if !hex40.MatchString(m.Commit) {
 			return nil, lockErr(path, where+": commit is not a 40-character hex id")
 		}
-		if _, err := ParseTarget(m.To); err != nil {
-			return nil, lockErr(path, where+": "+AsError(err).Msg)
+		if err := lockTargetSyntax(m.To); err != nil {
+			return nil, lockErr(path, where+": "+err.Error())
 		}
 		if len(m.Files) == 0 {
 			return nil, lockErr(path, where+": no files")
@@ -157,8 +159,12 @@ func (l *Lock) Upsert(p *Plan, sel Selection, t Target) error {
 	if err := Lockable(p.Ref); err != nil {
 		return err
 	}
+	to, err := l.targetString(t)
+	if err != nil {
+		return err
+	}
 	m := LockModel{
-		Ref: p.Ref.String(), Commit: p.Commit, To: l.targetString(t), License: p.License,
+		Ref: p.Ref.String(), Commit: p.Commit, To: to, License: p.License,
 		Include: sel.Include, Exclude: sel.Exclude, AllowPickle: sel.AllowPickle,
 	}
 	for _, f := range p.Selected() {
@@ -187,24 +193,92 @@ func Lockable(ref Ref) error {
 	return nil
 }
 
-// targetString stores directory targets relative to the lockfile when they
-// are inside its directory, so the project can move.
-func (l *Lock) targetString(t Target) string {
+// lockTargetSyntax accepts hf, none, and dir: targets that are relative
+// and stay inside the lockfile's directory. A lockfile arrives with a cloned
+// repository: it must not be able to send files anywhere else.
+func lockTargetSyntax(to string) error {
+	switch {
+	case to == "hf" || to == "none":
+		return nil
+	case strings.HasPrefix(to, "dir:"):
+		p := strings.TrimPrefix(to[4:], "./")
+		if p == "." || p == "" {
+			return nil
+		}
+		if filepath.IsAbs(p) || strings.HasPrefix(p, "/") || !isLocalSlash(path.Clean(p)) {
+			return fmt.Errorf("target %q is outside the project: a lock may only name directories inside its own", to)
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown target %q", to)
+}
+
+// within checks that dst, with symlinks resolved as far as it exists, is
+// base or below it.
+func within(base, dst string) error {
+	realBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return err
+	}
+	cur, rest := filepath.Clean(dst), ""
+	for {
+		if _, err := os.Lstat(cur); err == nil {
+			break
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			break
+		}
+		rest = filepath.Join(filepath.Base(cur), rest)
+		cur = parent
+	}
+	realCur, err := filepath.EvalSymlinks(cur)
+	if err != nil {
+		return err
+	}
+	real := filepath.Join(realCur, rest)
+	if real != realBase && !strings.HasPrefix(real, realBase+string(os.PathSeparator)) {
+		return fmt.Errorf("target resolves to %s, outside the project %s", real, realBase)
+	}
+	return nil
+}
+
+// targetString stores a directory target relative to the lockfile. Targets
+// outside the lockfile's directory cannot be locked.
+func (l *Lock) targetString(t Target) (string, error) {
 	if t.Kind != "dir" {
 		if t.Kind == "" {
-			return "hf"
+			return "hf", nil
 		}
-		return t.Kind
+		return t.Kind, nil
 	}
 	base, err := filepath.Abs(filepath.Dir(l.path))
-	if err == nil {
-		if rel, err := filepath.Rel(base, t.Path); err == nil && rel == "." {
-			return "dir:."
-		} else if err == nil && filepath.IsLocal(rel) {
-			return "dir:./" + filepath.ToSlash(rel)
-		}
+	if err != nil {
+		return "", err
 	}
-	return "dir:" + t.Path
+	if err := within(base, t.Path); err != nil {
+		return "", lockTargetErr(t.Path)
+	}
+	rel, err := filepath.Rel(base, t.Path)
+	if err != nil || !(rel == "." || filepath.IsLocal(rel)) {
+		return "", lockTargetErr(t.Path)
+	}
+	if rel == "." {
+		return "dir:.", nil
+	}
+	return "dir:./" + filepath.ToSlash(rel), nil
+}
+
+func lockTargetErr(p string) error {
+	return newErr(ExitUsage, "usage", p+" is outside the project and cannot be recorded in the lock").
+		why("a lock may only name directories inside its own, so a cloned lock cannot write elsewhere").
+		fix("", "export inside the project, or download without --lock")
+}
+
+// LockableTarget reports whether t can be recorded in the lock at lockPath.
+func LockableTarget(lockPath string, t Target) error {
+	_, err := NewLock(lockPath).targetString(t)
+	return err
 }
 
 // Request builds the pull that reproduces m. With update, the revision is
@@ -214,9 +288,20 @@ func (l *Lock) Request(m *LockModel, update bool) (Request, error) {
 	if err != nil {
 		return Request{}, err
 	}
+	if err := lockTargetSyntax(m.To); err != nil {
+		return Request{}, lockErr(l.path, m.Ref+": "+err.Error())
+	}
 	to := m.To
-	if strings.HasPrefix(to, "dir:") && !filepath.IsAbs(to[4:]) {
-		to = "dir:" + filepath.Join(filepath.Dir(l.path), filepath.FromSlash(to[4:]))
+	if strings.HasPrefix(to, "dir:") {
+		base, err := filepath.Abs(filepath.Dir(l.path))
+		if err != nil {
+			return Request{}, err
+		}
+		dst := filepath.Join(base, filepath.FromSlash(to[4:]))
+		if err := within(base, dst); err != nil {
+			return Request{}, lockErr(l.path, m.Ref+": "+err.Error())
+		}
+		to = "dir:" + dst
 	}
 	t, err := ParseTarget(to)
 	if err != nil {

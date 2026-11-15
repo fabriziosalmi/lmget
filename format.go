@@ -13,7 +13,10 @@ import (
 // store. A matching hash proves the bytes are what the source publishes, not
 // that they are what the name claims: a pickle renamed to .safetensors would
 // pass the hash and still run code when loaded.
-func checkFormat(p, name string) error {
+// declaredPickle is whether the plan treated the file as a pickle by name
+// (pickle extension, not OpenVINO IR weights). Pickle content in any other
+// file is refused, so a .bin next to a decoy .xml cannot slip through.
+func checkFormat(p, name string, declaredPickle bool) error {
 	f, err := os.Open(p)
 	if err != nil {
 		return diskErr(err)
@@ -33,7 +36,7 @@ func checkFormat(p, name string) error {
 			fix("", "the file was discarded; report it to the publisher")
 	}
 	ext := strings.ToLower(path.Ext(name))
-	if looksPickle(f, head, size) && !pickleExt[ext] {
+	if looksPickle(f, head, size) && !declaredPickle {
 		return bad("its content is a Python pickle, which runs code when loaded")
 	}
 	switch ext {

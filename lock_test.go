@@ -60,8 +60,11 @@ func TestLockRoundTrip(t *testing.T) {
 func TestLockStoresDirTargetRelative(t *testing.T) {
 	dir := t.TempDir()
 	l := NewLock(filepath.Join(dir, DefaultLockName))
-	if got := l.targetString(Target{Kind: "dir", Path: filepath.Join(dir, "models", "q")}); got != "dir:./models/q" {
-		t.Fatalf("got %q", got)
+	if got, err := l.targetString(Target{Kind: "dir", Path: filepath.Join(dir, "models", "q")}); err != nil || got != "dir:./models/q" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if _, err := l.targetString(Target{Kind: "dir", Path: t.TempDir()}); err == nil {
+		t.Fatal("a directory outside the project was accepted for the lock")
 	}
 	l.Models = []LockModel{{Ref: "hf:org/m", To: "dir:./models/q"}}
 	r, err := l.Request(&l.Models[0], false)
@@ -157,6 +160,9 @@ sha256 = "` + strings.Repeat("a", 64) + `"
 		"bad commit":      strings.Replace(good, commit, "main", 1),
 		"bad ref":         strings.Replace(good, `"hf:org/m"`, `"hf:../x"`, 1),
 		"bad target":      strings.Replace(good, `to = "hf"`, `to = "s3:bucket"`, 1),
+		"target escapes":  strings.Replace(good, `to = "hf"`, `to = "dir:../../.ssh"`, 1),
+		"target absolute": strings.Replace(good, `to = "hf"`, `to = "dir:/etc"`, 1),
+		"target sneaky":   strings.Replace(good, `to = "hf"`, `to = "dir:./a/../../b"`, 1),
 		"unknown key":     strings.Replace(good, `to = "hf"`, "to = \"hf\"\nscript = \"rm -rf\"", 1),
 		"duplicate model": good + strings.TrimPrefix(good, "version = 1\n"),
 		"negative size":   strings.Replace(good, "size = 1", "size = -1", 1),
@@ -176,5 +182,23 @@ sha256 = "` + strings.Repeat("a", 64) + `"
 		} else if AsError(err).Code != ExitUsage {
 			t.Errorf("%s: exit %d, want %d", name, AsError(err).Code, ExitUsage)
 		}
+	}
+}
+
+// A lock whose target directory is a symlink leading out of the project is
+// refused before anything is downloaded or written.
+func TestLockTargetCannotEscapeThroughSymlink(t *testing.T) {
+	proj, outside := t.TempDir(), t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(proj, "models")); err != nil {
+		t.Fatal(err)
+	}
+	l := NewLock(filepath.Join(proj, DefaultLockName))
+	l.Models = []LockModel{{Ref: "hf:org/m", Commit: commit, To: "dir:./models/q"}}
+	if _, err := l.Request(&l.Models[0], false); err == nil {
+		t.Fatal("a target reaching outside through a symlink was accepted")
+	}
+	l.Models[0].To = "dir:./real/q"
+	if _, err := l.Request(&l.Models[0], false); err != nil {
+		t.Fatalf("a normal target was refused: %v", err)
 	}
 }

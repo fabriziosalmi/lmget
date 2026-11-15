@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -53,6 +54,10 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 		add("partial", "warn", fmt.Sprintf("%d interrupted downloads (%s on disk)", st.Partial, HumanBytes(st.PartialBytes)),
 			"run the same lmget command again to resume")
 	}
+	if _, bad, err := c.store.Manifests(); err == nil && len(bad) > 0 {
+		add("manifests", "fail", fmt.Sprintf("%d manifests cannot be read, e.g. %s", len(bad), bad[0]),
+			"lmget rm refuses to delete blobs until they are fixed or removed by hand")
+	}
 	if list, err := c.List(); err == nil {
 		missing := 0
 		for _, in := range list {
@@ -67,10 +72,18 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 		}
 	}
 	if o.Verify {
-		bad, n, err := c.verifyBlobs(ctx)
+		unlock, lerr := c.store.flock(".lock", true, false)
+		if lerr != nil {
+			add("verify", "fail", AsError(lerr).Msg, "run doctor --verify when no download is running")
+			return cs
+		}
+		defer unlock()
+		bad, n, stuck, err := c.verifyBlobs(ctx)
 		switch {
 		case err != nil:
 			add("verify", "fail", err.Error(), "")
+		case len(stuck) > 0:
+			add("verify", "fail", fmt.Sprintf("%d corrupt blobs quarantined, but %d links to them could not be removed, e.g. %s", len(bad), len(stuck), stuck[0]), "remove those links by hand: they serve corrupt bytes")
 		case len(bad) > 0:
 			add("verify", "fail", fmt.Sprintf("%d of %d blobs were corrupt and moved to quarantine", len(bad), n), "lmget sync, or lmget get <model>, downloads them again")
 		default:
@@ -100,6 +113,8 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 		resp.Body.Close()
 		add("network", "ok", fmt.Sprintf("%s answered in %d ms", c.opt.HFEndpoint, time.Since(start).Milliseconds()), "")
 		switch {
+		case strings.HasPrefix(c.tokenSource, "unreadable:"):
+			add("token", "fail", "token file "+strings.TrimPrefix(c.tokenSource, "unreadable:")+" exists but cannot be read", "fix its permissions, or export HF_TOKEN")
 		case c.opt.HFToken == "":
 			add("token", "ok", "none: public models only", "gated or private models need HF_TOKEN")
 		case resp.StatusCode == 200:
@@ -155,16 +170,16 @@ func sameDevice(a, b string) bool {
 
 // verifyBlobs re-hashes every blob; a blob whose content no longer matches
 // its name is moved to <store>/quarantine.
-func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, err error) {
+func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, stuck []string, err error) {
 	dir := filepath.Join(c.store.Root(), "blobs", "sha256")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	// export links recorded by lmget: a corrupt blob's hard links share its
 	// bytes, so they go too and the next export recreates them
 	var links []string
-	if ms, err := c.store.Manifests(); err == nil {
+	if ms, _, err := c.store.Manifests(); err == nil {
 		for _, m := range ms {
 			for _, ex := range m.Exports {
 				links = append(links, ex.Links...)
@@ -174,7 +189,7 @@ func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, err erro
 	buf := make([]byte, 1<<20)
 	for _, e := range entries {
 		if ctx.Err() != nil {
-			return bad, n, ctx.Err()
+			return bad, n, stuck, ctx.Err()
 		}
 		name := e.Name()
 		if !hex64.MatchString(name) {
@@ -183,13 +198,13 @@ func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, err erro
 		n++
 		f, err := os.Open(filepath.Join(dir, name))
 		if err != nil {
-			return bad, n, err
+			return bad, n, stuck, err
 		}
 		h := sha256.New()
 		_, err = io.CopyBuffer(h, f, buf)
 		f.Close()
 		if err != nil {
-			return bad, n, err
+			return bad, n, stuck, err
 		}
 		if hex.EncodeToString(h.Sum(nil)) != name {
 			if fi, err := os.Stat(filepath.Join(dir, name)); err == nil {
@@ -197,7 +212,9 @@ func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, err erro
 					for _, l := range links {
 						if li, err := os.Lstat(l); err == nil && li.Mode().IsRegular() {
 							if in, ok := inodeOf(li); ok && in == bad {
-								os.Remove(l)
+								if err := os.Remove(l); err != nil {
+									stuck = append(stuck, l)
+								}
 							}
 						}
 					}
@@ -206,10 +223,10 @@ func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, err erro
 			q := filepath.Join(c.store.Root(), "quarantine")
 			os.MkdirAll(q, 0o755)
 			if err := os.Rename(filepath.Join(dir, name), filepath.Join(q, name)); err != nil {
-				return bad, n, err
+				return bad, n, stuck, err
 			}
 			bad = append(bad, name)
 		}
 	}
-	return bad, n, nil
+	return bad, n, stuck, nil
 }
