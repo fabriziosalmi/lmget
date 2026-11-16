@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -47,9 +48,11 @@ func run(args []string) int {
 	}
 	switch args[0] {
 	case "mirror":
-		if _, err := c.UpdateIndex(ctx); err != nil {
+		ix, err := c.UpdateIndex(ctx)
+		if err != nil {
 			return fail(err)
 		}
+		warnExpiry(ix, time.Now()) // every run (6 h) in the last week
 		res, err := c.MirrorIndex(ctx, nil)
 		if err != nil {
 			return fail(err)
@@ -93,6 +96,8 @@ func run(args []string) int {
 			msg := fmt.Sprintf("seeding %d blobs on port %d", n, s.Client().LocalPort())
 			if ix == nil {
 				msg = "no valid index (" + lmget.Printable(lmget.AsError(err).Msg) + "): seeding nothing"
+			} else if w := expiryWarning(ix.Expires, time.Now()); w != "" {
+				msg += "; " + w // logged when it changes: daily, hourly in the last two days
 			}
 			if msg != last {
 				for _, e := range errs {
@@ -114,9 +119,25 @@ func run(args []string) int {
 		if err := fs.Parse(args[1:]); err != nil {
 			return 2
 		}
-		if _, err := c.Index(); err != nil {
+		ix, err := c.Index()
+		if err != nil {
 			return fail(err)
 		}
+		warnExpiry(ix, time.Now())
+		go func() { // a long-running serve warns again once a day
+			t := time.NewTicker(24 * time.Hour)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					if ix, err := c.Index(); err == nil {
+						warnExpiry(ix, time.Now())
+					}
+				}
+			}
+		}()
 		srv := &http.Server{Addr: *listen, Handler: c.NodeHandler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 		go func() { <-ctx.Done(); srv.Shutdown(context.Background()) }()
 		fmt.Fprintf(os.Stderr, "lmget-node: serving on %s\n", *listen)
@@ -126,6 +147,32 @@ func run(args []string) int {
 		return 0
 	}
 	return usage()
+}
+
+// expiryWarn is how long before the index expires lmget-node starts saying
+// so: an expired index stops every node at once.
+const expiryWarn = 7 * 24 * time.Hour
+
+// expiryWarning is the warning for an index expiring at expires, or "".
+func expiryWarning(expires, now time.Time) string {
+	left := expires.Sub(now)
+	if left >= expiryWarn {
+		return ""
+	}
+	when := fmt.Sprintf("in %d days", int(math.Round(left.Hours()/24)))
+	switch {
+	case left <= 0:
+		return "warning: the index expired on " + expires.UTC().Format(time.DateOnly) + ": nothing is served until the maintainer publishes a new one"
+	case left < 48*time.Hour:
+		when = fmt.Sprintf("in %d hours", int(left.Hours()))
+	}
+	return "warning: the index expires on " + expires.UTC().Format("2006-01-02 15:04 UTC") + " (" + when + "): the maintainer must sign and publish a new one"
+}
+
+func warnExpiry(ix *lmget.Index, now time.Time) {
+	if w := expiryWarning(ix.Expires, now); w != "" {
+		fmt.Fprintf(os.Stderr, "lmget-node: %s\n", w)
+	}
 }
 
 func fail(err error) int {
