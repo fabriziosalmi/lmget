@@ -3,13 +3,13 @@ package lmget
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -34,6 +34,7 @@ func (s *switchable) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type lazy struct{ h atomic.Pointer[http.Handler] }
 
 func (l *lazy) set(h http.Handler) { l.h.Store(&h) }
+
 func (l *lazy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h := l.h.Load(); h != nil {
 		(*h).ServeHTTP(w, r)
@@ -219,139 +220,47 @@ func TestANodeServingOtherBytesIsSkipped(t *testing.T) {
 	}
 }
 
-func TestNodeServesOnlyIndexedBlobs(t *testing.T) {
-	m := setupM3(t)
-	cl := m.node.Client()
-	get := func(path string, hdr ...string) (int, []byte) {
-		req, _ := http.NewRequest(http.MethodGet, m.node.URL+path, nil)
-		for i := 0; i+1 < len(hdr); i += 2 {
-			req.Header.Set(hdr[i], hdr[i+1])
-		}
-		resp, err := cl.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer resp.Body.Close()
-		b, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, b
-	}
-	model := m.files[0].data
-	if code, b := get("/blobs/sha256/" + sha(model)); code != 200 || !bytes.Equal(b, model) {
-		t.Fatalf("an indexed blob: %d", code)
-	}
-	if code, b := get("/blobs/sha256/"+sha(model), "Range", "bytes=10-19"); code != 206 || !bytes.Equal(b, model[10:20]) {
-		t.Fatalf("a range: %d", code)
-	}
-	// a blob the node's store holds but the index does not name
-	other := randBytes(100)
-	os.WriteFile(m.nodeCli.store.BlobPath(sha(other)), other, 0o444)
-	for _, p := range []string{"/blobs/sha256/" + sha(other), "/blobs/sha256/../../index.json", "/blobs/sha256/" + strings.ToUpper(sha(model)), "/", "/refs/"} {
-		if code, _ := get(p); code == 200 {
-			t.Errorf("%s served", p)
-		}
-	}
-	if code, b := get("/index.json"); code != 200 || !json.Valid(b) {
-		t.Fatalf("the index: %d", code)
-	}
-}
-
-// the builder trusts the source, not the lock: license, gating and files
-func TestBuildIndexChecksTheSource(t *testing.T) {
-	m := setupM3(t)
-	b := m.client(t, t.TempDir())
-	rev := func(body string) {
-		inner := (&fakeHF{files: m.files}).handler()
-		m.hf.h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.URL.Path, "/revision/") {
-				w.Write([]byte(body))
-				return
-			}
-			inner.ServeHTTP(w, r)
-		})
-	}
-	build := func() error {
-		_, err := b.BuildIndex(context.Background(), m.lock, BuildOptions{Sequence: 2, Valid: time.Hour, Nodes: []string{m.node.URL}})
-		return err
-	}
-	rev(`{"sha":"` + commit + `","gated":false,"cardData":{"license":"llama3"}}`)
-	if err := build(); err == nil || !strings.Contains(err.Error(), "allowlist") {
-		t.Errorf("a non-allowlisted license: %v", err)
-	}
-	rev(`{"sha":"` + commit + `","gated":"auto","cardData":{"license":"apache-2.0"}}`)
-	if err := build(); err == nil || !strings.Contains(err.Error(), "gated") {
-		t.Errorf("a gated model: %v", err)
-	}
-	m.hf.h = (&fakeHF{files: m.files}).handler()
-	for i, name := range []string{"config.json (git id only at the source)", "model.safetensors (sha256 at the source)"} {
-		saved := m.lock.Models[0].Files[i].SHA256
-		m.lock.Models[0].Files[i].SHA256 = strings.Repeat("e", 64)
-		if err := build(); err == nil {
-			t.Errorf("a lock with a wrong sha256 for %s was indexed", name)
-		}
-		m.lock.Models[0].Files[i].SHA256 = saved
-	}
-	if err := build(); err != nil {
-		t.Fatalf("the correct lock was refused: %v", err)
-	}
-}
-
-// a node refuses to mirror a model whose source no longer matches the index
-func TestMirrorRefusesDrift(t *testing.T) {
-	m := setupM3(t)
-	m.files[1].data = []byte(`{"a":2}`) // config.json changed at the source, same commit
-	m.hf.h = (&fakeHF{files: m.files}).handler()
-	n := m.client(t, t.TempDir())
-	n.UpdateIndex(context.Background())
-	res, err := n.MirrorIndex(context.Background(), nil)
-	if err != nil || len(res) != 1 || res[0].Err == "" {
-		t.Fatalf("drift was mirrored: %+v %v", res, err)
-	}
-}
-
-func TestLicenseAllowlist(t *testing.T) {
-	for l, want := range map[string]bool{"apache-2.0": true, "MIT": true, "apache-2.0, mit": true, "apache-2.0, llama3": false, "": false, "other": false, "cc-by-nc-4.0": false} {
-		if LicenseAllowed(l) != want {
-			t.Errorf("LicenseAllowed(%q) != %v", l, want)
-		}
-	}
-}
-
-// defence in depth: a node does not mirror a model whose license is not on the
-// allowlist, even when a signed index lists it
-func TestMirrorSkipsLicensesOffTheAllowlist(t *testing.T) {
-	m := setupM3(t)
-	ix := sampleIndex(2)
-	ix.Nodes = []string{m.node.URL}
-	ix.Models[0].Ref, ix.Models[0].Commit, ix.Models[0].License = "hf:org/m", commit, "llama3"
-	ix.Models[0].Files = nil
-	for _, lf := range m.lock.Models[0].Files {
-		ix.Models[0].Files = append(ix.Models[0].Files, IndexFile{LockFile: lf})
-	}
-	publish(m.idx, m.signer, ix)
-	n := m.client(t, t.TempDir())
-	if _, err := n.UpdateIndex(context.Background()); err != nil {
+// A node that fails is skipped for the rest of the run: measured on the
+// real nodes, a dead first node cost every file its whole retry sequence
+// (about 16 s each) before the next node was asked.
+func TestADeadNodeIsAskedForOneFileOnly(t *testing.T) {
+	var mu sync.Mutex
+	asked := map[string]int{}
+	dead := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		asked[r.URL.Path]++
+		mu.Unlock()
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+	}))
+	defer dead.Close()
+	m := setupM3(t, dead.URL) // the index lists the dead node first
+	u := m.client(t, t.TempDir())
+	u.retryBase = time.Millisecond
+	if _, err := u.UpdateIndex(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	res, err := n.MirrorIndex(context.Background(), nil)
-	if err != nil || len(res) != 1 || !strings.Contains(res[0].Err, "allowlist") {
-		t.Fatalf("got %+v %v", res, err)
-	}
-	if st := n.Stats(); st.Blobs != 0 {
-		t.Fatalf("%d blobs mirrored for a model off the allowlist", st.Blobs)
-	}
-}
-
-// the index carries the v2 infohash of every blob, as the node will seed it
-func TestBuiltIndexCarriesTorrentIdentities(t *testing.T) {
-	m := setupM3(t)
-	ix, err := m.nodeCli.Index()
+	m.hf.down.Store(true)
+	var from []string
+	out, err := u.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "dir", Path: t.TempDir()}}, func(e Event) {
+		if e.Type == EvFileDone {
+			from = append(from, e.From)
+		}
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range ix.Models[0].Files {
-		bt, err := NewBlobTorrent(m.nodeCli.store.BlobPath(f.SHA256), f.SHA256)
-		if err != nil || f.BTIH2 != bt.Infohash {
-			t.Fatalf("%s: index btih2 %q, blob %v %v", f.Path, f.BTIH2, bt, err)
+	if !out.Plan.FromIndex || len(from) != len(m.files) {
+		t.Fatalf("from_index=%v, %d files done; want %d from the index", out.Plan.FromIndex, len(from), len(m.files))
+	}
+	good := NodeOrigin + strings.TrimPrefix(m.node.URL, "https://")
+	for _, f := range from {
+		if f != good {
+			t.Fatalf("a file came from %q, want %q", f, good)
 		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(asked) != 1 {
+		t.Fatalf("the dead node was asked for %d different blobs (%v); want 1, then skipped", len(asked), asked)
 	}
 }

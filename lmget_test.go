@@ -406,3 +406,15 @@ func TestExportDirAcceptsIdenticalFilesOnly(t *testing.T) {
 		t.Fatal("user file was overwritten")
 	}
 }
+
+// Critic lead: names that reach the terminal cannot carry control sequences.
+func TestControlCharactersNeverReachTheTerminal(t *testing.T) {
+	for _, p := range []string{"a\x1b[2Jb.json", "x\x07.bin", "ok\u009b31m.txt"} {
+		if isLocalSlash(p) {
+			t.Errorf("%q accepted as a file path", p)
+		}
+	}
+	if got := licenseString("mit\x1b]52;c;ZXZpbA==\x07"); strings.ContainsAny(got, "\x1b\x07") {
+		t.Errorf("license kept control characters: %q", got)
+	}
+}

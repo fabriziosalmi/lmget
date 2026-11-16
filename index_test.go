@@ -243,3 +243,62 @@ func TestBuiltInProjectKey(t *testing.T) {
 		t.Fatal("lmget-index.pub is not the built-in key")
 	}
 }
+
+// Audit run 4, hardening: once a newer index has been accepted, an older one
+// stays refused even after the newer one expired (the cached copy no longer
+// verifies, but the record of the highest accepted sequence remains).
+func TestAnOlderIndexStaysRefusedAfterTheNewerOneExpires(t *testing.T) {
+	c, is, s := indexSetup(t)
+	newer := sampleIndex(3)
+	newer.Expires = time.Now().Add(2 * time.Second).UTC().Truncate(time.Second).Add(time.Second)
+	publish(is, s, newer)
+	if _, err := c.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Until(newer.Expires) + 100*time.Millisecond)
+	if _, err := c.Index(); err == nil {
+		t.Fatal("the cached index should have expired: the test proves nothing")
+	}
+	publish(is, s, sampleIndex(2)) // older, still valid for 30 days
+	_, err := c.UpdateIndex(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "older than one already accepted") {
+		t.Fatalf("UpdateIndex of sequence 2 after 3 expired = %v; want a refusal", err)
+	}
+	// and a different index with the same sequence as the expired one
+	same := sampleIndex(3)
+	same.Nodes = []string{"https://other.example.org"}
+	publish(is, s, same)
+	if _, err := c.UpdateIndex(context.Background()); err == nil || !strings.Contains(err.Error(), "same sequence") {
+		t.Fatalf("a different index with sequence 3 = %v; want a refusal", err)
+	}
+	publish(is, s, sampleIndex(4))
+	if _, err := c.UpdateIndex(context.Background()); err != nil {
+		t.Fatalf("a newer index must still be accepted: %v", err)
+	}
+}
+
+// Audit run 4, hardening: the index lists Hugging Face models only. An entry
+// of another source, even signed, is refused: its plan from the index would
+// skip what that source's resolver checks (a pinned url#sha256, the manifest
+// digest of an OCI or Ollama commit).
+func TestTheIndexListsHuggingFaceModelsOnly(t *testing.T) {
+	c, is, s := indexSetup(t)
+	for _, ref := range []string{"https://example.com/m/model.gguf", "ollama:smollm2:135m"} {
+		ix := sampleIndex(1)
+		ix.Models[0].Ref = ref
+		ix.Models[0].Commit = strings.Repeat("c", 64) // an Ollama manifest digest
+		if strings.HasPrefix(ref, "https://") {
+			ix.Models[0].Commit = urlID(ref) // what a url lock entry carries
+		}
+		if r, err := ParseRef(ref); err != nil || Lockable(r) != nil {
+			t.Fatalf("%s is not a lockable reference (%v): the test proves nothing", ref, err)
+		}
+		publish(is, s, ix)
+		_, err := c.UpdateIndex(context.Background())
+		if err == nil || !strings.Contains(AsError(err).Error()+fmtWhy(err), "Hugging Face models only") {
+			t.Fatalf("a signed index listing %s = %v; want a refusal", ref, err)
+		}
+	}
+}
+
+func fmtWhy(err error) string { return AsError(err).Why }

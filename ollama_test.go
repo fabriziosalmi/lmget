@@ -532,3 +532,67 @@ func TestOllamaLockCannotRelabelAnotherModelsManifest(t *testing.T) {
 		t.Fatal("ollama:trusted now runs someone/evil")
 	}
 }
+
+// Hardening: repeated layer names never collide with a name already taken.
+func TestOllamaLayerNamesStayUnique(t *testing.T) {
+	c, err := New(Options{Home: t.TempDir(), OllamaRegistry: "https://registry.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := func(typ, hexc string) map[string]any {
+		return map[string]any{"mediaType": "application/vnd.ollama.image." + typ, "digest": "sha256:" + strings.Repeat(hexc, 64), "size": 1}
+	}
+	b, _ := json.Marshal(map[string]any{"schemaVersion": 2, "mediaType": ollamaManifestType,
+		"config": map[string]any{"mediaType": "x", "digest": "sha256:" + strings.Repeat("a", 64), "size": 1},
+		"layers": []any{d("model", "b"), d("license-2", "c"), d("license", "d"), d("license", "e")}})
+	p, err := c.ollamaPlan(ollamaRef(t, "ollama:m"), b, sha(b), Selection{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, f := range p.Files {
+		if seen[f.Path] {
+			t.Fatalf("two plan files named %s", f.Path)
+		}
+		seen[f.Path] = true
+	}
+}
+
+// Hardening: a lock that lists only some layers cannot make lmget write a
+// tag file whose layers are not linked.
+func TestOllamaExportRefusesALockWithoutEveryLayer(t *testing.T) {
+	f := newFakeOllama()
+	ls := smolLayers()
+	f.publish("library/smollm2", "135m", ls...)
+	srv := httptest.NewTLSServer(f)
+	defer srv.Close()
+	models := t.TempDir()
+	t.Setenv("OLLAMA_MODELS", models)
+	c := newOllamaClient(t, srv, t.TempDir())
+	ref := ollamaRef(t, "ollama:smollm2:135m")
+	out, err := c.Pull(context.Background(), Request{Ref: ref, Target: Target{Kind: "none"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := NewLock(filepath.Join(t.TempDir(), DefaultLockName))
+	if err := l.Upsert(out.Plan, Selection{}, Target{Kind: "ollama"}); err != nil {
+		t.Fatal(err)
+	}
+	var kept []LockFile
+	for _, lf := range l.Models[0].Files {
+		if lf.Path != "template" {
+			kept = append(kept, lf)
+		}
+	}
+	l.Models[0].Files = kept
+	req, err := l.Request(&l.Models[0], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Pull(context.Background(), req, nil); AsError(err).Code != ExitUsage {
+		t.Fatalf("got %v, want the partial export refused", err)
+	}
+	if _, err := os.Stat(filepath.Join(models, "manifests")); err == nil {
+		t.Fatal("a tag file was written for a model with an unlinked layer")
+	}
+}

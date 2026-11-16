@@ -330,3 +330,58 @@ func TestOCIRefusesAnotherManifestForADigest(t *testing.T) {
 		t.Fatalf("got %v, want the substituted manifest refused", err)
 	}
 }
+
+// Audit run 4. A registry names a token service (realm) on the HF endpoint:
+// lmget must not send the HF token there, so nothing HF answers for the
+// user's token can reach the registry.
+func TestOCIRealmOnTheHFEndpointGetsNoHFToken(t *testing.T) {
+	var mu sync.Mutex
+	var hfAuth, regAuth []string
+	hf := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hfAuth = append(hfAuth, r.Header.Get("Authorization"))
+		mu.Unlock()
+		if r.Header.Get("Authorization") != "Bearer hf_secret_for_hf_only" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"token": "HF-DERIVED"})
+	}))
+	defer hf.Close()
+	reg := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		regAuth = append(regAuth, r.Header.Get("Authorization"))
+		mu.Unlock()
+		w.Header().Set("WWW-Authenticate", `Bearer realm="`+hf.URL+`/api/spaces/victim/space/jwt",service="x"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer reg.Close()
+	t.Setenv("HF_TOKEN_PATH", filepath.Join(t.TempDir(), "none"))
+	t.Setenv("HF_HOME", t.TempDir())
+	c, err := New(Options{Home: t.TempDir(), HFEndpoint: hf.URL, HFToken: "hf_secret_for_hf_only", HTTP: reg.Client(), NoMirror: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := ParseRef("oci://" + strings.TrimPrefix(reg.URL, "https://") + "/evil/model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Pull(context.Background(), Request{Ref: ref, Target: Target{Kind: "none"}}, nil); err == nil {
+		t.Fatal("the pull succeeded")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(hfAuth) == 0 {
+		t.Fatal("the realm was never asked: the test proves nothing")
+	}
+	for _, a := range hfAuth {
+		if a != "" {
+			t.Fatalf("the realm on the HF endpoint got %q", a)
+		}
+	}
+	for _, a := range regAuth {
+		if strings.Contains(a, "HF-DERIVED") || strings.Contains(a, "hf_secret") {
+			t.Fatalf("the registry got %q", a)
+		}
+	}
+}

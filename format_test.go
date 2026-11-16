@@ -12,6 +12,77 @@ import (
 	"testing"
 )
 
+func TestIgnorableCodePointsAndUnreadableZips(t *testing.T) {
+	// two names that differ only by an ignorable code point collide on HFS+
+	if isLocalSlash("model‌.safetensors") {
+		t.Error("a file name with an ignorable code point was accepted")
+	}
+	// a user-chosen export directory is not a lock target: exportContained is the guard
+	root := t.TempDir()
+	if err := exportContained(root, filepath.Join(root, ".g‌it", "hooks")); err == nil {
+		t.Error("an export directory aliasing .git was accepted")
+	}
+	if err := exportContained(root, filepath.Join(root, "models", "q")); err != nil {
+		t.Errorf("a normal export directory was refused: %v", err)
+	}
+	// a zip Go cannot read may still be opened by torch's reader: fail closed
+	p := filepath.Join(t.TempDir(), "model.onnx")
+	os.WriteFile(p, []byte("PK\x03\x04 this is not a readable zip archive"), 0o644)
+	if err := checkFormat(p, "model.onnx", false); err == nil {
+		t.Error("an unreadable zip passed the format check")
+	}
+}
+
+// A pickle named pytorch_model.bin next to a decoy pytorch_model.xml looks
+// like OpenVINO by name; its content must still get it refused.
+func TestPickleBehindDecoyXMLIsRefused(t *testing.T) {
+	files := append(modelFiles(),
+		fakeFile{path: "pytorch_model.bin", data: torchZip(t), lfs: true},
+		fakeFile{path: "pytorch_model.xml", data: []byte("<net/>")})
+	f := &fakeHF{files: files}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	dir := t.TempDir()
+	c := newTestClient(t, srv, t.TempDir())
+	_, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "dir", Path: dir}}, nil)
+	if e := AsError(err); e == nil || e.Kind != "format" {
+		t.Fatalf("got %v, want a format error", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "pytorch_model.bin")); err == nil {
+		t.Fatal("the pickle was exported")
+	}
+}
+
+// LOW: protocol 0 and 1 pickles have no PROTO header.
+func TestOldProtocolPicklesAreRecognised(t *testing.T) {
+	p0 := []byte("cposix\nsystem\np0\n(Vecho pwned\np1\ntp2\nRp3\n.")
+	p1 := []byte("cposix\nsystem\nq\x00(X\x0a\x00\x00\x00echo pwnedq\x01tq\x02Rq\x03.")
+	cases := []struct {
+		name string
+		data []byte
+		ok   bool
+	}{
+		{"model.onnx", p0, false},
+		{"model.bin", p1, false},                                 // a .bin next to a decoy .xml is not declared pickle
+		{"vocab.txt", []byte("cat\ndog\nend."), true},            // a word list is text
+		{"weights.onnx", []byte("cabc\x00\x01\x02 data."), true}, // starts with c, ends with ., no GLOBAL
+		{"model.pt", p0, true},                                   // declared pickle by name
+	}
+	for _, tc := range cases {
+		dir := t.TempDir()
+		path := filepath.Join(dir, tc.name)
+		os.WriteFile(path, tc.data, 0o644)
+		siblings := map[string]bool{"model.xml": true} // the decoy OpenVINO pair
+		err := checkFormat(path, tc.name, isPickle(tc.name, siblings))
+		if tc.ok && err != nil {
+			t.Errorf("%s: refused: %v", tc.name, err)
+		}
+		if !tc.ok && err == nil {
+			t.Errorf("%s: an old-protocol pickle passed", tc.name)
+		}
+	}
+}
+
 // zipWithPickle is a zip as torch.save writes it: an archive/data.pkl entry.
 func zipWithPickle(t *testing.T) []byte {
 	var b bytes.Buffer
