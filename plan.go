@@ -59,7 +59,12 @@ type Selection struct {
 	AllowPickle bool     // keep pickle weights even when safetensors exist
 }
 
-var pickleExt = map[string]bool{".bin": true, ".pt": true, ".pth": true, ".ckpt": true, ".pkl": true, ".pickle": true}
+// pickleExt are the names of formats a loader unpickles: torch (.bin, .pt,
+// .pth, .ckpt), libtorch and rust-bert (.ot, a torch zip with data.pkl, as in
+// sentence-transformers/all-MiniLM-L6-v2), scikit-learn (.joblib) and plain
+// pickles.
+var pickleExt = map[string]bool{".bin": true, ".pt": true, ".pth": true, ".ckpt": true, ".pkl": true, ".pickle": true,
+	".ot": true, ".joblib": true}
 
 // isPickle is a name heuristic. A .bin next to a same-stem .xml is OpenVINO
 // IR weights (raw tensors), not a pickle.

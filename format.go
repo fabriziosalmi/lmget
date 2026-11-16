@@ -2,6 +2,7 @@ package lmget
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
@@ -80,10 +81,43 @@ func looksPickle(f *os.File, head []byte, size int64, ext string) bool {
 	if textExt[ext] {
 		return false
 	}
+	if zipAtTail(f, size) {
+		return true
+	}
 	if len(head) >= 2 && head[0] == 0x80 && head[1] >= 2 && head[1] <= 5 {
 		return true // a PROTO header: treated as a pickle even if the rest is malformed
 	}
 	return walkPickle(io.NewSectionReader(f, 0, size), size)
+}
+
+// zipAtTail reports a zip archive appended to a file that starts as
+// something else (a GGUF or safetensors header, say): zip readers find an
+// archive from its end, so a loader that opens zips could find a pickle in
+// it. Only an archive Go reads and that holds a .pkl entry counts: the four
+// bytes of an end record also occur by chance in weights.
+func zipAtTail(f *os.File, size int64) bool {
+	const maxTail = 22 + 65535 // end of central directory record and its longest comment
+	n := min(size, maxTail)
+	if n < 22 {
+		return false
+	}
+	tail := make([]byte, n)
+	if _, err := f.ReadAt(tail, size-n); err != nil {
+		return false
+	}
+	if !bytes.Contains(tail, []byte("PK\x05\x06")) {
+		return false
+	}
+	zr, err := zip.NewReader(f, size)
+	if err != nil {
+		return false
+	}
+	for _, zf := range zr.File {
+		if strings.HasSuffix(strings.ToLower(zf.Name), ".pkl") {
+			return true
+		}
+	}
+	return false
 }
 
 // pickle opcode argument kinds
