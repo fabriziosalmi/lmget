@@ -57,7 +57,7 @@ type signer struct {
 	pub string
 }
 
-func testSigner(t *testing.T) signer {
+func testSigner(t testing.TB) signer {
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
