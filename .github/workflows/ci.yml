@@ -25,7 +25,7 @@ jobs:
       - name: vet and gofmt
         run: |
           go vet ./...
-          test -z "$(gofmt -l $(git ls-files '*.go'))"
+          test -z "$(git ls-files -z '*.go' | xargs -0 gofmt -l)"
       - name: tests with the race detector
         run: go test -race -count=1 ./...
       - name: release build is reproducible

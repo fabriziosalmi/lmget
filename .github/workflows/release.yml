@@ -3,6 +3,11 @@ name: release
 # A pushed tag v* builds the archives, attests their build provenance
 # (SLSA, signed through Sigstore) and creates a DRAFT release. A person
 # publishes it after reading it.
+#
+# Two jobs: "build" runs the repository's code (tests, build) with a
+# read-only token and no way to sign; "release" holds the permissions to
+# sign and to write, and runs no repository code: it only checks that the
+# archives are the ones built and that the tag still names the built commit.
 
 on:
   push:
@@ -15,12 +20,12 @@ env:
   GOFLAGS: -tags=purego_utp # pure Go uTP in anacrolix: no C++ compiler, as shipped
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write      # create the draft release
-      id-token: write      # sign the provenance
-      attestations: write  # store the attestation
+      contents: read
+    outputs:
+      checksums: ${{ steps.sums.outputs.checksums }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +38,49 @@ jobs:
         run: go test -race -count=1 ./...
       - name: build the archives
         run: ./scripts/release-build.sh "$GITHUB_REF_NAME" dist
+      - name: checksums as a job output
+        id: sums
+        run: |
+          {
+            echo 'checksums<<EOF'
+            cat dist/checksums.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write      # create the draft release
+      id-token: write      # sign the provenance
+      attestations: write  # store the attestation
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: the archives are the ones the build job hashed
+        env:
+          BUILT: ${{ needs.build.outputs.checksums }}
+        run: |
+          printf '%s\n' "$BUILT" > built.txt
+          cmp built.txt dist/checksums.txt
+          (cd dist && sha256sum -c checksums.txt)
+      - name: the tag still names the built commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          now=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)
+          if [ "$now" != "$GITHUB_SHA" ]; then
+            echo "tag $GITHUB_REF_NAME moved to $now, the archives were built from $GITHUB_SHA" >&2
+            exit 1
+          fi
       # required for a public repository; on a private one its availability
       # depends on the plan, so a failure there is recorded, not fatal
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -42,7 +90,9 @@ jobs:
       - name: draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt \
+          cd dist
+          gh release create "$GITHUB_REF_NAME" ./*.tar.gz checksums.txt \
             --draft --verify-tag --title "lmget $GITHUB_REF_NAME" \
             --notes "Verify an archive: gh attestation verify <archive> --repo $GITHUB_REPOSITORY --signer-workflow $GITHUB_REPOSITORY/.github/workflows/release.yml --source-ref refs/tags/$GITHUB_REF_NAME"
