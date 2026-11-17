@@ -40,8 +40,11 @@ type Options struct {
 	// IndexURL is the signed index (https); default $LMGET_INDEX_URL. Its
 	// signature is IndexURL+".minisig". IndexKeys add minisign public keys
 	// to the built-in ones; default $LMGET_INDEX_KEY.
-	IndexURL  string
-	IndexKeys []string
+	IndexURL string
+	// IndexMirrors serve the same signed index when IndexURL cannot; default
+	// DefaultIndexMirrors with the default IndexURL, none with another one.
+	IndexMirrors []string
+	IndexKeys    []string
 	// RootKeys add minisign public keys to the built-in root keys, which
 	// sign keys.json (keys.go); default $LMGET_ROOT_KEY. KeysURL is the key
 	// list; default keys.json next to IndexURL.
@@ -68,7 +71,9 @@ type Client struct {
 	ociTokens   map[string]ociToken // pull tokens, per OCI repository
 	nodeMu      sync.Mutex
 	nodeDown    map[string]time.Time // index nodes that failed, until when they are skipped
-	retryBase   time.Duration        // first retry wait of a chunk, doubled each time
+	indexMu     sync.Mutex
+	indexTried  bool          // ensureIndex fetched (or tried to fetch) the index in this run
+	retryBase   time.Duration // first retry wait of a chunk, doubled each time
 	// streamedFiles counts files verified from the hash computed while they
 	// downloaded, instead of reading them again (issue #1); tests read it
 	streamedFiles atomic.Int64
@@ -101,6 +106,9 @@ func New(o Options) (*Client, error) {
 	}
 	if o.IndexURL == "" {
 		o.IndexURL = DefaultIndexURL
+	}
+	if o.IndexMirrors == nil && o.IndexURL == DefaultIndexURL {
+		o.IndexMirrors = DefaultIndexMirrors
 	}
 	if len(o.IndexKeys) == 0 && os.Getenv("LMGET_INDEX_KEY") != "" {
 		o.IndexKeys = []string{os.Getenv("LMGET_INDEX_KEY")}

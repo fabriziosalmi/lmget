@@ -317,18 +317,26 @@ func (c *Client) Index() (*Index, error) {
 // UpdateIndex fetches the index and its signature, verifies them, refuses a
 // sequence older than the cached one, and caches them.
 func (c *Client) UpdateIndex(ctx context.Context) (*Index, error) {
+	return c.updateIndexAt(ctx, c.opt.IndexURL, true)
+}
+
+// updateIndexAt is UpdateIndex from u. Without keys, the key list is not
+// fetched: a mirror of the index is not where the key list lives, and the
+// keys already trusted here (built in, or a key list accepted before) decide.
+func (c *Client) updateIndexAt(ctx context.Context, u string, keys bool) (*Index, error) {
 	if len(c.rootKeys()) == 0 && len(IndexKeys)+len(c.opt.IndexKeys) == 0 { // nothing could verify it: do not even fetch it
 		return nil, newErr(ExitUsage, "usage", "no index key is configured").
 			why("the project index is not published yet")
 	}
-	u := c.opt.IndexURL
 	if pu, err := url.Parse(u); u == "" || err != nil || pu.Scheme != "https" {
 		return nil, newErr(ExitUsage, "usage", "no index URL is configured").
 			why("LMGET_INDEX_URL must be an https URL")
 	}
 	// the key list first: it says which keys sign the index
-	if err := c.UpdateKeys(ctx); err != nil {
-		return nil, err
+	if keys {
+		if err := c.UpdateKeys(ctx); err != nil {
+			return nil, err
+		}
 	}
 	if _, _, err := c.trustedIndexKeys(time.Now()); err != nil {
 		return nil, err

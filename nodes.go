@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -33,6 +34,37 @@ func noOrigin() error {
 func sourceDown(err error) bool {
 	e := AsError(err)
 	return (e.Code == ExitNetwork && e.Kind != "changed") || e.Code == ExitNotFound
+}
+
+// DefaultIndexMirrors serve the project's signed index when lmget.org does
+// not answer: every node keeps the verified copy it serves from. The
+// signature, not the host, is what makes an index trusted.
+var DefaultIndexMirrors = []string{"https://node1.lmget.org/index.json", "https://node2.lmget.org/index.json"}
+
+// ensureIndex fetches the signed index when the source failed and no valid
+// copy is cached (a new store, or an expired copy): without it, the nodes
+// could not stand in for the source the first time they are needed. It
+// tries once per run, the index URL first, then its mirrors.
+func (c *Client) ensureIndex(ctx context.Context) {
+	if _, err := c.Index(); err == nil {
+		return
+	}
+	c.indexMu.Lock()
+	defer c.indexMu.Unlock()
+	if c.indexTried {
+		return
+	}
+	c.indexTried = true
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if _, err := c.UpdateIndex(ctx); err == nil {
+		return
+	}
+	for _, u := range c.opt.IndexMirrors {
+		if _, err := c.updateIndexAt(ctx, u, false); err == nil {
+			return
+		}
+	}
 }
 
 // indexEntry returns the verified cached index and its entry for ref at
