@@ -221,26 +221,32 @@ func TestIndexNeedsAKey(t *testing.T) {
 // The built-in project key is the one minisign generated (its key number is
 // printed reversed, as a little-endian uint64) and matches lmget-index.pub.
 func TestBuiltInProjectKey(t *testing.T) {
-	if len(IndexKeys) != 1 {
-		t.Fatalf("%d built-in keys", len(IndexKeys))
+	want := []struct{ number, pubFile string }{
+		{"21C7BDA090E969F4", "lmget-index.pub"},        // the project key
+		{"736BC89C91E98921", "lmget-index-backup.pub"}, // the offline backup key
 	}
-	k, err := ParseMinisignKey(IndexKeys[0])
-	if err != nil {
-		t.Fatal(err)
+	if len(IndexKeys) != len(want) {
+		t.Fatalf("%d built-in keys, want %d", len(IndexKeys), len(want))
 	}
-	var num strings.Builder
-	for i := 7; i >= 0; i-- {
-		fmt.Fprintf(&num, "%02X", k.ID[i])
-	}
-	if num.String() != "21C7BDA090E969F4" {
-		t.Fatalf("key number %s", num.String())
-	}
-	pub, err := os.ReadFile("lmget-index.pub")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if k2, err := ParseMinisignKey(string(pub)); err != nil || string(k2.PK) != string(k.PK) || k2.ID != k.ID {
-		t.Fatal("lmget-index.pub is not the built-in key")
+	for i, w := range want {
+		k, err := ParseMinisignKey(IndexKeys[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var num strings.Builder
+		for b := 7; b >= 0; b-- {
+			fmt.Fprintf(&num, "%02X", k.ID[b])
+		}
+		if num.String() != w.number {
+			t.Fatalf("key %d: number %s, want %s", i, num.String(), w.number)
+		}
+		pub, err := os.ReadFile(w.pubFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if k2, err := ParseMinisignKey(string(pub)); err != nil || string(k2.PK) != string(k.PK) || k2.ID != k.ID {
+			t.Fatalf("%s is not built-in key %s", w.pubFile, w.number)
+		}
 	}
 }
 

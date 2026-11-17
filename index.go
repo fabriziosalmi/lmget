@@ -32,9 +32,18 @@ import (
 // every read.
 
 // IndexKeys are the minisign public keys lmget trusts for the project index:
-// the project key, key number 21C7BDA090E969F4 (lmget-index.pub in the
-// repository). Its secret key is kept in Infisical and never on disk here.
-var IndexKeys = []string{"RWT0aemQoL3HIZb5q4xhyeAUFBAtnyetjUH2KFXr0H235qQdXzZhtZrB"}
+//   - the project key, key number 21C7BDA090E969F4 (lmget-index.pub), which
+//     signs every index;
+//   - the backup key, key number 736BC89C91E98921 (lmget-index-backup.pub),
+//     kept offline apart from the project key, so the index can still be
+//     signed if the project key is lost.
+//
+// Neither secret key is ever in the repository. An index signed by either is
+// accepted; the sequence, expiry and 60-day validity rules apply to both.
+var IndexKeys = []string{
+	"RWT0aemQoL3HIZb5q4xhyeAUFBAtnyetjUH2KFXr0H235qQdXzZhtZrB",
+	"RWQhiemRnMhrcwx8Kp7d8KmyCw5WZzE0PGWIMgXsWWInXEiTuwx5BBBr",
+}
 
 const (
 	indexMaxBytes = 32 << 20
