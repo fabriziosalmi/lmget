@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -169,5 +170,80 @@ func TestATailZipGoCannotReadIsAPickle(t *testing.T) {
 	}
 	if err := checkFormat(p, "model.safetensors", false); err == nil || !strings.Contains(AsError(err).Why, "pickle") {
 		t.Fatalf("a safetensors file with an unreadable zip holding a pickle at its tail: %v", err)
+	}
+}
+
+// Audit run 6: tail archives that Go or Python's zipfile open although the
+// end record's comment does not end at the end of the file, inside the last
+// tensor of an otherwise valid file. Each was accepted at 20209be.
+func TestTailZipsWithTrailingBytesOrShortCommentsArePickles(t *testing.T) {
+	z := zipWithPickle(t)
+	end := bytes.LastIndex(z, []byte("PK\x05\x06"))
+	variants := map[string][]byte{
+		"trailing bytes (Go reads it)": append(append([]byte(nil), z...), "garbage"...),
+		"declared comment longer than the file": func() []byte {
+			b := append([]byte(nil), z...)
+			binary.LittleEndian.PutUint16(b[end+20:], 5)
+			return b
+		}(),
+		"trailing bytes and a wrong entry count": func() []byte {
+			b := append(append([]byte(nil), z...), "garbage"...)
+			binary.LittleEndian.PutUint16(b[end+8:], 2)
+			binary.LittleEndian.PutUint16(b[end+10:], 2)
+			return b
+		}(),
+	}
+	for name, tailZip := range variants {
+		for fname, b := range map[string][]byte{"model.safetensors": stAround(tailZip), "model.gguf": ggufAround(tailZip)} {
+			p := filepath.Join(t.TempDir(), fname)
+			os.WriteFile(p, b, 0o644)
+			if err := checkFormat(p, fname, false); err == nil || !strings.Contains(AsError(err).Why, "pickle") {
+				t.Errorf("%s in %s: %v", name, fname, err)
+			}
+		}
+	}
+}
+
+// Audit run 6: a central directory of millions of empty entries made Go's
+// zip reader hold about 4 bytes of heap per byte of file. Past the read
+// budget the archive counts as unreadable, so as a pickle, at either end.
+func TestAHugeZipDirectoryIsRefusedWithinTheBudget(t *testing.T) {
+	for _, n := range []int{zipReadBudget/46 + 50_000, 2 * zipReadBudget / 46} { // past the budget, then twice it
+		hugeZipDirectory(t, n)
+	}
+}
+
+func hugeZipDirectory(t *testing.T, n int) {
+	build := func(prefix []byte) []byte {
+		b := append([]byte(nil), prefix...)
+		cdOff := len(b)
+		rec := append([]byte("PK\x01\x02"), make([]byte, 42)...)
+		b = append(b, bytes.Repeat(rec, n)...)
+		eocd := make([]byte, 22)
+		copy(eocd, "PK\x05\x06")
+		binary.LittleEndian.PutUint16(eocd[8:], uint16(n%65536))
+		binary.LittleEndian.PutUint16(eocd[10:], uint16(n%65536))
+		binary.LittleEndian.PutUint32(eocd[12:], uint32(n*46))
+		binary.LittleEndian.PutUint32(eocd[16:], uint32(cdOff))
+		return append(b, eocd...)
+	}
+	head := append([]byte("PK\x03\x04"), make([]byte, 26)...)
+	for name, b := range map[string][]byte{"model.bin": build(head), "model.gguf": build(append([]byte("GGUF"), make([]byte, 12)...))} {
+		p := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		err := checkFormat(p, name, false)
+		runtime.ReadMemStats(&after)
+		if err == nil || !strings.Contains(AsError(err).Why, "pickle") {
+			t.Errorf("%s with %d directory entries: %v", name, n, err)
+		}
+		// bounded by the budget, not by the file: the same for both sizes
+		if grew := after.TotalAlloc - before.TotalAlloc; grew > 8*zipReadBudget {
+			t.Errorf("%s: the check allocated %d MiB", name, grew>>20)
+		}
 	}
 }

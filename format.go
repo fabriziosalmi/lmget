@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -63,7 +64,7 @@ var textExt = map[string]bool{".txt": true, ".json": true, ".md": true, ".yaml":
 // treated as one: a loader with another zip parser might still open it.
 func looksPickle(f *os.File, head []byte, size int64, ext string) bool {
 	if len(head) >= 4 && string(head[:4]) == "PK\x03\x04" {
-		zr, err := zip.NewReader(f, size)
+		zr, err := readZip(f, size)
 		if err != nil {
 			return true
 		}
@@ -89,11 +90,12 @@ func looksPickle(f *os.File, head []byte, size int64, ext string) bool {
 // zipAtTail reports a zip archive appended to a file that starts as
 // something else (a GGUF or safetensors header, say): zip readers find an
 // archive from its end, so a loader that opens zips could find a pickle in
-// it. A tail with a plausible end-of-archive record (its comment ends exactly
-// at the end of the file) is an archive: it counts when it holds a .pkl
-// entry, or when Go cannot read it, since another zip reader might (the same
-// rule as a file that starts with a zip). The four bytes of the record
-// signature alone also occur by chance in weights and do not count.
+// it. When the tail holds an end-of-archive signature, Go's zip reader is
+// asked first: an archive it reads counts when it holds a .pkl entry. One it
+// cannot read counts when another reader would still follow it (see
+// tailLooksLikeArchive): the same rule as a file that starts with a zip. The
+// four bytes of the signature alone also occur by chance in weights and do
+// not count.
 func zipAtTail(f *os.File, size int64) bool {
 	const maxTail = 22 + 65535 // end of central directory record and its longest comment
 	n := min(size, maxTail)
@@ -104,26 +106,75 @@ func zipAtTail(f *os.File, size int64) bool {
 	if _, err := f.ReadAt(tail, size-n); err != nil {
 		return false
 	}
-	plausible := false
-	for i := bytes.LastIndex(tail, []byte("PK\x05\x06")); i >= 0; i = bytes.LastIndex(tail[:i], []byte("PK\x05\x06")) {
-		if i+22 <= len(tail) && int(binary.LittleEndian.Uint16(tail[i+20:i+22])) == len(tail)-i-22 {
-			plausible = true
-			break
-		}
-	}
-	if !plausible {
+	if !bytes.Contains(tail, []byte("PK\x05\x06")) {
 		return false
 	}
-	zr, err := zip.NewReader(f, size)
-	if err != nil {
-		return true
+	// Go's reader first: it finds an end record followed by trailing bytes too
+	if zr, err := readZip(f, size); err == nil {
+		for _, zf := range zr.File {
+			if strings.HasSuffix(strings.ToLower(zf.Name), ".pkl") {
+				return true
+			}
+		}
+		return false
 	}
-	for _, zf := range zr.File {
-		if strings.HasSuffix(strings.ToLower(zf.Name), ".pkl") {
+	return tailLooksLikeArchive(f, tail, size-n)
+}
+
+// tailLooksLikeArchive reports an end record Go cannot read that another zip
+// reader would still follow: its comment ends at the end of the file, or the
+// central directory it names (by declared offset, or by its size counted back
+// from the record, as Python's zipfile does) starts with a PK\x01\x02 header.
+// A chance end signature in weights has neither.
+func tailLooksLikeArchive(f *os.File, tail []byte, base int64) bool {
+	sig := make([]byte, 4)
+	for i := bytes.LastIndex(tail, []byte("PK\x05\x06")); i >= 0; i = bytes.LastIndex(tail[:i], []byte("PK\x05\x06")) {
+		if i+22 > len(tail) {
+			continue
+		}
+		if int(binary.LittleEndian.Uint16(tail[i+20:i+22])) == len(tail)-i-22 {
 			return true
+		}
+		end := base + int64(i)
+		cdSize := int64(binary.LittleEndian.Uint32(tail[i+12:]))
+		cdOff := int64(binary.LittleEndian.Uint32(tail[i+16:]))
+		for _, at := range []int64{end - cdSize, cdOff} {
+			if at >= 0 && at+4 <= end {
+				if _, err := f.ReadAt(sig, at); err == nil && string(sig) == "PK\x01\x02" {
+					return true
+				}
+			}
 		}
 	}
 	return false
+}
+
+// zipReadBudget bounds what Go's zip reader may read to list an archive. It
+// keeps every central directory entry in memory (about 4 bytes of heap per
+// byte read), and reads entries until the first that is not one, whatever
+// the end record declares: an archive past this budget counts as one Go
+// cannot read, which is a pickle. A torch.save archive lists one entry per
+// tensor storage, tens of KB for real checkpoints (audit run 6).
+const zipReadBudget = 16 << 20
+
+var errZipTooLarge = errors.New("zip directory larger than the read budget")
+
+type budgetReader struct {
+	r    io.ReaderAt
+	left int64
+}
+
+func (b *budgetReader) ReadAt(p []byte, off int64) (int, error) {
+	if int64(len(p)) > b.left {
+		return 0, errZipTooLarge
+	}
+	b.left -= int64(len(p))
+	return b.r.ReadAt(p, off)
+}
+
+// readZip opens an archive with Go's reader within zipReadBudget.
+func readZip(f io.ReaderAt, size int64) (*zip.Reader, error) {
+	return zip.NewReader(&budgetReader{r: f, left: zipReadBudget}, size)
 }
 
 // pickle opcode argument kinds

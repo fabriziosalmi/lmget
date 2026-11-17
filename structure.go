@@ -11,6 +11,7 @@ import (
 	"math"
 	"math/bits"
 	"sort"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -197,6 +198,15 @@ const (
 	ggufArray  = 9
 )
 
+// What the walk keeps in memory is bounded by these, not by the file: real
+// GGUF files carry tens of keys and at most a few thousand tensors, and
+// llama.cpp itself keeps a full tensor per entry (audit run 6).
+const (
+	ggufMaxTensors  = 1 << 16
+	ggufMaxKV       = 1 << 16
+	ggufMaxKeyBytes = 16 << 20 // key strings kept for the duplicate check
+)
+
 var ggufScalar = map[uint32]uint64{0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 
 // ggufReader reads a GGUF header, knowing how much of the file is left.
@@ -349,10 +359,18 @@ func checkGGUF(r io.ReaderAt, size int64) string {
 	if nTensors > g.remain()/25 || nKV > g.remain()/14 || nTensors*25+nKV*14 > g.remain() {
 		return fmt.Sprintf("the GGUF header claims %d tensors and %d keys, more than the file can hold", nTensors, nKV)
 	}
+	if nTensors > ggufMaxTensors || nKV > ggufMaxKV {
+		return fmt.Sprintf("the GGUF header claims %d tensors and %d keys, more than any model carries (at most %d of each)", nTensors, nKV, ggufMaxTensors)
+	}
 	align := uint64(32) // GGUF_DEFAULT_ALIGNMENT
 	keys := make(map[string]bool, min(nKV, 1<<10))
+	var keyBytes uint64
 	for i := uint64(0); i < nKV && g.failed == ""; i++ {
 		key := g.str(1<<20, fmt.Sprintf("key %d is longer than 1 MiB", i))
+		if keyBytes += uint64(len(key)); keyBytes > ggufMaxKeyBytes {
+			g.fail("the GGUF keys take more than %d MiB", ggufMaxKeyBytes>>20)
+			break
+		}
 		t := g.u32()
 		if g.failed != "" {
 			break
@@ -360,6 +378,10 @@ func checkGGUF(r io.ReaderAt, size int64) string {
 		switch {
 		case key == "":
 			g.fail("key %d is empty", i)
+		case strings.IndexByte(key, 0) >= 0:
+			// llama.cpp compares keys as C strings: "general.alignment\x00x"
+			// would mean general.alignment to it and another key to us
+			g.fail("key %d contains a NUL byte", i)
 		case keys[key]:
 			g.fail("the key %s is given twice", quote(key))
 		case key == "general.alignment":
@@ -391,6 +413,10 @@ func checkGGUF(r io.ReaderAt, size int64) string {
 		}
 		if names[name] {
 			g.fail("the tensor %s is given twice", quote(name))
+			break
+		}
+		if strings.IndexByte(name, 0) >= 0 {
+			g.fail("the name of tensor %d contains a NUL byte", i)
 			break
 		}
 		names[name] = true

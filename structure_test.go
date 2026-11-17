@@ -154,6 +154,16 @@ func TestGGUFStructure(t *testing.T) {
 		{"second tensor past the end", twoQ4(32, 40, 32), "past the end"},
 		{"alignment not a power of 2", twoQ4(48, 80, 48), "power of 2"},
 		{"counts beyond the file", head(3, 1<<40, 0).Bytes(), "more than the file"},
+		{"more tensors than any model", append(head(3, ggufMaxTensors+1, 0).Bytes(), make([]byte, 25*(ggufMaxTensors+1))...), "more than any model"},
+		{"more keys than any model", append(head(3, 0, ggufMaxKV+1).Bytes(), make([]byte, 14*(ggufMaxKV+1))...), "more than any model"},
+		{"keys past the byte budget", func() []byte {
+			n := ggufMaxKeyBytes/(1<<20) + 1
+			g := head(3, 0, uint64(n))
+			for i := 0; i < n; i++ {
+				g.str(fmt.Sprintf("%07d", i) + strings.Repeat("k", 1<<20-7)).u32(0).WriteByte(0) // a uint8 key
+			}
+			return g.Bytes()
+		}(), "more than 16 MiB"},
 		{"string past the end", func() []byte {
 			g := head(3, 0, 1)
 			g.u64(1 << 20).WriteString("abc")
@@ -164,6 +174,16 @@ func TestGGUFStructure(t *testing.T) {
 			g.u64(1<<30 + 1)
 			return append(g.Bytes(), make([]byte, 32)...)
 		}(), "claims"},
+		{"NUL in a key", func() []byte {
+			g := head(3, 0, 1)
+			g.str("general.alignment\x00x").u32(4).u32(64)
+			return g.Bytes()
+		}(), "NUL"},
+		{"NUL in a tensor name", func() []byte {
+			g := head(3, 1, 0)
+			g.tensor("w\x00", 0, 0, 1)
+			return g.pad(32).Write64(4).Bytes()
+		}(), "NUL"},
 		{"empty key", func() []byte {
 			g := head(3, 0, 1)
 			g.str("").u32(4).u32(1)
