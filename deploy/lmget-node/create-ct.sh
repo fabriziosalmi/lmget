@@ -4,8 +4,8 @@
 # sources, the index) and, for a Cloudflare Tunnel, outbound 7844: put it on
 # a bridge that allows nothing else and accepts no inbound connection.
 #
-#   VMID=<id> IP=<address>/24 GW=<gateway> BRIDGE=vmbr1 ./create-ct.sh
-#   VMID=<id> IP=dhcp BRIDGE=vmbr0 TEMPLATE=local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst ./create-ct.sh
+#   VMID=<id> IP=<address>/24 GW=<gateway> BRIDGE=<isolated bridge> ./create-ct.sh
+#   VMID=<id> IP=dhcp BRIDGE=<LAN bridge> TEMPLATE=local:vztmpl/<template> ./create-ct.sh
 set -euo pipefail
 : "${VMID:?} ${IP:?} ${BRIDGE:?}"
 STORAGE=${STORAGE:-local-lvm}

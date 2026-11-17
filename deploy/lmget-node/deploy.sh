@@ -17,6 +17,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
 	echo "the working tree has uncommitted changes: deploy a commit" >&2
 	exit 1
 fi
+export GOWORK=off # a go.work in a parent directory must not change what is built
 rev=$(git rev-parse --short HEAD)
 ARCH=$(ssh "$PVE" "pct exec $VMID -- dpkg --print-architecture")
 stage=$(mktemp -d)
@@ -37,7 +38,11 @@ tar -C "$stage" -cf - . | ssh "$PVE" "rm -rf /tmp/lmget-node-deploy && mkdir /tm
 	cd / && rm -rf /tmp/lmget-node-deploy"
 if [ -n "${TOKEN_CMD:-}" ]; then
 	echo "== tunnel token -> /etc/lmget-node/tunnel.env (0600, through stdin)"
-	eval "$TOKEN_CMD" | tr -d '\r\n' | ssh "$PVE" "pct exec $VMID -- sh -c 'umask 077; mkdir -p /etc/lmget-node; { printf TUNNEL_TOKEN=; cat; echo; } > /etc/lmget-node/tunnel.env'"
+	token=$(eval "$TOKEN_CMD" | tr -d '\r\n')
+	[ -n "$token" ] || { echo "TOKEN_CMD gave no token: tunnel.env left as it was" >&2; exit 1; }
+	# written to a temporary file and renamed: a failed write never leaves an empty token behind
+	printf '%s' "$token" | ssh "$PVE" "pct exec $VMID -- sh -c 'umask 077; mkdir -p /etc/lmget-node && { printf TUNNEL_TOKEN=; cat; echo; } > /etc/lmget-node/tunnel.env.new && mv /etc/lmget-node/tunnel.env.new /etc/lmget-node/tunnel.env'"
+	unset token
 fi
 ssh "$PVE" "pct exec $VMID -- env SEED=${SEED:-0} ISOLATE=${ISOLATE:-0} bash /root/lmget-node-deploy/install.sh"
 echo "== deployed $rev to CT $VMID"
