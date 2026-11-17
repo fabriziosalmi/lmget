@@ -26,9 +26,9 @@ What happens on every run:
 - **Plan first.** The revision is resolved to a commit, and every file is listed with its size and published hash before a byte is downloaded.
 - **Verified.** Large files are checked against their sha256 (Git LFS); small files against their git blob id, and their sha256 is recorded. A mismatch discards the partial file and exits with code 5.
 - **Resumable.** Interrupt at any time; the same command resumes from the last completed chunk.
-- **Content-addressed.** Files are stored once by sha256 in `~/.lmget` (or `$LMGET_HOME`) and hardlinked into the target, so nothing is copied twice.
-- **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle is refused unless its name says so. Pickles are detected by walking their opcodes (protocols 0 to 5); a zip with a `.pkl` entry, as `torch.save` writes, counts as one, and so does a zip lmget cannot read. Refused files exit with code 5.
-- **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.ckpt`, ...) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory, that contain control characters, or that contain invisible code points (which some filesystems drop, so two names could land on one file) are refused. Sizes above 16 TiB are refused.
+- **Content-addressed.** Files are stored once by sha256 in `~/.lmget` (or `$LMGET_HOME`) and hardlinked into the target, so nothing is copied twice (across filesystems, where a hard link is impossible, the target gets a symlink to the store).
+- **Checked by content, not only by hash.** A matching hash proves the bytes are what the source publishes, not that they are what the name says. Before a file enters the store, `.safetensors` must have a valid header, `.gguf` must start with the GGUF magic, and a file whose content is a Python pickle is refused unless its name says so. Pickles are detected by walking their opcodes (protocols 0 to 5); a zip with a `.pkl` entry, as `torch.save` writes, counts as one, and so does a zip lmget cannot read, or a zip with a `.pkl` entry appended after another format's header. Refused files exit with code 5.
+- **Safer defaults.** Pickle weights (`.bin`, `.pt`, `.pth`, `.ckpt`, `.ot`, `.joblib`, `.pkl`) are skipped when the repository also has safetensors (`--allow-pickle` keeps them). File paths that would leave the model directory, that contain control characters, or that contain invisible code points (which some filesystems drop, so two names could land on one file) are refused. Sizes above 16 TiB are refused.
 
 ## Ollama
 
@@ -47,14 +47,14 @@ The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ol
 
 ## Signed index and nodes
 
-The project keeps a signed index of models it mirrors: for each, the reference, the commit and every file with its size and sha256, and the nodes that serve those files by hash. `lmget index` fetches it, verifies its minisign signature against the project key built into lmget (the index is published at `https://lmget.org/index.json`; `LMGET_INDEX_URL` and `LMGET_INDEX_KEY` point lmget at another index), refuses an index older than the one it has or past its expiry date, and keeps it in the store.
+The project keeps a signed index of models it mirrors: for each, the reference, the commit and every file with its size and sha256, and the nodes that serve those files by hash. `lmget index` fetches it, verifies its minisign signature against the project key built into lmget (the index is published at `https://lmget.org/index.json`; `LMGET_INDEX_URL` and `LMGET_INDEX_KEY` point lmget at another index), refuses an index older than the highest one it ever accepted (even after that one expired), an index past its expiry date, and an index valid for more than 60 days, and keeps it in the store.
 
-With a verified index in the store, the nodes are the last origin of a file: after the source (and, for Hugging Face, ModelScope) failed. When the source cannot be reached at all, or no longer has the model, the plan of an indexed model comes from the index, because its file list is signed. Access refusals (gated, private) are never routed to the nodes, and every byte is verified against the signed hash.
+With a verified index in the store, the nodes are the last origin of a file: after the source (and, for Hugging Face, ModelScope) failed. When the source cannot be reached at all, or no longer has the model, the plan of an indexed model comes from the index, because its file list is signed. Access refusals (gated, private) are never routed to the nodes, and every byte is verified against the signed hash. A node that fails or serves other bytes is skipped for the rest of the run.
 
 Two maintainer tools sit next to the CLI:
 
 - `lmget-index build -lock lmget.lock -sequence N -node https://...` writes the index from a lockfile. Every model is resolved again at its source: it must not be gated, the license the source declares must be on the allowlist (Apache-2.0, MIT, BSD, ISC, CC0, CC-BY-4.0, Unlicense), and the lock must list every file the source publishes at the locked commit, with the source's own sizes, sha256 and git ids (an index entry is a whole model, never a selection; pickle weights next to safetensors only with `allow_pickle`). The builder then downloads every file into its own store, pinned to the lock (so a lock cannot put a wrong sha256 under the signature), and computes each blob's torrent identity. Sign the output with `minisign -S`.
-- `lmget-node mirror` mirrors the models of the index, pinned to its commits and files (a source that drifted from the index is refused); `lmget-node serve` serves the index and only the blobs it names, with ranges, behind a TLS reverse proxy; `lmget-node seed` seeds the same blobs as BitTorrent v2 torrents and announces them on the Mainline DHT, re-reading the index every minute. Both stop offering a blob once the index no longer names it, and all of them once the index expires.
+- `lmget-node mirror` mirrors the models of the index, pinned to its commits and files (a source that drifted from the index is refused); `lmget-node serve` serves the index and only the blobs it names, with ranges, behind a TLS reverse proxy; `lmget-node seed` seeds the same blobs as BitTorrent v2 torrents and announces them on the Mainline DHT, re-reading the index every minute. Both stop offering a blob once the index no longer names it, and all of them once the index expires; from 7 days before the expiry they say so in their log. [deploy/lmget-node](deploy/lmget-node) runs a node in a Proxmox container with no inbound port, behind a Cloudflare Tunnel.
 
 Every blob is its own BitTorrent v2 torrent: its name and file are its sha256 and the piece length is fixed at 4 MiB, so its infohash depends only on its content. The index carries that infohash (`btih2`) for every file, so any BitTorrent v2 client can fetch a mirrored blob from the nodes and from other seeders. The `lmget` CLI itself does not include a torrent client: it downloads from the nodes over HTTP and stays small.
 
@@ -122,10 +122,10 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | type | fields |
 |---|---|
 | `resolve` | `ref` |
-| `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `url`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free` |
+| `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `oci`, `url`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free`, `from_index` (the plan came from the signed index) |
 | `file_start` | `file`, `total` |
 | `progress` | `file`, `bytes`, `total` (at most 4 per second per file) |
-| `file_done` | `file`, `sha256`, `total`, `cached`, `from` (`modelscope` when the bytes came from the second origin) |
+| `file_done` | `file`, `sha256`, `total`, `cached`, `from` (`modelscope` or `node:<host>` when the bytes did not come from the source) |
 | `export` | `target`, `path` |
 | `done` | `total`, `fetched`, `elapsed_s`, `path` |
 | `lock` | `path` of the lockfile written after the pull |
