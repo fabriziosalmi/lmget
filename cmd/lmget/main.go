@@ -138,7 +138,7 @@ func run() lmget.ExitCode {
 		fs.StringSliceVar(&f.exclude, "exclude", nil, "skip files matching these globs")
 		fs.BoolVar(&f.allowPickle, "allow-pickle", false, "keep pickle weights (.bin, .pt, ...) even when safetensors exist")
 		if c != info {
-			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, ollama, dir:PATH, none (Ollama models default to ollama)")
+			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, ollama, omlx, lmstudio, dir:PATH, none (Ollama models default to ollama)")
 			fs.BoolVar(&f.dryRun, "dry-run", false, "stop after the plan")
 			fs.BoolVar(&f.lock, "lock", false, "record the result in the lockfile, creating it if needed")
 		}

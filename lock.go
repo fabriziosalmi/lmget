@@ -284,7 +284,7 @@ func Lockable(ref Ref) error {
 // repository: it must not be able to send files anywhere else.
 func lockTargetSyntax(to string) error {
 	switch {
-	case to == "hf" || to == "none" || to == "ollama":
+	case to == "hf" || to == "none" || to == "ollama" || to == "omlx" || to == "lmstudio":
 		return nil
 	case strings.HasPrefix(to, "dir:"):
 		p := strings.TrimPrefix(to[4:], "./")
