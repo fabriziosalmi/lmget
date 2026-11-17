@@ -160,12 +160,94 @@ func TestIndexedModelComesFromTheNodeWhenTheSourceIsDown(t *testing.T) {
 	}
 }
 
-func TestNoIndexNoFallback(t *testing.T) {
+// Found live on 2026-11-17: a store that never fetched the index got an
+// exit 6 with the source down, though the nodes had the model. Now the
+// first failure fetches the signed index, and the node serves the files.
+func TestAFreshStoreFetchesTheIndexWhenTheSourceIsDown(t *testing.T) {
 	m := setupM3(t)
 	u := m.client(t, t.TempDir()) // never fetched the index
 	m.hf.down.Store(true)
+	out, err := u.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil)
+	if err != nil {
+		t.Fatalf("fresh store, source down: %v", err)
+	}
+	if !out.Plan.FromIndex {
+		t.Fatal("the plan did not come from the signed index")
+	}
+	if _, err := u.Index(); err != nil {
+		t.Fatalf("the index fetched on the way was not cached: %v", err)
+	}
+	// a pinned sync from a fresh store too
+	req, err := m.lock.Request(&m.lock.Models[0], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.client(t, t.TempDir()).Pull(context.Background(), req, nil); err != nil {
+		t.Fatalf("pinned sync, fresh store, source down: %v", err)
+	}
+}
+
+// With the index URL failing too, a mirror of the index (a node, which
+// serves the copy it verified) stands in; its signature is checked as always.
+func TestTheIndexComesFromAMirrorWhenItsURLFails(t *testing.T) {
+	m := setupM3(t)
+	m.idx.set([]byte("<html>down</html>"), "not a signature")
+	c, err := New(Options{Home: t.TempDir(), HFEndpoint: m.hfURL, HTTP: m.tlsHTTP, NoMirror: true,
+		IndexURL: m.idxURL, IndexMirrors: []string{m.node.URL + "/index.json"},
+		IndexKeys: []string{m.signer.pub}, Conns: 4, ChunkSize: 256 << 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.hf.down.Store(true)
+	out, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil)
+	if err != nil || !out.Plan.FromIndex {
+		t.Fatalf("index URL and source down, mirror up: %v", err)
+	}
+
+	// a mirror serving an index signed by another key is refused
+	m2 := setupM3(t)
+	m2.idx.set([]byte("down"), "x")
+	other := testSigner(t)
+	c2, err := New(Options{Home: t.TempDir(), HFEndpoint: m2.hfURL, HTTP: m2.tlsHTTP, NoMirror: true,
+		IndexURL: m2.idxURL, IndexMirrors: []string{m2.node.URL + "/index.json"},
+		IndexKeys: []string{other.pub}, Conns: 4, ChunkSize: 256 << 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m2.hf.down.Store(true)
+	if _, err := c2.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil); AsError(err).Code != ExitNetwork {
+		t.Fatalf("an index signed by an untrusted key was used: %v", err)
+	}
+}
+
+// No index anywhere: the source's own error, as before.
+func TestNoIndexAnywhereNoFallback(t *testing.T) {
+	m := setupM3(t)
+	m.idx.set([]byte("down"), "x")
+	u := m.client(t, t.TempDir()) // no mirrors: a custom index URL has none
+	m.hf.down.Store(true)
 	if _, err := u.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil); AsError(err).Code != ExitNetwork {
 		t.Fatalf("got %v, want the source's network error", err)
+	}
+}
+
+// Only the default index URL has mirrors: a custom one is never replaced by
+// the project's nodes.
+func TestOnlyTheDefaultIndexHasMirrors(t *testing.T) {
+	t.Setenv("LMGET_INDEX_URL", "")
+	c, err := New(Options{Home: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.opt.IndexMirrors) != len(DefaultIndexMirrors) {
+		t.Fatalf("default index: mirrors %v", c.opt.IndexMirrors)
+	}
+	c, err = New(Options{Home: t.TempDir(), IndexURL: "https://index.example.org/index.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.opt.IndexMirrors) != 0 {
+		t.Fatalf("custom index: mirrors %v", c.opt.IndexMirrors)
 	}
 }
 

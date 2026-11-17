@@ -53,6 +53,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	} else {
 		plan, err = c.Resolve(ctx, r.Ref, r.Selection)
 		if err != nil && sourceDown(err) {
+			c.ensureIndex(ctx)
 			if _, m := c.indexEntry(r.Ref, ""); m != nil {
 				plan, err = c.planFromIndex(r.Ref, m, r.Selection)
 			}
@@ -256,6 +257,7 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 			}
 		}
 		if err != nil && sourceDown(err) { // last: the nodes of the signed index
+			c.ensureIndex(ctx)
 			for _, nf := range c.nodeFiles(ref, commit, *f) {
 				if c.nodeIsDown(nf.From) {
 					continue
