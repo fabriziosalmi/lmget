@@ -149,6 +149,11 @@ func (ix *Index) Find(ref Ref, commit string) *IndexModel {
 	return nil
 }
 
+// MaxIndexValidity bounds how long one signed index stays valid: if the
+// signing key were ever stolen, an index signed with it would stop being
+// accepted within this time, whatever expiry it claims.
+const MaxIndexValidity = 60 * 24 * time.Hour
+
 func (ix *Index) validate() error {
 	switch {
 	case ix.Version != indexVersion:
@@ -157,6 +162,8 @@ func (ix *Index) validate() error {
 		return errors.New("no sequence number")
 	case !ix.Expires.After(ix.Issued):
 		return errors.New("expires before it was issued")
+	case ix.Expires.Sub(ix.Issued) > MaxIndexValidity:
+		return fmt.Errorf("valid for %s, more than the %d days allowed", ix.Expires.Sub(ix.Issued).Round(time.Hour), int(MaxIndexValidity.Hours()/24))
 	case len(ix.Nodes) > 32 || len(ix.Models) > 10000:
 		return errors.New("too many nodes or models")
 	}

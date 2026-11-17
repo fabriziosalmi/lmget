@@ -302,3 +302,21 @@ func TestTheIndexListsHuggingFaceModelsOnly(t *testing.T) {
 }
 
 func fmtWhy(err error) string { return AsError(err).Why }
+
+// An index valid for more than MaxIndexValidity is refused, whatever its
+// signature: a stolen key cannot sign an index that stays accepted for years.
+func TestAnIndexValidForTooLongIsRefused(t *testing.T) {
+	c, is, s := indexSetup(t)
+	long := sampleIndex(1)
+	long.Expires = long.Issued.Add(MaxIndexValidity + time.Hour)
+	publish(is, s, long)
+	if _, err := c.UpdateIndex(context.Background()); err == nil || !strings.Contains(AsError(err).Why, "days allowed") {
+		t.Fatalf("an index valid for %s = %v; want a refusal", MaxIndexValidity+time.Hour, err)
+	}
+	ok := sampleIndex(2)
+	ok.Expires = ok.Issued.Add(MaxIndexValidity - time.Hour)
+	publish(is, s, ok)
+	if _, err := c.UpdateIndex(context.Background()); err != nil {
+		t.Fatalf("an index valid for just under the limit: %v", err)
+	}
+}

@@ -30,7 +30,7 @@ func run(args []string) int {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	lockPath := fs.String("lock", "lmget.lock", "lockfile listing the models to index")
 	seq := fs.Int64("sequence", 0, "sequence number, higher than the published index")
-	valid := fs.Duration("valid", 30*24*time.Hour, "how long the index stays valid")
+	valid := fs.Duration("valid", 30*24*time.Hour, "how long the index stays valid (at most 60 days: clients refuse longer)")
 	out := fs.String("o", "", "output file (default stdout)")
 	var ns nodes
 	fs.Var(&ns, "node", "https URL of a node (repeatable)")
