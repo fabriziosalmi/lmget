@@ -227,7 +227,9 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 				if _, verr := c.verify(part, &nf); verr != nil {
 					os.Remove(part) // this node served other bytes: try the next one
 					os.Remove(state)
-					c.markNodeDown(nf.From)
+					if AsError(verr).Code == ExitVerify { // not a local disk error
+						c.markNodeDown(nf.From)
+					}
 					continue
 				}
 				f.SHA256, f.From, err = nf.SHA256, nf.From, nil
