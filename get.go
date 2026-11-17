@@ -68,7 +68,10 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	emit(e)
 	out := &Outcome{Plan: plan}
 	// before the dry run returns: lmget info says it too
-	revoked := c.revokedBlobs()
+	revoked, err := c.revokedBlobs()
+	if err != nil {
+		return nil, err
+	}
 	for _, f := range plan.Selected() {
 		if err := revokedErr(revoked, f.Path, f.SHA256); err != nil {
 			return nil, err

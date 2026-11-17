@@ -359,15 +359,21 @@ func (c *Client) UpdateIndex(ctx context.Context) (*Index, error) {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return nil, diskErr(err)
 	}
+	// The accepted state first, kept apart from the copy that expires and
+	// that a later key change can stop verifying: the blob revocations, then
+	// the highest accepted index. A crash before the data leaves them ahead
+	// of the cache, which fails safe (audit run 6).
+	if err := c.writeRevokedBlobs(ix); err != nil {
+		return nil, diskErr(err)
+	}
+	if err := writeFileAtomic(c.highestPath(), []byte(fmt.Sprintf("%d %x\n", ix.Sequence, sum))); err != nil {
+		return nil, diskErr(err)
+	}
 	// signature first, then the data: a reader never pairs new data with an old signature
 	if err := writeFileAtomic(ps, sig); err != nil {
 		return nil, diskErr(err)
 	}
 	if err := writeFileAtomic(p, data); err != nil {
-		return nil, diskErr(err)
-	}
-	// last: the highest accepted index, kept apart from the copy that expires
-	if err := writeFileAtomic(c.highestPath(), []byte(fmt.Sprintf("%d %x\n", ix.Sequence, sum))); err != nil {
 		return nil, diskErr(err)
 	}
 	return ix, nil
@@ -391,8 +397,8 @@ func (c *Client) highestIndex() (int64, string, bool) {
 			ok = true
 		}
 	}
-	// the cached index counts too: the record is written last, so a crash
-	// between the data and the record leaves it one index behind
+	// the cached index counts too, for stores written before the record was
+	// moved ahead of the data
 	if old, err := c.Index(); err == nil && (!ok || old.Sequence > seq) {
 		p, _ := c.indexPaths()
 		if cur, err := os.ReadFile(p); err == nil {

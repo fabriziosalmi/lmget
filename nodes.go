@@ -1,7 +1,12 @@
 package lmget
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -101,24 +106,72 @@ func (c *Client) nodeFiles(ref Ref, commit string, f File) []File {
 	return out
 }
 
-// revokedBlobs is the revocation list of the cached index, verified, even
-// once it expired: bytes do not become safe when an index ages, and a newer
-// index that withdraws a revocation replaces it.
-func (c *Client) revokedBlobs() map[string]string {
+const revokedBlobsHeader = "lmget revoked blobs, index sequence "
+
+func (c *Client) revokedBlobsPath() string {
+	return filepath.Join(c.store.Root(), "signed-index", "revoked-blobs")
+}
+
+// writeRevokedBlobs records the revocations of an index being accepted. The
+// record is the accepted state: it needs no key and does not expire, so the
+// revocations hold after the index expires and after the key that signed it
+// is rotated out or revoked, until a newer accepted index replaces them.
+func (c *Client) writeRevokedBlobs(ix *Index) error {
+	lines := []string{revokedBlobsHeader + fmt.Sprint(ix.Sequence)}
+	for _, r := range ix.Revoked { // validated: hex64 and printable reasons
+		lines = append(lines, r.SHA256+" "+r.Reason)
+	}
+	slices.Sort(lines[1:])
+	if err := os.MkdirAll(filepath.Dir(c.revokedBlobsPath()), 0o755); err != nil {
+		return err
+	}
+	return writeFileAtomic(c.revokedBlobsPath(), []byte(strings.Join(lines, "\n")+"\n"))
+}
+
+// revokedBlobs is the revocation list this store accepted last. A store
+// written before the record existed falls back to its cached index, verified
+// even once expired. A record that cannot be read is an error: the
+// revocations are unknown, so nothing may pass as if there were none.
+func (c *Client) revokedBlobs() (map[string]string, error) {
+	b, err := os.ReadFile(c.revokedBlobsPath())
+	if err == nil {
+		lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+		if !strings.HasPrefix(lines[0], revokedBlobsHeader) {
+			return nil, revokedRecordErr()
+		}
+		out := make(map[string]string, len(lines)-1)
+		for _, l := range lines[1:] {
+			sha, reason, ok := strings.Cut(l, " ")
+			if !ok || !hex64.MatchString(sha) {
+				return nil, revokedRecordErr()
+			}
+			out[sha] = reason
+		}
+		return out, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return nil, revokedRecordErr()
+	}
 	p, ps := c.indexPaths()
 	data, err := os.ReadFile(p)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	sig, err := os.ReadFile(ps)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	ix, err := c.openIndexAt(data, string(sig), time.Now(), true)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	return ix.RevokedBlobs()
+	return ix.RevokedBlobs(), nil
+}
+
+func revokedRecordErr() error {
+	return newErr(ExitVerify, "revoked", "the record of revoked blobs cannot be read").
+		why("without it lmget cannot tell which bytes the project withdrew").
+		fix("lmget index", "fetch the index again: it rewrites the record")
 }
 
 // revokedErr refuses a file whose bytes the index revoked.

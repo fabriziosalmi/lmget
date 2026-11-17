@@ -69,6 +69,15 @@ func (c *Client) Export(plan *Plan, t Target) (string, error) {
 		return "", diskErr(err)
 	}
 	defer unlock()
+	revoked, err := c.revokedBlobs() // as Pull does: revoked bytes are never exported
+	if err != nil {
+		return "", err
+	}
+	for _, f := range plan.Selected() {
+		if err := revokedErr(revoked, f.Path, f.SHA256); err != nil {
+			return "", err
+		}
+	}
 	return c.export2(plan, t)
 }
 

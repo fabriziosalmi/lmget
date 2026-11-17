@@ -96,9 +96,11 @@ func CheckKeyList(kl *KeyList, roots []string) error {
 		return fmt.Errorf("revokes %d keys, at most %d", len(kl.Revoked), maxRevokedKeys)
 	}
 	root := map[string]bool{}
+	var rootPKs []MinisignKey
 	for _, s := range roots {
 		if k, err := ParseMinisignKey(s); err == nil {
 			root[KeyNumber(k)] = true
+			rootPKs = append(rootPKs, k)
 		}
 	}
 	revoked := map[string]bool{}
@@ -123,7 +125,7 @@ func CheckKeyList(kl *KeyList, roots []string) error {
 			return fmt.Errorf("index key %s is listed twice", n)
 		case revoked[n]:
 			return fmt.Errorf("index key %s is listed and revoked", n)
-		case root[n]:
+		case root[n] || isRootPK(k, rootPKs):
 			return fmt.Errorf("index key %s is a root key: the root key must stay offline", n)
 		}
 		seen[n] = true
@@ -199,7 +201,36 @@ func (c *Client) cachedKeyList(now time.Time) *KeyList {
 	if err != nil || expired {
 		return nil
 	}
+	if seq, ok := c.keysHighest(); ok && kl.Sequence < seq {
+		return nil // a newer list was accepted since: this one is not in force
+	}
 	return kl
+}
+
+// keysHighest is the sequence of the highest key list this store accepted.
+func (c *Client) keysHighest() (int64, bool) {
+	_, _, ph, _ := c.keyPaths()
+	b, err := os.ReadFile(ph)
+	if err != nil {
+		return 0, false
+	}
+	var seq int64
+	var sum string
+	if n, _ := fmt.Sscanf(string(b), "%d %64s", &seq, &sum); n != 2 {
+		return 0, true // a record that cannot be read still says a list was accepted
+	}
+	return seq, true
+}
+
+// isRootPK reports a key whose public key is a root key's, whatever key
+// number it carries.
+func isRootPK(k MinisignKey, roots []MinisignKey) bool {
+	for _, r := range roots {
+		if bytes.Equal(k.PK, r.PK) {
+			return true
+		}
+	}
+	return false
 }
 
 // revokedKeys is every key number this store has seen revoked, plus the
@@ -242,13 +273,20 @@ func (c *Client) IndexKeyState() (KeyState, error) {
 // every revoked key and every root key.
 func (c *Client) trustedIndexKeys(now time.Time) ([]MinisignKey, *KeyList, error) {
 	kl := c.cachedKeyList(now)
+	_, listAccepted := c.keysHighest()
 	base := IndexKeys
-	if kl != nil {
+	switch {
+	case kl != nil:
 		base = kl.IndexKeys
+	case listAccepted:
+		// once a key list was accepted, the built-in keys are not trusted
+		// again: a key retired by a list stays retired when the list expires
+		base = nil
 	}
 	revoked := c.revokedKeys()
+	roots := c.rootKeys()
 	root := map[string]bool{}
-	for _, k := range c.rootKeys() {
+	for _, k := range roots {
 		root[KeyNumber(k)] = true
 	}
 	var keys []MinisignKey
@@ -259,7 +297,7 @@ func (c *Client) trustedIndexKeys(now time.Time) ([]MinisignKey, *KeyList, error
 			return nil, kl, newErr(ExitUsage, "usage", "an index key is not a minisign public key")
 		}
 		n := KeyNumber(k)
-		if revoked[n] || root[n] {
+		if revoked[n] || root[n] || isRootPK(k, roots) {
 			dropped++
 			continue
 		}
@@ -269,7 +307,11 @@ func (c *Client) trustedIndexKeys(now time.Time) ([]MinisignKey, *KeyList, error
 	}
 	if len(keys) == 0 {
 		e := newErr(ExitUsage, "usage", "no index key is configured").why("the project index is not published yet")
-		if dropped > 0 {
+		if listAccepted && kl == nil {
+			e = newErr(ExitVerify, "verify", "no key list is in force").
+				why("this store accepted a key list, and the one it holds has expired or was replaced; the built-in keys are not trusted again after a key list").
+				fix("lmget index", "fetch the current key list and index")
+		} else if dropped > 0 {
 			e = newErr(ExitVerify, "verify", "every index key is revoked").
 				why("a newer key list names the keys in force").
 				fix("lmget index", "fetch the current key list and index")

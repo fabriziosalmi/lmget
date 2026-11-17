@@ -73,7 +73,11 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 		}
 	}
 	// blobs the signed index revoked
-	if revoked := c.revokedBlobs(); len(revoked) > 0 {
+	revoked, rerr := c.revokedBlobs()
+	if rerr != nil {
+		add("revoked", "fail", AsError(rerr).Msg, "lmget index")
+	}
+	if len(revoked) > 0 {
 		var hits []string
 		models := map[string]bool{}
 		for sha := range revoked {

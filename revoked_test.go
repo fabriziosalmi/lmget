@@ -94,7 +94,7 @@ func TestARevocationOutlivesItsIndex(t *testing.T) {
 	}
 	// a cached index whose signature does not verify revokes nothing
 	os.WriteFile(p, append(data, ' '), 0o644)
-	if len(u.revokedBlobs()) != 0 {
+	if rb, _ := u.revokedBlobs(); len(rb) != 0 {
 		t.Fatal("an unsigned revocation list was used")
 	}
 }
@@ -172,4 +172,21 @@ func kindOf(err error) string {
 		return ""
 	}
 	return AsError(err).Kind
+}
+
+// Audit run 6: the library's Export refuses revoked bytes as Pull does.
+func TestExportRefusesARevokedBlob(t *testing.T) {
+	m, _, evil := revokedSetup(t)
+	u := m.client(t, t.TempDir())
+	out, err := u.Pull(context.Background(), Request{Ref: hfRef("org/evil"), Target: Target{Kind: "none"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publishRevoked(t, m, 2, sha(evil[0].data))
+	if _, err := u.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.Export(out.Plan, Target{Kind: "dir", Path: t.TempDir()}); kindOf(err) != "revoked" {
+		t.Fatalf("Export of a revoked blob: %v", err)
+	}
 }
