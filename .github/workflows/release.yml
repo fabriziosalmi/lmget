@@ -20,7 +20,23 @@ env:
   GOFLAGS: -tags=purego_utp # pure Go uTP in anacrolix: no C++ compiler, as shipped
 
 jobs:
+  test:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: tests with the race detector
+        run: go test -race -count=1 ./...
+
   build:
+    needs: test
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -34,8 +50,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: tests with the race detector
-        run: go test -race -count=1 ./...
+      # in a job of its own, after the tests: no test code runs in the
+      # workspace the archives are built in
       - name: build the archives
         run: ./scripts/release-build.sh "$GITHUB_REF_NAME" dist
       - name: checksums as a job output
@@ -76,7 +92,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          now=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)
+          read -r typ sha < <(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object.type + " " + .object.sha')
+          if [ "$typ" = tag ]; then # an annotated tag: the commit it points at
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+          fi
+          now=$sha
           if [ "$now" != "$GITHUB_SHA" ]; then
             echo "tag $GITHUB_REF_NAME moved to $now, the archives were built from $GITHUB_SHA" >&2
             exit 1
@@ -93,6 +113,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           cd dist
-          gh release create "$GITHUB_REF_NAME" ./*.tar.gz checksums.txt \
-            --draft --verify-tag --title "lmget $GITHUB_REF_NAME" \
+          mapfile -t assets < <(awk '{print $2}' checksums.txt) # exactly the archives hashed by the build job
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" checksums.txt \
+            --draft --verify-tag --target "$GITHUB_SHA" --title "lmget $GITHUB_REF_NAME" \
             --notes "Verify an archive: gh attestation verify <archive> --repo $GITHUB_REPOSITORY --signer-workflow $GITHUB_REPOSITORY/.github/workflows/release.yml --source-ref refs/tags/$GITHUB_REF_NAME"

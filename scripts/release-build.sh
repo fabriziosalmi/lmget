@@ -30,9 +30,11 @@ for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
 	arch=${target#*/}
 	name="lmget_${version#v}_${os}_${arch}"
 	mkdir -p "$work/$name"
-	# the flags are fixed here, not taken from the environment: Go records
-	# them in the binary, so a GOFLAGS of the caller would change the bytes
-	(cd "$root" && CGO_ENABLED=0 GOFLAGS= GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -tags=purego_utp \
+	# the flags are fixed here, not taken from the environment or from
+	# "go env -w": Go records them in the binary, so a caller's GOFLAGS,
+	# GOAMD64 or go.work would change the bytes
+	(cd "$root" && CGO_ENABLED=0 GOENV=off GOWORK=off GOFLAGS= GOAMD64=v1 GOARM64=v8.0 GOEXPERIMENT= \
+		GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -tags=purego_utp \
 		-ldflags "-s -w -buildid= -X github.com/fabriziosalmi/lmget.Version=$version" \
 		-o "$work/$name/lmget" ./cmd/lmget)
 	cp "$root/LICENSE" "$root/README.md" "$work/$name/"
