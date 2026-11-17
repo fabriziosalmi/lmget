@@ -163,6 +163,10 @@ func (ix *Index) Find(ref Ref, commit string) *IndexModel {
 // accepted within this time, whatever expiry it claims.
 const MaxIndexValidity = 60 * 24 * time.Hour
 
+// indexClockSkew is how far ahead of this machine's clock an index may be
+// dated, for clocks that are slightly off.
+const indexClockSkew = time.Hour
+
 func (ix *Index) validate() error {
 	switch {
 	case ix.Version != indexVersion:
@@ -254,6 +258,15 @@ func (c *Client) openIndex(data []byte, sig string, now time.Time) (*Index, erro
 	if err := ix.validate(); err != nil {
 		return nil, newErr(ExitVerify, "verify", "the signed index is not valid").why("%s", err.Error())
 	}
+	// the 60-day cap is measured against the clock, not only between the
+	// two signed dates: an index "issued" in the future would otherwise stay
+	// valid for as long as its signer chose
+	if ix.Issued.After(now.Add(indexClockSkew)) || ix.Expires.Sub(now) > MaxIndexValidity+indexClockSkew {
+		return nil, newErr(ExitVerify, "verify", "the index is dated in the future").
+			why("issued %s, expires %s: an index is valid for at most %d days from now",
+				ix.Issued.UTC().Format(time.RFC3339), ix.Expires.UTC().Format(time.RFC3339), int(MaxIndexValidity.Hours()/24)).
+			fix("", "check this machine's clock")
+	}
 	if !now.Before(ix.Expires) {
 		return nil, newErr(ExitVerify, "verify", "the index expired on "+ix.Expires.UTC().Format(time.DateOnly)).
 			why("an expired index may describe models that were withdrawn since").
@@ -342,21 +355,24 @@ func (c *Client) highestPath() string {
 // its key was rotated. A store from before this record falls back to the
 // cached index when that still verifies.
 func (c *Client) highestIndex() (int64, string, bool) {
+	var seq int64
+	var sum string
+	ok := false
 	if b, err := os.ReadFile(c.highestPath()); err == nil {
-		var seq int64
-		var sum string
 		if n, _ := fmt.Sscanf(string(b), "%d %64s", &seq, &sum); n == 2 && hex64.MatchString(sum) {
-			return seq, sum, true
+			ok = true
 		}
 	}
-	if old, err := c.Index(); err == nil {
+	// the cached index counts too: the record is written last, so a crash
+	// between the data and the record leaves it one index behind
+	if old, err := c.Index(); err == nil && (!ok || old.Sequence > seq) {
 		p, _ := c.indexPaths()
 		if cur, err := os.ReadFile(p); err == nil {
 			s := sha256.Sum256(cur)
 			return old.Sequence, hex.EncodeToString(s[:]), true
 		}
 	}
-	return 0, "", false
+	return seq, sum, ok
 }
 
 func (c *Client) fetchSmall(ctx context.Context, u string, limit int64) ([]byte, error) {

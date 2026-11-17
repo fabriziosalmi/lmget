@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -324,5 +325,41 @@ func TestAnIndexValidForTooLongIsRefused(t *testing.T) {
 	publish(is, s, ok)
 	if _, err := c.UpdateIndex(context.Background()); err != nil {
 		t.Fatalf("an index valid for just under the limit: %v", err)
+	}
+}
+
+// Audit run 5: the 60-day cap holds against the clock. An index dated years
+// ahead with a short window would otherwise stay valid for years.
+func TestAnIndexDatedInTheFutureIsRefused(t *testing.T) {
+	c, is, s := indexSetup(t)
+	future := sampleIndex(1)
+	future.Issued = time.Now().AddDate(5, 0, 0).UTC().Truncate(time.Second)
+	future.Expires = future.Issued.Add(MaxIndexValidity - time.Hour)
+	publish(is, s, future)
+	if _, err := c.UpdateIndex(context.Background()); err == nil || !strings.Contains(err.Error(), "dated in the future") {
+		t.Fatalf("an index issued %s = %v; want a refusal", future.Issued.Format(time.DateOnly), err)
+	}
+}
+
+// Audit run 5: a crash after the new index is cached but before the highest
+// record is written leaves the record one index behind; the previous index
+// must still be refused.
+func TestACrashBeforeTheHighestRecordCannotRollBack(t *testing.T) {
+	c, is, s := indexSetup(t)
+	old := publish(is, s, sampleIndex(5))
+	if _, err := c.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	publish(is, s, sampleIndex(6))
+	if _, err := c.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(old) // the record as the crash left it: still sequence 5
+	if err := os.WriteFile(c.highestPath(), []byte(fmt.Sprintf("5 %x\n", sum)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	is.set(old, s.sign(old))
+	if _, err := c.UpdateIndex(context.Background()); err == nil || !strings.Contains(err.Error(), "older than one already accepted") {
+		t.Fatalf("replay of sequence 5 after a crash at 6 = %v; want a refusal", err)
 	}
 }
