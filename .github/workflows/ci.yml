@@ -69,7 +69,13 @@ jobs:
           $h = (Get-FileHash -Algorithm SHA256 (Join-Path $rel "$name.tar.gz")).Hash.ToLowerInvariant()
           "$h  $name.tar.gz" | Set-Content -Encoding ascii (Join-Path $rel 'checksums.txt')
           $srv = Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1','--directory',$rel -PassThru
-          Start-Sleep -Seconds 3
+          # wait until the server answers, not a fixed time: a slow runner once took longer than 3 s
+          $up = $false
+          for ($i = 0; $i -lt 60 -and -not $up; $i++) {
+            try { Invoke-WebRequest -Uri 'http://127.0.0.1:8765/checksums.txt' -UseBasicParsing | Out-Null; $up = $true }
+            catch { Start-Sleep -Milliseconds 500 }
+          }
+          if (-not $up) { throw 'the test server did not start in 30 s' }
           $env:LMGET_VERSION = 'v0.0.0-ci'
           $env:LMGET_RELEASE_URL = 'http://127.0.0.1:8765'
           $env:LMGET_INSTALL_DIR = Join-Path $env:RUNNER_TEMP 'bin'
