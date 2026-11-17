@@ -1,0 +1,16 @@
+/*
+  Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+/index.json
+  Cache-Control: no-cache
+  Content-Type: application/json
+/index.json.minisig
+  Cache-Control: no-cache
+  Content-Type: text/plain; charset=utf-8
+/keys.json
+  Cache-Control: no-cache
+  Content-Type: application/json
+/keys.json.minisig
+  Cache-Control: no-cache
+  Content-Type: text/plain; charset=utf-8

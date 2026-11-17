@@ -1,6 +1,11 @@
-# lmget
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/lmget-dark.svg">
+    <img alt="lmget" src="site/lmget-light.svg" width="212" height="64">
+  </picture>
+</p>
 
-Get open models from their sources, verified.
+<p align="center">Get open models from their sources, verified.<br><a href="https://lmget.org">lmget.org</a></p>
 
 lmget resolves a model, shows what it is about to download, fetches it with resumable parallel requests, checks every file against the hash the source publishes, and links it where your tools already look for it.
 

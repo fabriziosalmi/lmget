@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>lmget: get open models from their sources, verified</title>
+<meta name="description" content="A command-line tool that downloads open model weights from their sources and checks every file against the hash the source publishes.">
+<link rel="stylesheet" href="/site.css">
+<link rel="icon" href="/lmget-dark.svg" type="image/svg+xml">
+</head>
+<body>
+<main>
+  <h1><img src="/lmget-dark.svg" alt="lmget" width="212" height="64"></h1>
+  <p class="lead">Get open models from their sources, verified.</p>
+
+  <ul>
+    <li>Checks every file against the hash its source publishes, and refuses pickle content hidden under another name.</li>
+    <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look.</li>
+    <li>When a source fails, a signed index and mirror nodes keep indexed models available.</li>
+  </ul>
+
+  <pre><code>lmget Qwen/Qwen3-0.6B        <span class="dim"># download, verify, link</span>
+lmget info Qwen/Qwen3-0.6B   <span class="dim"># the plan only</span>
+lmget ollama:smollm2:135m    <span class="dim"># ready for ollama run</span></code></pre>
+
+  <p>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</p>
+
+  <h2>Install</h2>
+  <p>Download the archive for macOS or Linux from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>, then check where it was built:</p>
+  <pre><code>gh attestation verify lmget_*.tar.gz --repo fabriziosalmi/lmget \
+  --signer-workflow fabriziosalmi/lmget/.github/workflows/release.yml</code></pre>
+
+  <nav aria-label="Project links">
+    <a href="https://github.com/fabriziosalmi/lmget">Source</a>
+    <a href="https://github.com/fabriziosalmi/lmget/releases">Releases</a>
+    <a href="/index.json">Signed index</a>
+    <a href="https://github.com/fabriziosalmi/lmget/security/policy">Security</a>
+  </nav>
+  <footer>Apache-2.0</footer>
+</main>
+</body>
+</html>

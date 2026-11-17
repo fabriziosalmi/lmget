@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="212" height="64" viewBox="0 0 212 64" role="img" aria-labelledby="t">
+  <title id="t">lmget</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+    <path d="M10 26v20a6 6 0 0 0 6 6h28a6 6 0 0 0 6-6V26" stroke="#f2f2f2"/>
+    <path d="M18 34l8 8 16-18" stroke="#3ddc97"/>
+    <path d="M30 6v12" stroke="#f2f2f2"/>
+  </g>
+  <text x="68" y="46" fill="#f2f2f2" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="38" font-weight="600" letter-spacing="-1">lmget</text>
+</svg>
