@@ -73,9 +73,18 @@ func (c *Client) Export(plan *Plan, t Target) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	all := make(map[string]bool, len(plan.Files))
+	for _, f := range plan.Files {
+		all[f.Path] = true
+	}
 	for _, f := range plan.Selected() {
 		if err := revokedErr(revoked, f.Path, f.SHA256); err != nil {
 			return "", err
+		}
+		if c.store.Has(f.SHA256, f.Size) { // as Pull does: the content under this name
+			if err := c.checkStored(&f, isPickle(f.Path, all)); err != nil {
+				return "", err
+			}
 		}
 	}
 	return c.export2(plan, t)

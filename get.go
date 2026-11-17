@@ -122,6 +122,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			continue
 		}
 		if f.Cached {
+			if err := c.checkStored(f, isPickle(f.Path, all)); err != nil {
+				return nil, err
+			}
 			e := ev(EvFileDone)
 			e.File, e.SHA256, e.Cached, e.Total = f.Path, f.SHA256, true, f.Size
 			emit(e)
@@ -195,6 +198,9 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 		return 0, err
 	}
 	if f.SHA256 != "" && !f.mustFetch && c.store.Has(f.SHA256, f.Size) {
+		if err := c.checkStored(f, declaredPickle); err != nil {
+			return 0, err
+		}
 		f.Cached = true
 		e := ev(EvFileDone)
 		e.File, e.SHA256, e.Cached, e.Total = f.Path, f.SHA256, true, f.Size
@@ -301,6 +307,18 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 	e.File, e.SHA256, e.Total, e.Bytes, e.From = f.Path, sum, f.Size, f.Size, f.From
 	emit(e)
 	return cnt.fetched.Load(), nil
+}
+
+// checkStored runs the content check on a blob already in the store, under
+// the name this plan gives it: bytes that entered the store as model.pkl must
+// not be exported as model.safetensors (audit before publishing). The blob
+// stays: another model may use it under a name that says what it is.
+func (c *Client) checkStored(f *File, declaredPickle bool) error {
+	err := checkFormat(c.store.BlobPath(f.SHA256), f.Path, declaredPickle)
+	if e, ok := err.(*Error); ok && e.Kind == "format" {
+		e.Fixes = []Fix{{Note: "these bytes are already in the store under another name; nothing was exported"}}
+	}
+	return err
 }
 
 // verify hashes the finished file once: sha256 always, and the git blob id

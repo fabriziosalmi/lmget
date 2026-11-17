@@ -247,3 +247,31 @@ func hugeZipDirectory(t *testing.T, n int) {
 		}
 	}
 }
+
+// Audit before publishing: bytes stored as model.pkl by one repository must
+// not be exported as model.safetensors by another without the content check.
+func TestStoredBytesAreCheckedUnderTheirNewName(t *testing.T) {
+	t.Setenv("HF_HUB_CACHE", t.TempDir())
+	z := torchZip(t)
+	f := &fakeHF{byRepo: map[string][]fakeFile{
+		"org/honest":   {{path: "model.pkl", data: z, lfs: true}},
+		"org/disguise": {{path: "model.safetensors", data: z, lfs: true}},
+	}}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	if _, err := c.Pull(context.Background(), Request{Ref: hfRef("org/honest"), Target: Target{Kind: "none"}, Selection: Selection{AllowPickle: true}}, nil); err != nil {
+		t.Fatalf("a pickle named as one: %v", err)
+	}
+	dir := t.TempDir()
+	_, err := c.Pull(context.Background(), Request{Ref: hfRef("org/disguise"), Target: Target{Kind: "dir", Path: dir}}, nil)
+	if kindOf(err) != "format" {
+		t.Fatalf("the stored pickle under a safetensors name: %v", err)
+	}
+	if ents, _ := os.ReadDir(dir); len(ents) > 0 {
+		t.Fatal("the disguised file was exported")
+	}
+	if !c.store.Has(sha(z), int64(len(z))) {
+		t.Fatal("the blob the honest model uses was removed")
+	}
+}
