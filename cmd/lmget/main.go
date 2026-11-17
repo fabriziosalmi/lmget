@@ -37,7 +37,10 @@ type flags struct {
 	acceptLic   bool // --accept-license-change
 	origins     []string
 	verify      bool
-	toChanged   bool // --to given explicitly
+	toChanged   bool   // --to given explicitly
+	yes         bool   // accept a nickname's choice
+	forSize     string // --for: memory a nickname's model may use
+	format      string // --format: a nickname's format
 }
 
 func main() { os.Exit(int(run())) }
@@ -137,6 +140,11 @@ func run() lmget.ExitCode {
 		fs.StringSliceVar(&f.include, "include", nil, "only files matching these globs (path or file name)")
 		fs.StringSliceVar(&f.exclude, "exclude", nil, "skip files matching these globs")
 		fs.BoolVar(&f.allowPickle, "allow-pickle", false, "keep pickle weights (.bin, .pt, ...) even when safetensors exist")
+		fs.StringVar(&f.forSize, "for", "", "with a nickname: memory the model may use, e.g. 8GB (default: measured here)")
+		fs.StringVar(&f.format, "format", "", "with a nickname: safetensors, mlx, gguf or ollama (default: what the app loads)")
+		if c != info {
+			fs.BoolVarP(&f.yes, "yes", "y", false, "with a nickname: accept the proposed model without asking")
+		}
 		if c != info {
 			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, ollama, omlx, lmstudio, dir:PATH, none (Ollama models default to ollama)")
 			fs.BoolVar(&f.dryRun, "dry-run", false, "stop after the plan")
@@ -231,6 +239,26 @@ func fail(mode ui.Mode, err error) lmget.ExitCode {
 
 func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	mode := outputMode(f)
+	var nick *nickname
+	if lmget.IsAliasName(arg) {
+		c, err := lmget.New(lmget.Options{})
+		if err != nil {
+			return fail(mode, err)
+		}
+		if nick, err = resolveNickname(f, mode, c, arg, dry); err != nil {
+			return fail(mode, err)
+		}
+		if nick.include != nil {
+			f.include = nick.include
+		}
+		if nick.to != "" {
+			f.to, f.toChanged = nick.to, true
+		}
+		arg = nick.ref.String()
+	} else if f.forSize != "" || f.format != "" || f.yes {
+		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: "--for, --format and --yes go with a nickname",
+			Why: arg + " names the model itself: lmget downloads exactly that"})
+	}
 	ref, err := lmget.ParseRef(arg)
 	if err != nil {
 		return fail(mode, err)
@@ -427,6 +455,12 @@ func doIndex(f flags) lmget.ExitCode {
 	}
 	ks, _ := c.IndexKeyState() // the index just verified: the state cannot fail now
 	ui.IndexSummary(mode, os.Stdout, ix, ks)
+	// the nicknames travel with the index; a project without them is fine
+	if al, err := c.UpdateAliases(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "lmget: nicknames not updated: "+lmget.Printable(lmget.AsError(err).Msg))
+	} else if al != nil && mode != ui.ModeJSON {
+		fmt.Fprintf(os.Stderr, "lmget: %d nicknames, sequence %d, valid until %s\n", len(al.Aliases), al.Sequence, al.Expires.UTC().Format("2006-01-02"))
+	}
 	return lmget.ExitOK
 }
 
