@@ -90,6 +90,7 @@ func TestNodeDoesNotServeABlobOfTheWrongSize(t *testing.T) {
 	if err := os.WriteFile(tmp, []byte("not the signed bytes"), 0o444); err != nil {
 		t.Fatal(err)
 	}
+	os.Chmod(p, 0o644) // tampering starts by clearing read-only: Windows refuses a rename over a read-only file
 	if err := os.Rename(tmp, p); err != nil {
 		t.Fatal(err)
 	}
