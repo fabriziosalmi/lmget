@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -143,7 +144,7 @@ func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
 		if !validOCIRepo(ref.Repo) {
 			return "", fmt.Errorf("not an OCI repository: %q", ref.Repo)
 		}
-		return filepath.Join(s.root, "refs", "oci", filepath.FromSlash(ref.Repo), commit+".json"), nil
+		return filepath.Join(s.root, "refs", "oci", filepath.FromSlash(ociDirName(ref.Repo, runtime.GOOS)), commit+".json"), nil
 	}
 	if _, err := validRef(ref.Source, ref.Repo, "main", ref.Repo); err != nil {
 		return "", err
@@ -341,4 +342,15 @@ func writeFileAtomicMode(path string, b []byte, mode os.FileMode) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// ociDirName is where an OCI repository's manifests go in the store. On
+// Windows a registry's port (localhost:5000) cannot be in a directory name;
+// '%' is in no valid OCI name, so the encoding is unambiguous. The
+// reference itself is read from the manifest, never from the path.
+func ociDirName(repo, goos string) string {
+	if goos == "windows" {
+		return strings.ReplaceAll(repo, ":", "%3A")
+	}
+	return repo
 }

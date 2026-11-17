@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -212,7 +213,7 @@ func TestOllamaPullExportsWhatOllamaReads(t *testing.T) {
 	if err != nil || !bytes.Equal(b, man) {
 		t.Fatalf("tag file missing or not the manifest bytes: %v", err)
 	}
-	if fi, _ := os.Stat(tag); fi.Mode().Perm() != 0o644 {
+	if fi, _ := os.Stat(tag); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o644 {
 		t.Fatalf("tag file mode %v, want 0644: Ollama rewrites it", fi.Mode().Perm())
 	}
 	tfi, _ := os.Lstat(tag)

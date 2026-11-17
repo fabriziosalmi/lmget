@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -41,8 +42,10 @@ func TestAppModelsDir(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(`{"server":{"port":1234},"auth":{"api_key":"not-read"},"model":{"model_dir":"/srv/models","model_dirs":["/srv/models","/x"]}}`)
-	check("omlx", "/srv/models")
+	srv := filepath.Join(home, "srv", "models") // absolute on every system
+	j, _ := json.Marshal(srv)
+	write(`{"server":{"port":1234},"auth":{"api_key":"not-read"},"model":{"model_dir":` + string(j) + `,"model_dirs":[` + string(j) + `,"x"]}}`)
+	check("omlx", srv)
 	write(`{"model":{"model_dir":"~/m"}}`)
 	check("omlx", filepath.Join(home, "m"))
 	write(`{"server":{}}`) // no key: oMLX's default
@@ -52,10 +55,11 @@ func TestAppModelsDir(t *testing.T) {
 	write(`{not json`)
 	refused("omlx", "unreadable settings")
 
-	t.Setenv("LMGET_OMLX_DIR", "/opt/omlx") // the variable wins, even over broken settings
-	check("omlx", "/opt/omlx")
-	t.Setenv("LMGET_LMSTUDIO_DIR", "/opt/lms")
-	check("lmstudio", "/opt/lms")
+	opt := filepath.Join(home, "opt")
+	t.Setenv("LMGET_OMLX_DIR", filepath.Join(opt, "omlx")) // the variable wins, even over broken settings
+	check("omlx", filepath.Join(opt, "omlx"))
+	t.Setenv("LMGET_LMSTUDIO_DIR", filepath.Join(opt, "lms"))
+	check("lmstudio", filepath.Join(opt, "lms"))
 	t.Setenv("LMGET_LMSTUDIO_DIR", "lms")
 	refused("lmstudio", "a relative variable")
 

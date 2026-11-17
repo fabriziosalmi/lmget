@@ -16,3 +16,15 @@ func TestWindowsUnsafeNames(t *testing.T) {
 		}
 	}
 }
+
+func TestOCIDirNameOnWindows(t *testing.T) {
+	if got := ociDirName("localhost:5000/ai/smollm2", "windows"); got != "localhost%3A5000/ai/smollm2" {
+		t.Fatal(got)
+	}
+	if got := ociDirName("localhost:5000/ai/smollm2", "linux"); got != "localhost:5000/ai/smollm2" {
+		t.Fatal("the path changed on Unix, where stores already exist:", got)
+	}
+	if windowsUnsafeName(ociDirName("127.0.0.1:60154", "windows")) {
+		t.Fatal("the encoded name is still unsafe on Windows")
+	}
+}
