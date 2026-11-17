@@ -137,7 +137,7 @@ func TestRunAsksOllama(t *testing.T) {
 
 func TestEngineAddresses(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("LMGET_OMLX_URL", "")
 	t.Setenv("OLLAMA_HOST", "")
 	if e, _ := EngineFor("ollama", ""); e.URL != "http://127.0.0.1:11434" {

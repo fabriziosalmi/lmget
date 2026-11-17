@@ -12,7 +12,7 @@ import (
 // settings, then the app's default; relative paths are refused.
 func TestAppModelsDir(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("LMGET_OMLX_DIR", "")
 	t.Setenv("LMGET_LMSTUDIO_DIR", "")
 	check := func(app, want string) {

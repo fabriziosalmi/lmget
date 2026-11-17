@@ -3,6 +3,7 @@ package lmget
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -30,7 +31,7 @@ func TestHistoryRoundTripSkipsBadLinesAndRotates(t *testing.T) {
 	if len(h) != 2 || bad != 2 || h[0].Ref != "hf:org/a" || h[1].Command != "rm" || h[0].Version == "" {
 		t.Fatalf("entries %+v, unreadable %d", h, bad)
 	}
-	if fi, _ := os.Stat(c.HistoryPath()); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(c.HistoryPath()); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
 		t.Errorf("history mode %v, want 0600", fi.Mode().Perm())
 	}
 

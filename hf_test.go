@@ -95,6 +95,7 @@ func TestTreePaginationThatNeverEndsStops(t *testing.T) {
 }
 
 func TestUnreadableTokenFileIsReported(t *testing.T) {
+	skipOnWindows(t, "a file mode cannot make a file unreadable to its owner there")
 	tok := filepath.Join(t.TempDir(), "token")
 	os.WriteFile(tok, []byte("hf_secret"), 0o000)
 	t.Setenv("HF_TOKEN", "")
