@@ -8,13 +8,14 @@
 # With TOKEN_CMD set, the Cloudflare Tunnel token is read from that command's
 # stdout and written to /etc/lmget-node/tunnel.env (0600) through stdin: it
 # never appears on a command line or in this script's output, e.g.
-#   TOKEN_CMD='infisical secrets get LMGET_NODE1_TUNNEL_TOKEN --env prod --plain --silent --projectId ...'
+#   TOKEN_CMD='<your secrets manager command that prints the token>'
 set -euo pipefail
 : "${PVE:?} ${VMID:?}"
 REPO=$(cd "$(dirname "$0")/../.." && pwd -P)
 cd "$REPO"
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-	echo "the working tree has uncommitted changes: deploy a commit" >&2
+# untracked files count too: a stray .go file in a built package is compiled in
+if [ -n "$(git status --porcelain)" ]; then
+	echo "the working tree has uncommitted or untracked changes: deploy a commit" >&2
 	exit 1
 fi
 export GOWORK=off # a go.work in a parent directory must not change what is built

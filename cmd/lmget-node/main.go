@@ -30,14 +30,16 @@ func usage() int {
                                   seed the mirrored blobs as BitTorrent v2 torrents
 
 The store is $LMGET_HOME; the index comes from $LMGET_INDEX_URL (default
-https://lmget.org/index.json), verified with the
-built-in key or $LMGET_INDEX_KEY.
+https://lmget.org/index.json), verified with the index keys in force (the
+built-in key, or those of the accepted key list) and $LMGET_INDEX_KEY.
 `)
 	return 2
 }
 
 func run(args []string) int {
-	if len(args) == 0 {
+	// mirror takes no arguments: one more (a typo, -h) prints the usage
+	// instead of starting a download into the store
+	if len(args) == 0 || (args[0] == "mirror" && len(args) > 1) {
 		return usage()
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
