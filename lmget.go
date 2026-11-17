@@ -41,6 +41,10 @@ type Options struct {
 	// signature is IndexURL+".minisig". IndexKeys add minisign public keys
 	// to the built-in ones; default $LMGET_INDEX_KEY.
 	IndexURL string
+	// NodePreference lists index node hosts, preferred first (the CLI orders
+	// them by the speed its history measured); nodes not listed keep the
+	// index's order, after the listed ones.
+	NodePreference []string
 	// IndexMirrors serve the same signed index when IndexURL cannot; default
 	// DefaultIndexMirrors with the default IndexURL, none with another one.
 	IndexMirrors []string

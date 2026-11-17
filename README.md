@@ -76,7 +76,7 @@ lmget qwen --to ollama      # for that app
 
 A lowercase name of letters, digits, `.`, `_` and `-`, without `/` or `:`, is a nickname (the names of lmget's commands excepted). lmget reads this machine (memory, Apple Silicon, an NVIDIA GPU through `nvidia-smi`, a container's memory limit) and the apps installed (oMLX, LM Studio, Ollama), then proposes one variant:
 
-- The target is the first installed app, in the order oMLX (Apple Silicon only), LM Studio, Ollama, for which the family has a variant that fits; else the Hugging Face cache. `--to` sets it.
+- The target, for a chat model, is the first installed app, in the order oMLX (Apple Silicon only), LM Studio, Ollama, for which the family has a variant that fits; else the Hugging Face cache. Other kinds (transcription, embeddings, reranking, image embeddings) go to the Hugging Face cache, where transformers and sentence-transformers read them. `--to` sets it.
 - The format is the best one the target loads that has a variant that fits, in this order: oMLX: MLX, then safetensors; LM Studio: MLX then GGUF on Apple Silicon, GGUF elsewhere; Ollama: the registry's models; the Hugging Face cache: safetensors, then MLX (Apple Silicon only), then GGUF. `--format` sets it.
 - The size is the largest variant whose weights fit the memory budget, and the disk: 60% of the memory on Apple Silicon, 85% of an NVIDIA GPU's memory for safetensors and GGUF, 50% of the memory otherwise. `--for` sets the budget.
 - The choice depends on the machine, not on what is free at the moment, so it is the same every time. When the memory free now is below the model's weights, lmget says so. It also names the next size up.
@@ -174,6 +174,16 @@ lmget doctor --verify            # also re-hash every blob in the store
 
 `rm` removes only the links lmget created that still point at its data; files the user replaced, downloads made by other tools, and shared files another model still uses (a blob another commit's snapshot links to, a file another model exported to the same directory) are left in place. `rm` then deletes every blob in the store that no stored model references, not only this model's. The space reported as freed is measured from the blobs' link counts, so space still held by other hard links is reported separately. `doctor --verify` moves a corrupt blob to `quarantine/` in the store and removes lmget's hard links to it, so the next `get` or `sync` downloads it again. `doctor` never prints the token, only where it was found.
 
+## History
+
+lmget keeps a local record of what it did, `history.jsonl` in the store (`~/.lmget/history.jsonl`, mode 0600): for each pull, the time, the lmget version, the command, the model and commit, the nickname and how its proposal was answered, the target kind, the bytes, the bytes fetched by origin, the time taken and the exit code; and each `rm`. It holds no token, no prompt and no path outside the store, and lmget sends it nowhere. It is used in three ways, all visible:
+
+- The index nodes are asked fastest first, by the median speed measured over pulls of at least 50 MiB that one node served alone.
+- A nickname reuses the `--for` and `--format` of its latest accepted, successful pull, and says so ("as you chose on ..."); passing either flag overrides it, and a remembered choice that no longer fits is dropped.
+- After `lmget get`, one line points at models last pulled more than 30 days ago when they hold at least 1 GB together: at most once a day, and no more after three showings with no `lmget rm` in between.
+
+`lmget history` lists the last 20 entries and the node speeds measured (`--json` writes all of them as one object of type `history`, with `path`, `entries` and `unreadable`), `lmget history clear` deletes it, and `LMGET_HISTORY=off` (or `0`, `false`, `no`) turns it off: nothing is written or read then. Past 1 MiB the file becomes `history.jsonl.1`, and the one before that is dropped. A line that cannot be read is skipped and counted, never fatal.
+
 ## Direct URLs
 
 Only https is accepted, and URLs with credentials (`user:pass@`) are refused. The expected sha256 comes from, in order: a `#sha256=` fragment you add, a `Repr-Digest` or `Digest` header from the server, or, when neither exists, the first download, shown as "pinned on first download" and recorded in `lmget.lock` when there is one (`--lock`, or a lockfile in the directory); without a lock, the next run downloads and records it again. A fragment that disagrees with the server's header stops the run with exit code 5. A partial download is bound to the server's strong `ETag`, else to its `Last-Modified`, and every ranged request carries it in `If-Range`: if the file changes on the server during a download, the run stops with exit code 6 and the next run starts over, instead of joining two versions. A URL with a query string (signed URLs carry credentials there) is never written to `lmget.lock`: with `--lock`, or with a lockfile in the directory, lmget refuses it with exit code 2 before downloading. lmget sends no token to hosts other than the Hugging Face endpoint, and a redirect from https to http is refused.
@@ -227,7 +237,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | `lock` | `path` of the lockfile written after the pull |
 | `error` | `error`: `code`, `kind`, `message`, `why`, `fixes[]` (`cmd`, `note`), `cause` (the underlying error) |
 
-`sync --json` emits the same events once per model. `ls`, `rm`, `doctor` and `index` with `--json` write a single object with `v`, `type` and `time`, plus: for `ls` (type `list`), `models` and `store`; for `rm` (type `removed`), `result`; for `doctor` (type `doctor`), `checks`; for `index` (type `index`), `index`, `signed_by` and `keys`, where `index` is the verified index, `signed_by` the key number that signed it, and `keys` holds `list` (the key list in force, absent when none is), `keys` (the key numbers trusted for the index) and `revoked` (how many key numbers the store refuses).
+`sync --json` emits the same events once per model. `ls`, `rm`, `doctor`, `index` and `history` with `--json` write a single object with `v`, `type` and `time`, plus: for `ls` (type `list`), `models` and `store`; for `rm` (type `removed`), `result`; for `doctor` (type `doctor`), `checks`; for `index` (type `index`), `index`, `signed_by` and `keys`, where `index` is the verified index, `signed_by` the key number that signed it, and `keys` holds `list` (the key list in force, absent when none is), `keys` (the key numbers trusted for the index) and `revoked` (how many key numbers the store refuses).
 
 ## Exit codes
 
