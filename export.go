@@ -118,6 +118,44 @@ func (c *Client) export2(plan *Plan, t Target) (string, error) {
 	return p, nil
 }
 
+// TargetAccepts reports whether target t can hold plan's selection. Pull
+// asks it before downloading, so a mismatch costs no bandwidth, and export
+// asks it again.
+func TargetAccepts(plan *Plan, t Target) error {
+	switch t.Kind {
+	case "hf":
+		if plan.Ref.Source != "hf" {
+			return newErr(ExitUsage, "usage", "the Hugging Face cache only holds Hugging Face repositories").
+				fix("--to dir:PATH", "a plain directory (the default for URLs is the current one)")
+		}
+	case "ollama":
+		if plan.Ref.Source != "ollama" {
+			return newErr(ExitUsage, "usage", "the Ollama export holds Ollama models only").
+				fix("--to dir:PATH", "a plain directory")
+		}
+		for _, f := range plan.Files {
+			if !f.Selected() {
+				return newErr(ExitUsage, "usage", "the Ollama export needs every layer, "+f.Path+" is not selected").
+					fix("", "drop --include and --exclude, or export to --to dir:PATH")
+			}
+		}
+	case "omlx", "lmstudio":
+		if plan.Ref.Source != "hf" {
+			return newErr(ExitUsage, "usage", appNames[t.Kind]+"'s models directory holds Hugging Face repositories here").
+				fix("--to dir:PATH", "a plain directory")
+		}
+		if t.Kind == "omlx" && !hasWeights(plan, ".safetensors") {
+			// oMLX finds a model by its config.json and *.safetensors: anything
+			// else would sit in its directory unseen
+			return newErr(ExitUsage, "usage", "oMLX loads safetensors models, and this selection has none").
+				why("oMLX discovers a model by config.json and *.safetensors files").
+				fix("", "pick an MLX or safetensors repository, e.g. an mlx-community one").
+				fix("--to lmstudio", "LM Studio also loads GGUF")
+		}
+	}
+	return nil
+}
+
 // export returns the target directory and the links it created in this call.
 func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 	for _, f := range plan.Selected() {
@@ -128,12 +166,11 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 			return "", nil, newErr(ExitFailure, "export", "unsafe path "+quote(f.Path))
 		}
 	}
+	if err := TargetAccepts(plan, t); err != nil {
+		return "", nil, err
+	}
 	switch t.Kind {
 	case "hf":
-		if plan.Ref.Source != "hf" {
-			return "", nil, newErr(ExitUsage, "usage", "the Hugging Face cache only holds Hugging Face repositories").
-				fix("--to dir:PATH", "a plain directory (the default for URLs is the current one)")
-		}
 		return c.exportHF(plan)
 	case "dir":
 		return c.exportDir(plan, t.Path, false)

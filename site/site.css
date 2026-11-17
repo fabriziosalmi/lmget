@@ -211,6 +211,10 @@ section {
   color: var(--fg);
 }
 
+.note code {
+  white-space: nowrap; /* a flag such as --to lmstudio never breaks at its dashes */
+}
+
 pre.out {
   font-size: 0.8125rem;
 }

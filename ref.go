@@ -103,7 +103,7 @@ func ParseRef(s string) (Ref, error) {
 	default:
 		if name, ok := plannedSources[src]; ok {
 			return Ref{}, newErr(ExitUsage, "unsupported", name+" is not supported yet").
-				why("this build resolves Hugging Face repositories only")
+				why("lmget resolves Hugging Face repositories, Ollama models, OCI images and https URLs")
 		}
 		return Ref{}, newErr(ExitUsage, "usage", "unknown source "+quote(src)).
 			fix("lmget hf:Org/Name", "Hugging Face is the default source")

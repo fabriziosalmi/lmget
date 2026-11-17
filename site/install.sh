@@ -5,7 +5,7 @@
 #
 # Downloads the latest lmget release for this OS and CPU from GitHub, checks
 # the archive against the release's checksums.txt, and, when the GitHub CLI
-# (gh) is installed, verifies its build provenance attestation too. Then it
+# (gh) is installed and signed in, verifies its build provenance attestation too. Then it
 # installs the lmget binary into $LMGET_INSTALL_DIR (default ~/.local/bin).
 # Nothing else is written, and nothing runs with sudo.
 #
@@ -63,12 +63,16 @@ fi
 [ "$got" = "$want" ] || die "sha256 mismatch for $archive: expected $want, got $got"
 say "sha256 matches checksums.txt"
 
-if command -v gh >/dev/null 2>&1; then
+# gh needs to be signed in to fetch the attestation: a gh that is not would
+# fail here for that reason alone, so it is treated like a missing gh
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
 	gh attestation verify "$tmp/$archive" --repo "$repo" \
 		--signer-workflow "$repo/.github/workflows/release.yml" \
 		--source-ref "refs/tags/$tag" >/dev/null 2>&1 ||
 		die "the build provenance attestation does not verify: not installing"
 	say "build provenance verified: built by release.yml from $tag"
+elif command -v gh >/dev/null 2>&1; then
+	say "gh is not signed in: provenance not checked. To check it: gh auth login, then gh attestation verify $archive --repo $repo"
 else
 	say "gh not found: provenance not checked. To check it: gh attestation verify $archive --repo $repo"
 fi

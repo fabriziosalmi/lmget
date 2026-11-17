@@ -183,7 +183,7 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 				}
 			}
 			if stored == len(l.Models) {
-				add("lock", "ok", fmt.Sprintf("%s: %d models, all in the store (sync works offline)", o.LockPath, len(l.Models)), "")
+				add("lock", "ok", fmt.Sprintf("%s: %d models, all in the store", o.LockPath, len(l.Models)), "")
 			} else {
 				add("lock", "warn", fmt.Sprintf("%s: %d of %d models in the store", o.LockPath, stored, len(l.Models)), "lmget sync")
 			}

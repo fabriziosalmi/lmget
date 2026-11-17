@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <title>lmget: get open models from their sources, verified</title>
-<meta name="description" content="A command-line tool that downloads open model weights from their sources and checks every file against the hash the source publishes.">
+<meta name="description" content="A command-line tool that downloads open model weights from their sources and checks every file against the hash its source publishes, or the one you pin.">
 <link rel="stylesheet" href="/site.css">
 <link rel="icon" href="/lmget-dark.svg" type="image/svg+xml">
 <script type="module" src="/app.js"></script>
@@ -24,21 +24,23 @@
         <span class="tip" role="status"></span>
       </span>
     </div>
-    <p class="note">For macOS and Linux, amd64 and arm64. The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed, its build provenance, then installs into <code>~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>.</p>
+    <p class="note">For macOS and Linux, amd64 and arm64. The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code>~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>.</p>
   </section>
 
   <section aria-labelledby="use">
     <h2 id="use">Use</h2>
     <div class="block">
-      <pre><code id="use-cmd">lmget Qwen/Qwen3-0.6B
+      <pre><code id="use-cmd">lmget qwen
+lmget Qwen/Qwen3-0.6B
 lmget info Qwen/Qwen3-0.6B
+lmget mlx-community/Qwen3.5-0.8B-4bit --to omlx
 lmget ollama:smollm2:135m</code></pre>
       <span class="copy" hidden>
         <button type="button" class="copy-button" command="--copy" commandfor="use-cmd">Copy<span class="sr"> example commands</span></button>
         <span class="tip" role="status"></span>
       </span>
     </div>
-    <p class="note">The first downloads, verifies and links into the Hugging Face cache. <code>info</code> shows the plan and downloads nothing. The third lands in Ollama, ready for <code>ollama run</code>.</p>
+    <p class="note"><code>qwen</code> is a nickname: lmget reads this machine's memory and the apps installed, proposes the Qwen3.5 variant that fits, and asks before downloading. The second downloads, verifies and links into the Hugging Face cache. <code>info</code> shows the plan and downloads nothing. <code>--to omlx</code> and <code>--to lmstudio</code> link into those apps; the last lands in Ollama, ready for <code>ollama run</code>.</p>
   </section>
 
   <section aria-labelledby="run">
@@ -58,9 +60,10 @@ lmget: done bytes=91335425 fetched=91335425 elapsed=13.8s</code></pre>
   <section aria-labelledby="what">
     <h2 id="what">What it does</h2>
     <ul>
-      <li>Checks every file against the hash its source publishes, and refuses pickle content hidden under another name.</li>
-      <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look.</li>
-      <li>When a source fails, a signed index and mirror nodes keep indexed models available.</li>
+      <li>Checks every file against the hash its source publishes, or the one you pin, and refuses pickle content hidden under another name.</li>
+      <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look: the Hugging Face cache, Ollama, oMLX, LM Studio or a directory.</li>
+      <li>Nicknames such as <code>qwen</code>, <code>whisper</code> or <code>embed</code> pick the variant that fits the machine; the list is signed like the index.</li>
+      <li>When Hugging Face fails, a signed index and mirror nodes keep the models it lists available, even to a first run.</li>
       <li>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</li>
     </ul>
   </section>
