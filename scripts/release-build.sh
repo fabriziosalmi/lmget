@@ -30,7 +30,9 @@ for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
 	arch=${target#*/}
 	name="lmget_${version#v}_${os}_${arch}"
 	mkdir -p "$work/$name"
-	(cd "$root" && CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false \
+	# the flags are fixed here, not taken from the environment: Go records
+	# them in the binary, so a GOFLAGS of the caller would change the bytes
+	(cd "$root" && CGO_ENABLED=0 GOFLAGS= GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -tags=purego_utp \
 		-ldflags "-s -w -buildid= -X github.com/fabriziosalmi/lmget.Version=$version" \
 		-o "$work/$name/lmget" ./cmd/lmget)
 	cp "$root/LICENSE" "$root/README.md" "$work/$name/"
