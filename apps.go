@@ -15,8 +15,9 @@ import (
 
 // AppModelsDir is where an app looks for models:
 //
-//	omlx      $LMGET_OMLX_DIR, else model.model_dir in ~/.omlx/settings.json,
-//	          else ~/.omlx/models (oMLX's default)
+//	omlx      $LMGET_OMLX_DIR, else model.model_dir in oMLX's settings.json,
+//	          else <base>/models, where <base> is ~/.omlx or the directory
+//	          oMLX's launcher reads from ~/Library/Application Support/oMLX/base-path
 //	lmstudio  $LMGET_LMSTUDIO_DIR, else ~/.lmstudio/models (LM Studio keeps a
 //	          directory moved in the app in no documented file: set the variable)
 func AppModelsDir(app string) (string, error) {
@@ -42,7 +43,7 @@ func AppModelsDir(app string) (string, error) {
 	if app == "lmstudio" {
 		return filepath.Join(home, ".lmstudio", "models"), nil
 	}
-	settings := filepath.Join(home, ".omlx", "settings.json")
+	settings := filepath.Join(omlxBase(), "settings.json")
 	dir, err := omlxModelDir(settings)
 	if err != nil {
 		return "", newErr(ExitUsage, "usage", "cannot read the models directory from "+settings).
@@ -50,7 +51,7 @@ func AppModelsDir(app string) (string, error) {
 			fix("", "set "+env+" to oMLX's models directory")
 	}
 	if dir == "" {
-		return filepath.Join(home, ".omlx", "models"), nil
+		return filepath.Join(omlxBase(), "models"), nil
 	}
 	return abs(expandHome(dir), settings)
 }

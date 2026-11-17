@@ -17,7 +17,7 @@ func DetectApps(m Machine) []string {
 	home, _ := os.UserHomeDir()
 	exists := func(p string) bool { _, err := os.Stat(p); return p != "" && err == nil }
 	has := map[string]bool{
-		"omlx": os.Getenv("LMGET_OMLX_DIR") != "" || exists(filepath.Join(home, ".omlx", "settings.json")) ||
+		"omlx": os.Getenv("LMGET_OMLX_DIR") != "" || exists(filepath.Join(omlxBase(), "settings.json")) ||
 			exists("/Applications/oMLX.app"),
 		"lmstudio": os.Getenv("LMGET_LMSTUDIO_DIR") != "" || exists(filepath.Join(home, ".lmstudio")) ||
 			exists("/Applications/LM Studio.app"),
