@@ -145,7 +145,11 @@ feed:
 // final; network errors and 5xx are retried.
 func (c *Client) fetchChunk(ctx context.Context, f File, out *os.File, off, size int64, cnt *counters) error {
 	var last error
-	for attempt := range 6 {
+	attempts := f.attempts
+	if attempts <= 0 {
+		attempts = 6
+	}
+	for attempt := range attempts {
 		if attempt > 0 {
 			select {
 			case <-time.After(time.Duration(1<<(attempt-1)) * c.retryBase):
@@ -167,7 +171,7 @@ func (c *Client) fetchChunk(ctx context.Context, f File, out *os.File, off, size
 		}
 		last = err
 	}
-	return newErr(ExitNetwork, "network", "download failed after 6 attempts").wrap(last).
+	return newErr(ExitNetwork, "network", fmt.Sprintf("download failed after %d attempts", attempts)).wrap(last).
 		fix("", "run the same command again: verified chunks are kept")
 }
 

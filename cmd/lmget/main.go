@@ -35,6 +35,7 @@ type flags struct {
 	lockfile    string
 	update      bool
 	acceptLic   bool // --accept-license-change
+	origins     []string
 	verify      bool
 	toChanged   bool // --to given explicitly
 }
@@ -145,6 +146,7 @@ func run() lmget.ExitCode {
 	for _, c := range []*cobra.Command{root, get, sync} {
 		c.Flags().IntVar(&f.conns, "conns", 8, "parallel connections per file")
 		c.Flags().BoolVar(&f.noMirror, "no-mirror", false, "never fall back to ModelScope when Hugging Face fails")
+		c.Flags().StringSliceVar(&f.origins, "origin", nil, "ask this blob server first (URL; repeatable; default $LMGET_ORIGINS)")
 		c.Flags().BoolVar(&f.acceptLic, "accept-license-change", false, "go on when the license differs from the one in the lockfile, and record the new one")
 	}
 	sync.Flags().BoolVar(&f.update, "update", false, "resolve revisions again and rewrite the lock")
@@ -218,7 +220,7 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 			return fail(mode, err)
 		}
 	}
-	c, err := lmget.New(lmget.Options{Conns: f.conns, NoMirror: f.noMirror})
+	c, err := lmget.New(lmget.Options{Conns: f.conns, NoMirror: f.noMirror, Origins: f.origins})
 	if err != nil {
 		return fail(mode, err)
 	}
@@ -282,7 +284,7 @@ func doSync(f flags, args []string) lmget.ExitCode {
 	if len(models) == 0 {
 		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: f.lockfile + " lists no models"})
 	}
-	c, err := lmget.New(lmget.Options{Conns: f.conns, NoMirror: f.noMirror})
+	c, err := lmget.New(lmget.Options{Conns: f.conns, NoMirror: f.noMirror, Origins: f.origins})
 	if err != nil {
 		return fail(mode, err)
 	}

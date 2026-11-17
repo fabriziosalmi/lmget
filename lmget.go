@@ -41,6 +41,10 @@ type Options struct {
 	// to the built-in ones; default $LMGET_INDEX_KEY.
 	IndexURL  string
 	IndexKeys []string
+	// Origins are blob servers asked first for files with a known sha256,
+	// at <origin>/blobs/sha256/<sha256>; default $LMGET_ORIGINS (URLs
+	// separated by commas or spaces). See origins.go.
+	Origins   []string
 	Conns     int   // parallel connections per file; default 8
 	ChunkSize int64 // ranged request size; default 16 MiB
 	HTTP      *http.Client
@@ -96,6 +100,14 @@ func New(o Options) (*Client, error) {
 		o.ModelScopeEndpoint = "https://www.modelscope.ai"
 	}
 	o.ModelScopeEndpoint = strings.TrimRight(o.ModelScopeEndpoint, "/")
+	if len(o.Origins) == 0 && os.Getenv("LMGET_ORIGINS") != "" {
+		o.Origins = []string{os.Getenv("LMGET_ORIGINS")}
+	}
+	origins, err := parseOrigins(o.Origins)
+	if err != nil {
+		return nil, err
+	}
+	o.Origins = origins
 	tokenSource := "option"
 	if o.HFToken == "" {
 		o.HFToken, tokenSource = hfToken()

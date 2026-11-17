@@ -111,6 +111,14 @@ ModelScope is asked nothing while Hugging Face works, and never for a file Huggi
 
 Private and gated models use `HF_TOKEN` or the token saved by `huggingface-cli login`. `HF_ENDPOINT` selects a mirror. The token is sent only to the configured endpoint, and is dropped on a redirect to any other host or port.
 
+## Your own origins
+
+```sh
+lmget sync --origin https://cache.example.lan     # or LMGET_ORIGINS="https://a,http://b"
+```
+
+An origin is a server that holds blobs at `<origin>/blobs/sha256/<sha256>`: a LAN cache, a company mirror, an `lmget-node`, or any static file server over another machine's `LMGET_HOME`, whose store uses the same paths (`python3 -m http.server -d ~/.lmget` is enough on a trusted network). lmget asks the origins, in order, for every file whose sha256 the plan knows, before the source; files the source publishes with a git id only (small, non-LFS files) are not asked for, and with a lockfile every file has its sha256. What an origin serves is verified like any download: an origin that serves other bytes is skipped for the rest of the run and the file comes from the source, which never resumes an origin's partial chunks. No token is ever sent to an origin. `http` is accepted because integrity rests on the hash, not on TLS; use `https` when the names of the models you fetch are not for the network to see. An origin is tried twice per chunk, so one that is down costs well under a second before the source takes over. The plan still comes from the source (or the signed index).
+
 ## Output for scripts and integrations
 
 On a terminal lmget draws a live view. When stdout is not a terminal it writes stable `lmget: ...` log lines to stderr and the resulting path to stdout:
@@ -127,7 +135,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `oci`, `url`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free`, `from_index` (the plan came from the signed index) |
 | `file_start` | `file`, `total` |
 | `progress` | `file`, `bytes`, `total` (at most 4 per second per file) |
-| `file_done` | `file`, `sha256`, `total`, `cached`, `from` (`modelscope` or `node:<host>` when the bytes did not come from the source) |
+| `file_done` | `file`, `sha256`, `total`, `cached`, `from` (`origin:<host>`, `modelscope` or `node:<host>` when the bytes did not come from the source) |
 | `export` | `target`, `path` |
 | `done` | `total`, `fetched`, `elapsed_s`, `path` |
 | `lock` | `path` of the lockfile written after the pull |

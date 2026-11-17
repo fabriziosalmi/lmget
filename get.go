@@ -210,12 +210,17 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 			}
 		}
 	}()
+	var sum string // set when the bytes were verified on arrival
 	if f.data != nil {
 		err = writeFileAtomic(part, f.data)
 		cnt.done.Store(int64(len(f.data)))
 	} else {
-		err = noOrigin() // a plan from the index has no source URL: only nodes
-		if f.url != "" {
+		// first the user's origins; a plan from the index has no source URL
+		err = noOrigin()
+		if of, s, ok := c.fromOrigins(ctx, *f, part, state, &cnt); ok {
+			f.From, sum, err = of.From, s, nil
+		} else if f.url != "" {
+			cnt.done.Store(0)
 			err = c.fetch(ctx, *f, part, state, &cnt)
 		}
 		if err != nil && c.canMirror(ref, err) {
@@ -238,7 +243,8 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 					}
 					continue // a 404 is this file only: the node may not have mirrored it yet
 				}
-				if _, verr := c.verify(part, &nf); verr != nil {
+				s, verr := c.verify(part, &nf)
+				if verr != nil {
 					os.Remove(part) // this node served other bytes: try the next one
 					os.Remove(state)
 					if AsError(verr).Code == ExitVerify { // not a local disk error
@@ -246,7 +252,7 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 					}
 					continue
 				}
-				f.SHA256, f.From, err = nf.SHA256, nf.From, nil
+				f.SHA256, f.From, sum, err = nf.SHA256, nf.From, s, nil
 				break
 			}
 		}
@@ -256,11 +262,13 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 	if err != nil {
 		return cnt.fetched.Load(), err
 	}
-	sum, err := c.verify(part, f)
+	if sum == "" {
+		sum, err = c.verify(part, f)
+	}
 	if err == nil {
 		err = checkFormat(part, f.Path, declaredPickle)
 	}
-	if le, ok := err.(*Error); ok && f.From != "" {
+	if le, ok := err.(*Error); ok && f.From != "" && le.Kind == "verify" {
 		le.fix("", "these bytes came from "+f.From+", which serves something other than what Hugging Face publishes")
 	}
 	if err != nil {

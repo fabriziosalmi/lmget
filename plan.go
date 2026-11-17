@@ -24,6 +24,9 @@ type File struct {
 	// mustFetch: the stored blob cannot be trusted for this file (its git id
 	// was never verified against it), so it is downloaded and checked
 	mustFetch bool
+	// attempts per chunk; 0 is the default, 6. A user's origin gets 2: the
+	// source stands behind it, so a dead origin must cost little.
+	attempts int
 	// data: the bytes are already known (an Ollama manifest read while
 	// resolving); they go through the same verify, check and commit
 	data []byte
