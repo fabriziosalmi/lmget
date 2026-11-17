@@ -20,6 +20,11 @@ type Request struct {
 	Target    Target
 	DryRun    bool       // stop after the plan
 	Pin       *LockModel // reproduce this locked entry: its commit, files and hashes
+	// License is the license the lockfile recorded for this model. When it is
+	// set and the source now declares another one (or none), the pull stops
+	// before downloading, unless AcceptLicenseChange is set.
+	License             string
+	AcceptLicenseChange bool
 }
 
 // Outcome is the result of a successful pull.
@@ -65,6 +70,15 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	if r.DryRun {
 		out.Elapsed = time.Since(t0)
 		return out, nil
+	}
+	if r.License != "" && plan.License != r.License && !r.AcceptLicenseChange {
+		now := plan.License
+		if now == "" {
+			now = "no license"
+		}
+		return nil, newErr(ExitVerify, "license", "the license changed: "+quote(r.License)+" in the lockfile, "+quote(now)+" at the source").
+			why("a new revision may come under terms that do not allow what the old one did").
+			fix("", "read the new license, then run the same command with --accept-license-change to record it")
 	}
 	if len(plan.Selected()) == 0 {
 		return nil, newErr(ExitUsage, "usage", "no files selected").

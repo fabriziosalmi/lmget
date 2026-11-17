@@ -72,6 +72,8 @@ func (c *Client) BuildIndex(ctx context.Context, l *Lock, o BuildOptions) (*Inde
 			return nil, refuse("gated models are never mirrored")
 		case !LicenseAllowed(p.License):
 			return nil, refuse("license %s is not on the allowlist", quote(p.License))
+		case lm.License != "" && lm.License != p.License:
+			return nil, refuse("the license changed: %s in the lock, %s at the source; lock the model again after reading it", quote(lm.License), quote(p.License))
 		}
 		byPath := map[string]File{}
 		for _, f := range p.Selected() {

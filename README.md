@@ -68,6 +68,8 @@ lmget sync --update              # resolve the revisions again and rewrite the l
 
 `lmget.lock` pins each model to a commit (for Ollama, the sha256 of its manifest) and every file to its size and sha256, together with the selection (`--include`, `--exclude`) and the target. Once a lockfile exists in the current directory, `lmget get` keeps it current. Concurrent lmget runs update it one at a time, and `sync` never writes over an entry that another run changed while it was downloading. `sync` stops with exit code 5 if the source no longer matches the lock. When every locked file is already in the store, `sync` does not use the network.
 
+The lock also records the license the source declared. If a later `get` or `sync --update` finds another license (or none), lmget stops before downloading, with exit code 5 and the two licenses side by side. Read the new terms, then run the same command with `--accept-license-change` to go on and record the new license. The index builder refuses such an entry the same way.
+
 A lockfile usually arrives with a cloned repository, so lmget treats it as untrusted input:
 
 - `sync` works offline only for files whose path and sha256 an earlier pull already checked against the source, and only with the git blob id that pull recorded for them; a lock cannot re-label bytes in the store as another model, nor name another blob of the Hugging Face cache.
@@ -142,7 +144,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 | 2 | bad reference, flag or unsupported source |
 | 3 | repository, revision or file not found |
 | 4 | private or gated: token missing or not granted |
-| 5 | verification failed: received bytes do not match the published or locked hash, or the content is not what the file name says |
+| 5 | verification failed: received bytes do not match the published or locked hash, the content is not what the file name says, or the license differs from the one in the lockfile |
 | 6 | network: source unreachable or failing after retries |
 | 7 | disk: not enough space, or a write failed |
 | 130 | interrupted; run the same command to resume |

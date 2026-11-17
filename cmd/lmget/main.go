@@ -34,6 +34,7 @@ type flags struct {
 	lock        bool
 	lockfile    string
 	update      bool
+	acceptLic   bool // --accept-license-change
 	verify      bool
 	toChanged   bool // --to given explicitly
 }
@@ -144,6 +145,7 @@ func run() lmget.ExitCode {
 	for _, c := range []*cobra.Command{root, get, sync} {
 		c.Flags().IntVar(&f.conns, "conns", 8, "parallel connections per file")
 		c.Flags().BoolVar(&f.noMirror, "no-mirror", false, "never fall back to ModelScope when Hugging Face fails")
+		c.Flags().BoolVar(&f.acceptLic, "accept-license-change", false, "go on when the license differs from the one in the lockfile, and record the new one")
 	}
 	sync.Flags().BoolVar(&f.update, "update", false, "resolve revisions again and rewrite the lock")
 	root.PersistentFlags().BoolVar(&f.json, "json", false, "emit one JSON event per line (schema v1)")
@@ -222,7 +224,16 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry}
+	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry, AcceptLicenseChange: f.acceptLic}
+	if locking && statErr == nil { // a model already in the lockfile keeps the license recorded there
+		l, err := lmget.ReadLock(f.lockfile)
+		if err != nil {
+			return fail(mode, err)
+		}
+		if m := l.Find(ref); m != nil {
+			req.License = m.License
+		}
+	}
 	opts := ui.Opts{Resume: resumeCmd()}
 	// lmget keeps an existing lockfile current, like go get with go.mod.
 	if locking {
@@ -289,6 +300,7 @@ func doSync(f flags, args []string) lmget.ExitCode {
 		if err != nil {
 			return fail(mode, err)
 		}
+		req.AcceptLicenseChange = f.acceptLic
 		before := *m
 		opts := ui.Opts{Resume: resumeCmd(), After: func(o *lmget.Outcome) (string, error) {
 			// another lmget may have changed this entry while we downloaded:

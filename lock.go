@@ -402,7 +402,8 @@ func (l *Lock) Request(m *LockModel, update bool) (Request, error) {
 	if err != nil {
 		return Request{}, err
 	}
-	r := Request{Ref: ref, Target: t, Selection: Selection{Include: m.Include, Exclude: m.Exclude, AllowPickle: m.AllowPickle}}
+	r := Request{Ref: ref, Target: t, Selection: Selection{Include: m.Include, Exclude: m.Exclude, AllowPickle: m.AllowPickle},
+		License: m.License}
 	if !update {
 		r.Pin = m
 	}

@@ -86,6 +86,12 @@ func TestBuildIndexChecksTheSource(t *testing.T) {
 		t.Errorf("a gated model: %v", err)
 	}
 	m.hf.h = (&fakeHF{files: m.files}).handler()
+	saved := m.lock.Models[0].License
+	m.lock.Models[0].License = "mit" // the source says apache-2.0, both allowlisted
+	if err := build(); err == nil || !strings.Contains(err.Error(), "license changed") {
+		t.Errorf("a license that changed since the lock: %v", err)
+	}
+	m.lock.Models[0].License = saved
 	for i, name := range []string{"config.json (git id only at the source)", "model.safetensors (sha256 at the source)"} {
 		saved := m.lock.Models[0].Files[i].SHA256
 		m.lock.Models[0].Files[i].SHA256 = strings.Repeat("e", 64)

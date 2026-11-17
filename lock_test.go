@@ -487,3 +487,44 @@ func TestLockfileIsNeverASymlink(t *testing.T) {
 		t.Fatal("writing the lock truncated a file through a planted symlink")
 	}
 }
+
+// a license that differs from the lockfile's stops the pull before any byte
+// is downloaded, for a pinned sync and for an update, unless accepted
+func TestALicenseChangeStopsThePullUntilAccepted(t *testing.T) {
+	t.Setenv("HF_HUB_CACHE", t.TempDir())
+	f := &fakeHF{files: modelFiles()}
+	_, l, srv := pullAndLock(t, f, t.TempDir(), Target{Kind: "none"})
+	defer srv.Close()
+	if l.Models[0].License != "apache-2.0" {
+		t.Fatalf("the lock recorded license %q", l.Models[0].License)
+	}
+	l.Models[0].License = "mit" // what the lock saw; the source now says apache-2.0
+	for _, update := range []bool{false, true} {
+		c := newTestClient(t, srv, t.TempDir())
+		req, err := l.Request(&l.Models[0], update)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := f.served.Load()
+		_, err = c.Pull(context.Background(), req, nil)
+		if e := AsError(err); e.Code != ExitVerify || e.Kind != "license" {
+			t.Fatalf("update=%v: got %v, want a license error", update, err)
+		}
+		if n := f.served.Load() - before; n != 0 {
+			t.Fatalf("update=%v: %d bytes downloaded before the license check", update, n)
+		}
+		req.AcceptLicenseChange = true
+		out, err := c.Pull(context.Background(), req, nil)
+		if err != nil {
+			t.Fatalf("update=%v: an accepted change was refused: %v", update, err)
+		}
+		if out.Plan.License != "apache-2.0" {
+			t.Fatalf("update=%v: plan license %q", update, out.Plan.License)
+		}
+	}
+	l.Models[0].License = "apache-2.0" // unchanged: no question asked
+	req, _ := l.Request(&l.Models[0], false)
+	if _, err := newTestClient(t, srv, t.TempDir()).Pull(context.Background(), req, nil); err != nil {
+		t.Fatalf("an unchanged license was refused: %v", err)
+	}
+}
