@@ -37,6 +37,15 @@ const stallTimeout = 60 * time.Second
 // fetch downloads url into part with parallel ranged requests and resumes
 // from state. It does not verify: the caller hashes the finished file.
 func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt *counters) error {
+	return c.fetchHashed(ctx, f, part, statePath, cnt, nil)
+}
+
+// fetchHashed is fetch that also hashes the file in chunk order while later
+// chunks still arrive, when dg is not nil: issue #1. dg is complete only when
+// every byte of the file went through the hash; the caller still compares it
+// with the published hashes before the store commit, and falls back to
+// reading the whole file again otherwise.
+func (c *Client) fetchHashed(ctx context.Context, f File, part, statePath string, cnt *counters, dg *digest) error {
 	// the origin is the second origin's name, or the source's host: a URL
 	// server claiming a Hugging Face file's sha256 must not leave chunks a
 	// later Hugging Face download completes
@@ -97,6 +106,14 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
+	var hashed chan int // completed chunk indexes, for the in-order hash
+	var hashDone chan bool
+	if dg != nil {
+		hashed = make(chan int, n)
+		hashDone = make(chan bool, 1)
+		already := append([]bool(nil), st.Done...) // resumed chunks, hashed first
+		go func() { hashDone <- dg.stream(out, f, st.Chunk, already, hashed) }()
+	}
 	var mu sync.Mutex
 	todo := make(chan int)
 	var wg sync.WaitGroup
@@ -128,6 +145,9 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 					cancel(diskErr(err))
 					return
 				}
+				if hashed != nil {
+					hashed <- i // buffered for every chunk: never blocks
+				}
 			}
 		}()
 	}
@@ -144,6 +164,10 @@ feed:
 	}
 	close(todo)
 	wg.Wait()
+	if hashed != nil {
+		close(hashed)
+		<-hashDone // the hash holds the file open for reading: wait for it in every case
+	}
 	if err := context.Cause(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}

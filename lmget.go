@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -68,6 +69,9 @@ type Client struct {
 	nodeMu      sync.Mutex
 	nodeDown    map[string]time.Time // index nodes that failed, until when they are skipped
 	retryBase   time.Duration        // first retry wait of a chunk, doubled each time
+	// streamedFiles counts files verified from the hash computed while they
+	// downloaded, instead of reading them again (issue #1); tests read it
+	streamedFiles atomic.Int64
 }
 
 func New(o Options) (*Client, error) {

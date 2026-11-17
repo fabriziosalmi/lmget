@@ -229,7 +229,8 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 			}
 		}
 	}()
-	var sum string // set when the bytes were verified on arrival
+	var sum string       // set when the bytes were verified on arrival
+	var streamed *digest // the hash computed while the source or ModelScope downloaded (issue #1)
 	if f.data != nil {
 		err = writeFileAtomic(part, f.data)
 		cnt.done.Store(int64(len(f.data)))
@@ -240,13 +241,17 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 			f.From, sum, err = of.From, s, nil
 		} else if f.url != "" {
 			cnt.done.Store(0)
-			err = c.fetch(ctx, *f, part, state, &cnt)
+			dg := &digest{}
+			if err = c.fetchHashed(ctx, *f, part, state, &cnt, dg); err == nil {
+				streamed = dg
+			}
 		}
 		if err != nil && c.canMirror(ref, err) {
 			if mf, ok := c.mirrorFile(ctx, ref, *f); ok {
 				cnt.done.Store(0) // fetch counts the chunks already on disk again
-				if merr := c.fetch(ctx, mf, part, state, &cnt); merr == nil {
-					f.From, err = mf.From, nil
+				dg := &digest{}
+				if merr := c.fetchHashed(ctx, mf, part, state, &cnt, dg); merr == nil {
+					f.From, err, streamed = mf.From, nil, dg
 				}
 			}
 		}
@@ -281,7 +286,10 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 	if err != nil {
 		return cnt.fetched.Load(), err
 	}
-	if sum == "" {
+	if sum == "" && streamed != nil && streamed.complete {
+		sum, err = streamed.check(part, f)
+		c.streamedFiles.Add(1)
+	} else if sum == "" {
 		sum, err = c.verify(part, f)
 	}
 	if err == nil { // a file known by its git id only: its sha256 is known now
