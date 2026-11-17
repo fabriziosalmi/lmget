@@ -425,7 +425,8 @@ func doIndex(f flags) lmget.ExitCode {
 	if err != nil {
 		return fail(mode, err)
 	}
-	ui.IndexSummary(mode, os.Stdout, ix)
+	ks, _ := c.IndexKeyState() // the index just verified: the state cannot fail now
+	ui.IndexSummary(mode, os.Stdout, ix, ks)
 	return lmget.ExitOK
 }
 

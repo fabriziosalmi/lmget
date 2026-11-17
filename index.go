@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,18 +32,12 @@ import (
 // refuses an index frozen in time. The cached copy is verified again on
 // every read.
 
-// IndexKeys are the minisign public keys lmget trusts for the project index:
-//   - the project key, key number 21C7BDA090E969F4 (lmget-index.pub), which
-//     signs every index;
-//   - the backup key, key number 736BC89C91E98921 (lmget-index-backup.pub),
-//     kept offline apart from the project key, so the index can still be
-//     signed if the project key is lost.
-//
-// Neither secret key is ever in the repository. An index signed by either is
-// accepted; the sequence, expiry and 60-day validity rules apply to both.
+// IndexKeys are the built-in keys that sign the project index while no valid
+// key list (keys.go) names others: the project key, key number
+// 21C7BDA090E969F4 (lmget-index.pub). The root key that signs key lists is in
+// RootKeys. No secret key is ever in the repository.
 var IndexKeys = []string{
 	"RWT0aemQoL3HIZb5q4xhyeAUFBAtnyetjUH2KFXr0H235qQdXzZhtZrB",
-	"RWQhiemRnMhrcwx8Kp7d8KmyCw5WZzE0PGWIMgXsWWInXEiTuwx5BBBr",
 }
 
 const (
@@ -122,7 +117,11 @@ type Index struct {
 	Expires  time.Time    `json:"expires"`
 	Nodes    []string     `json:"nodes"`
 	Models   []IndexModel `json:"models"`
+	signedBy string       // key number of the key whose signature verified
 }
+
+// SignedBy is the key number of the key that signed this index.
+func (ix *Index) SignedBy() string { return ix.signedBy }
 
 // IndexModel pins one model, as a lock entry does.
 type IndexModel struct {
@@ -216,38 +215,22 @@ func (ix *Index) validate() error {
 	return nil
 }
 
-func (c *Client) indexKeys() ([]MinisignKey, error) {
-	var keys []MinisignKey
-	for _, s := range append(append([]string(nil), IndexKeys...), c.opt.IndexKeys...) {
-		k, err := ParseMinisignKey(s)
-		if err != nil {
-			return nil, newErr(ExitUsage, "usage", "an index key is not a minisign public key")
-		}
-		keys = append(keys, k)
-	}
-	if len(keys) == 0 {
-		return nil, newErr(ExitUsage, "usage", "no index key is configured").
-			why("the project index is not published yet")
-	}
-	return keys, nil
-}
-
-// openIndex verifies a signed index with any trusted key and validates it.
+// openIndex verifies a signed index with a key trusted now (keys.go) and
+// validates it.
 func (c *Client) openIndex(data []byte, sig string, now time.Time) (*Index, error) {
-	keys, err := c.indexKeys()
+	keys, _, err := c.trustedIndexKeys(now)
 	if err != nil {
 		return nil, err
 	}
-	ok := false
+	signedBy := ""
 	for _, k := range keys {
 		if _, err := verifyMinisign(k, data, sig); err == nil {
-			ok = true
+			signedBy = KeyNumber(k)
 			break
 		}
 	}
-	if !ok {
-		return nil, newErr(ExitVerify, "verify", "the index signature is not valid").
-			why("no trusted key signed these bytes")
+	if signedBy == "" {
+		return nil, newErr(ExitVerify, "verify", "the index signature is not valid").why("%s", c.whyNotTrusted(sig, keys))
 	}
 	var ix Index
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -272,6 +255,7 @@ func (c *Client) openIndex(data []byte, sig string, now time.Time) (*Index, erro
 			why("an expired index may describe models that were withdrawn since").
 			fix("lmget index", "fetch the current one")
 	}
+	ix.signedBy = signedBy
 	return &ix, nil
 }
 
@@ -297,13 +281,21 @@ func (c *Client) Index() (*Index, error) {
 // UpdateIndex fetches the index and its signature, verifies them, refuses a
 // sequence older than the cached one, and caches them.
 func (c *Client) UpdateIndex(ctx context.Context) (*Index, error) {
-	if _, err := c.indexKeys(); err != nil { // nothing could verify it: do not even fetch it
-		return nil, err
+	if len(c.rootKeys()) == 0 && len(IndexKeys)+len(c.opt.IndexKeys) == 0 { // nothing could verify it: do not even fetch it
+		return nil, newErr(ExitUsage, "usage", "no index key is configured").
+			why("the project index is not published yet")
 	}
 	u := c.opt.IndexURL
 	if pu, err := url.Parse(u); u == "" || err != nil || pu.Scheme != "https" {
 		return nil, newErr(ExitUsage, "usage", "no index URL is configured").
 			why("LMGET_INDEX_URL must be an https URL")
+	}
+	// the key list first: it says which keys sign the index
+	if err := c.UpdateKeys(ctx); err != nil {
+		return nil, err
+	}
+	if _, _, err := c.trustedIndexKeys(time.Now()); err != nil {
+		return nil, err
 	}
 	data, err := c.fetchSmall(ctx, u, indexMaxBytes)
 	if err != nil {
@@ -389,6 +381,9 @@ func (c *Client) fetchSmall(ctx context.Context, u string, limit int64) ([]byte,
 		return nil, newErr(ExitNetwork, "network", "cannot reach "+hostOf(u)).wrap(err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, newErr(ExitNotFound, "not_found", fmt.Sprintf("%s has no %s", hostOf(u), quote(path.Base(u))))
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(u), printable(resp.Status)))
 	}

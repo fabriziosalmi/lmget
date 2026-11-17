@@ -41,6 +41,11 @@ type Options struct {
 	// to the built-in ones; default $LMGET_INDEX_KEY.
 	IndexURL  string
 	IndexKeys []string
+	// RootKeys add minisign public keys to the built-in root keys, which
+	// sign keys.json (keys.go); default $LMGET_ROOT_KEY. KeysURL is the key
+	// list; default keys.json next to IndexURL.
+	RootKeys []string
+	KeysURL  string
 	// Origins are blob servers asked first for files with a known sha256,
 	// at <origin>/blobs/sha256/<sha256>; default $LMGET_ORIGINS (URLs
 	// separated by commas or spaces). See origins.go.
@@ -95,6 +100,9 @@ func New(o Options) (*Client, error) {
 	}
 	if len(o.IndexKeys) == 0 && os.Getenv("LMGET_INDEX_KEY") != "" {
 		o.IndexKeys = []string{os.Getenv("LMGET_INDEX_KEY")}
+	}
+	if len(o.RootKeys) == 0 && os.Getenv("LMGET_ROOT_KEY") != "" {
+		o.RootKeys = []string{os.Getenv("LMGET_ROOT_KEY")}
 	}
 	if o.ModelScopeEndpoint == "" {
 		o.ModelScopeEndpoint = "https://www.modelscope.ai"

@@ -1,5 +1,9 @@
-// lmget-index builds the lmget index from a lockfile. Sign the output with the
-// official minisign tool: minisign -S -s <key> -m index.json
+// lmget-index builds the lmget index from a lockfile, and the key list that
+// names the keys allowed to sign it. Sign both with the official minisign
+// tool: the index with an index key, the key list with the root key.
+//
+//	lmget-index build -lock lmget.lock -sequence N -node https://... -o index.json
+//	lmget-index keys -sequence N -index-key lmget-index.pub [-revoke NUMBER] -o keys.json
 package main
 
 import (
@@ -9,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,8 +28,12 @@ func (n *nodes) Set(s string) error { *n = append(*n, s); return nil }
 func main() { os.Exit(run(os.Args[1:])) }
 
 func run(args []string) int {
+	if len(args) > 0 && args[0] == "keys" {
+		return runKeys(args[1:])
+	}
 	if len(args) == 0 || args[0] != "build" {
-		fmt.Fprint(os.Stderr, "usage: lmget-index build -lock lmget.lock -sequence N [-valid 720h] -node https://... [-node ...] [-o index.json]\n")
+		fmt.Fprint(os.Stderr, "usage: lmget-index build -lock lmget.lock -sequence N [-valid 720h] -node https://... [-node ...] [-o index.json]\n"+
+			"       lmget-index keys -sequence N [-valid 8760h] -index-key FILE [-index-key FILE ...] [-revoke NUMBER ...] [-o keys.json]\n")
 		return 2
 	}
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
@@ -70,4 +79,57 @@ func fail(err error) int {
 		fmt.Fprintf(os.Stderr, "lmget-index:   %s\n", lmget.Printable(e.Why))
 	}
 	return int(e.Code)
+}
+
+// runKeys writes keys.json: the index keys in force and the revoked key
+// numbers, checked as lmget will check them against the built-in root keys.
+func runKeys(args []string) int {
+	fs := flag.NewFlagSet("keys", flag.ContinueOnError)
+	seq := fs.Int64("sequence", 0, "sequence number, higher than the published key list")
+	valid := fs.Duration("valid", 365*24*time.Hour, "how long the list stays valid (at most 400 days)")
+	out := fs.String("o", "", "output file (default stdout)")
+	var keyFiles, revoked nodes
+	fs.Var(&keyFiles, "index-key", "public key file (minisign .pub) of a key that signs the index (repeatable)")
+	fs.Var(&revoked, "revoke", "key number to revoke, as minisign prints it (repeatable)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	kl := lmget.KeyList{Version: 1, Sequence: *seq, Issued: now, Expires: now.Add(*valid), IndexKeys: []string{}, Revoked: []string{}}
+	for _, f := range keyFiles {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return fail(err)
+		}
+		_, err = lmget.ParseMinisignKey(string(b))
+		if err != nil {
+			return fail(fmt.Errorf("%s: %w", f, err))
+		}
+		var line string
+		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+			if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "untrusted comment:") {
+				line = l
+			}
+		}
+		kl.IndexKeys = append(kl.IndexKeys, line)
+	}
+	kl.Revoked = append(kl.Revoked, revoked...)
+	if err := lmget.CheckKeyList(&kl, lmget.RootKeys); err != nil {
+		return fail(err)
+	}
+	b, _ := json.MarshalIndent(kl, "", "  ")
+	b = append(b, '\n')
+	if *out == "" {
+		os.Stdout.Write(b)
+	} else if err := os.WriteFile(*out, b, 0o644); err != nil {
+		return fail(err)
+	}
+	var names []string
+	for _, s := range kl.IndexKeys {
+		k, _ := lmget.ParseMinisignKey(s)
+		names = append(names, lmget.KeyNumber(k))
+	}
+	fmt.Fprintf(os.Stderr, "lmget-index: key list %d: index keys %s, %d revoked, valid until %s\nsign it with the root key: minisign -S -s <root key> -m %s\n",
+		kl.Sequence, strings.Join(names, " "), len(kl.Revoked), kl.Expires.Format(time.DateOnly), map[bool]string{true: "<file>", false: *out}[*out == ""])
+	return 0
 }

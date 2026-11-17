@@ -87,10 +87,19 @@ func sampleIndex(seq int64) Index {
 			Files: []IndexFile{{LockFile: LockFile{Path: "model.safetensors", Size: 10, SHA256: strings.Repeat("b", 64)}}}}}}
 }
 
-// indexServer serves whatever index and signature the test sets.
+// indexServer serves whatever index and signature the test sets, and a key
+// list once one is set (404 before, as when none is published).
 type indexServer struct {
-	mu        sync.Mutex
-	data, sig []byte
+	mu            sync.Mutex
+	data, sig     []byte
+	keys, keysSig []byte
+	keysAsked     int
+}
+
+func (s *indexServer) setKeys(data []byte, sig string) {
+	s.mu.Lock()
+	s.keys, s.keysSig = data, []byte(sig)
+	s.mu.Unlock()
 }
 
 func (s *indexServer) set(data []byte, sig string) {
@@ -102,6 +111,18 @@ func (s *indexServer) set(data []byte, sig string) {
 func (s *indexServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if strings.HasPrefix(r.URL.Path, "/keys.json") {
+		s.keysAsked++
+		switch {
+		case s.keys == nil:
+			http.NotFound(w, r)
+		case strings.HasSuffix(r.URL.Path, ".minisig"):
+			w.Write(s.keysSig)
+		default:
+			w.Write(s.keys)
+		}
+		return
+	}
 	if strings.HasSuffix(r.URL.Path, ".minisig") {
 		w.Write(s.sig)
 		return
@@ -201,9 +222,10 @@ func TestIndexRefusesWhatItShouldNot(t *testing.T) {
 
 func TestIndexNeedsAKey(t *testing.T) {
 	t.Setenv("LMGET_INDEX_KEY", "")
-	saved := IndexKeys
-	IndexKeys = nil // a build without the project key
-	t.Cleanup(func() { IndexKeys = saved })
+	t.Setenv("LMGET_ROOT_KEY", "")
+	saved, savedRoot := IndexKeys, RootKeys
+	IndexKeys, RootKeys = nil, nil // a build without any key
+	t.Cleanup(func() { IndexKeys, RootKeys = saved, savedRoot })
 	hit := false
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hit = true }))
 	defer srv.Close()
@@ -219,27 +241,26 @@ func TestIndexNeedsAKey(t *testing.T) {
 	}
 }
 
-// The built-in project key is the one minisign generated (its key number is
-// printed reversed, as a little-endian uint64) and matches lmget-index.pub.
+// The built-in keys are the ones minisign generated (the key number is
+// printed reversed, as a little-endian uint64) and match the .pub files: the
+// project key signs the index, the offline backup key is the root.
 func TestBuiltInProjectKey(t *testing.T) {
-	want := []struct{ number, pubFile string }{
-		{"21C7BDA090E969F4", "lmget-index.pub"},        // the project key
-		{"736BC89C91E98921", "lmget-index-backup.pub"}, // the offline backup key
+	want := []struct {
+		key, number, pubFile string
+	}{
+		{IndexKeys[0], "21C7BDA090E969F4", "lmget-index.pub"},
+		{RootKeys[0], "736BC89C91E98921", "lmget-index-backup.pub"},
 	}
-	if len(IndexKeys) != len(want) {
-		t.Fatalf("%d built-in keys, want %d", len(IndexKeys), len(want))
+	if len(IndexKeys) != 1 || len(RootKeys) != 1 {
+		t.Fatalf("%d index keys and %d root keys built in, want 1 and 1", len(IndexKeys), len(RootKeys))
 	}
 	for i, w := range want {
-		k, err := ParseMinisignKey(IndexKeys[i])
+		k, err := ParseMinisignKey(w.key)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var num strings.Builder
-		for b := 7; b >= 0; b-- {
-			fmt.Fprintf(&num, "%02X", k.ID[b])
-		}
-		if num.String() != w.number {
-			t.Fatalf("key %d: number %s, want %s", i, num.String(), w.number)
+		if KeyNumber(k) != w.number {
+			t.Fatalf("key %d: number %s, want %s", i, KeyNumber(k), w.number)
 		}
 		pub, err := os.ReadFile(w.pubFile)
 		if err != nil {

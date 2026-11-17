@@ -86,14 +86,23 @@ func List(mode Mode, w io.Writer, models []lmget.Installed, st lmget.StoreStats)
 }
 
 // IndexSummary renders lmget index.
-func IndexSummary(mode Mode, w io.Writer, ix *lmget.Index) {
+func IndexSummary(mode Mode, w io.Writer, ix *lmget.Index, ks lmget.KeyState) {
+	keys := "built-in keys"
+	if ks.List != nil {
+		keys = fmt.Sprintf("key list %d, expires %s", ks.List.Sequence, ks.List.Expires.UTC().Format(time.DateOnly))
+	}
 	switch mode {
 	case ModeJSON:
-		writeJSON(w, "index", map[string]any{"index": ix})
+		writeJSON(w, "index", map[string]any{"index": ix, "signed_by": ix.SignedBy(), "keys": ks})
 		return
 	case ModePlain:
-		fmt.Fprintf(w, "lmget: index sequence=%d issued=%s expires=%s models=%d nodes=%d\n",
-			ix.Sequence, ix.Issued.UTC().Format(time.RFC3339), ix.Expires.UTC().Format(time.RFC3339), len(ix.Models), len(ix.Nodes))
+		list := int64(0)
+		if ks.List != nil {
+			list = ks.List.Sequence
+		}
+		fmt.Fprintf(w, "lmget: index sequence=%d issued=%s expires=%s models=%d nodes=%d signed_by=%s key_list=%d revoked_keys=%d\n",
+			ix.Sequence, ix.Issued.UTC().Format(time.RFC3339), ix.Expires.UTC().Format(time.RFC3339), len(ix.Models), len(ix.Nodes),
+			ix.SignedBy(), list, ks.Revoked)
 		for _, m := range ix.Models {
 			fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", clean(m.Ref), m.Commit, len(m.Files), clean(m.License))
 		}
@@ -106,6 +115,7 @@ func IndexSummary(mode Mode, w io.Writer, ix *lmget.Index) {
 		fmt.Fprintf(&b, "    %s  %s  %s\n", clean(m.Ref), sDim.Render(m.Commit[:7]), sDim.Render(clean(m.License)))
 	}
 	fmt.Fprintf(&b, "    %s%d nodes\n", sLabel.Render("served by"), len(ix.Nodes))
+	fmt.Fprintf(&b, "    %s%s  %s\n", sLabel.Render("signed by"), ix.SignedBy(), sDim.Render(keys))
 	lipgloss.Fprint(w, b.String()+"\n")
 }
 
