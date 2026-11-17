@@ -1,6 +1,6 @@
 # Security Policy
 
-lmget downloads files that other programs load and run: model weights, tokenizers, chat templates. It verifies every file against the hash its source publishes, refuses files whose content does not match their name, and treats lock files from cloned repositories as untrusted input. A way around any of these checks is a security issue.
+lmget downloads files that other programs load and run: model weights, tokenizers, chat templates. It verifies every file against the hash its source publishes, refuses Python pickle content in files not named as pickles and `.safetensors` and `.gguf` files whose headers do not hold up, and treats lock files from cloned repositories as untrusted input. A way around any of these checks is a security issue.
 
 ## Supported versions
 

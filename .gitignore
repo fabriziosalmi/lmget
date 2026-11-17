@@ -4,5 +4,5 @@ _internal/
 .DS_Store
 /.smoke/
 /dist/
-# signing keys never enter the repository (the index key lives in Infisical)
+# signing keys never enter the repository
 *.key

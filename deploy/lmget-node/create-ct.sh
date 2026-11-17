@@ -1,8 +1,12 @@
 #!/bin/bash
 # create-ct.sh: run on a Proxmox VE host. Creates an unprivileged Debian 12
-# container for lmget-node. The container needs only outbound HTTPS (the
-# sources, the index) and, for a Cloudflare Tunnel, outbound 7844: put it on
-# a bridge that allows nothing else and accepts no inbound connection.
+# container for lmget-node. The container needs outbound DNS, outbound HTTPS
+# (the sources, the index, Cloudflare's apt repository) and, for a Cloudflare
+# Tunnel, outbound TCP 7844; while install.sh runs, also the distribution
+# mirrors its apt sources name; when seeding, outbound connections to any
+# port. Put it on a bridge that allows nothing else and accepts no inbound
+# connection. Refuses an existing VMID, and a static IP already configured on
+# another container of this host.
 #
 #   VMID=<id> IP=<address>/24 GW=<gateway> BRIDGE=<isolated bridge> ./create-ct.sh
 #   VMID=<id> IP=dhcp BRIDGE=<LAN bridge> TEMPLATE=local:vztmpl/<template> ./create-ct.sh
