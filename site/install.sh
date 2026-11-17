@@ -10,6 +10,9 @@
 # Nothing else is written, and nothing runs with sudo.
 #
 # Set LMGET_VERSION=v0.1.0 to install a given release instead of the latest.
+# LMGET_RELEASE_URL takes the archives from another server (a mirror, or a
+# test) and needs LMGET_VERSION; checksums.txt then comes from that server
+# too, so only the attestation check (gh) proves where it was built.
 set -eu
 
 repo=fabriziosalmi/lmget
@@ -33,6 +36,9 @@ case $(uname -m) in
 esac
 
 tag=${LMGET_VERSION:-}
+if [ -z "$tag" ] && [ -n "${LMGET_RELEASE_URL:-}" ]; then
+	die "LMGET_RELEASE_URL needs LMGET_VERSION"
+fi
 if [ -z "$tag" ]; then
 	# the latest release page redirects to its tag: no API call, no rate limit
 	url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest") ||
@@ -45,7 +51,8 @@ case $tag in
 esac
 
 archive="lmget_${tag#v}_${os}_${arch}.tar.gz"
-base="https://github.com/$repo/releases/download/$tag"
+base=${LMGET_RELEASE_URL:-https://github.com/$repo/releases/download/$tag}
+base=${base%/}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
