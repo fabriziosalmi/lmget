@@ -158,3 +158,24 @@ func TestATorchArchiveNamedOtIsADeclaredPickle(t *testing.T) {
 		t.Fatalf("pickle files = %v; want [rust_model.ot]", out.Plan.Pickle)
 	}
 }
+
+// Audit run 5: an archive at the tail that Go cannot read is refused like one
+// at the head: another zip reader (Python's, here an end record whose entry
+// count is wrong) still opens it.
+func TestATailZipGoCannotReadIsAPickle(t *testing.T) {
+	z := zipWithPickle(t)
+	end := bytes.LastIndex(z, []byte("PK\x05\x06"))
+	binary.LittleEndian.PutUint16(z[end+8:], 2)  // entries on this disk: 2, the directory has 1
+	binary.LittleEndian.PutUint16(z[end+10:], 2) // total entries
+	st := make([]byte, 8)
+	binary.LittleEndian.PutUint64(st, 2)
+	st = append(st, "{}"...)
+	p := filepath.Join(t.TempDir(), "model.safetensors")
+	os.WriteFile(p, append(st, z...), 0o644)
+	if _, err := zip.NewReader(bytes.NewReader(append(st, z...)), int64(len(st)+len(z))); err == nil {
+		t.Fatal("Go reads this archive: the test proves nothing")
+	}
+	if err := checkFormat(p, "model.safetensors", false); err == nil {
+		t.Fatal("a safetensors file with an unreadable zip holding a pickle at its tail passed the format check")
+	}
+}

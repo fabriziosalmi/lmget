@@ -93,8 +93,11 @@ func looksPickle(f *os.File, head []byte, size int64, ext string) bool {
 // zipAtTail reports a zip archive appended to a file that starts as
 // something else (a GGUF or safetensors header, say): zip readers find an
 // archive from its end, so a loader that opens zips could find a pickle in
-// it. Only an archive Go reads and that holds a .pkl entry counts: the four
-// bytes of an end record also occur by chance in weights.
+// it. A tail with a plausible end-of-archive record (its comment ends exactly
+// at the end of the file) is an archive: it counts when it holds a .pkl
+// entry, or when Go cannot read it, since another zip reader might (the same
+// rule as a file that starts with a zip). The four bytes of the record
+// signature alone also occur by chance in weights and do not count.
 func zipAtTail(f *os.File, size int64) bool {
 	const maxTail = 22 + 65535 // end of central directory record and its longest comment
 	n := min(size, maxTail)
@@ -105,12 +108,19 @@ func zipAtTail(f *os.File, size int64) bool {
 	if _, err := f.ReadAt(tail, size-n); err != nil {
 		return false
 	}
-	if !bytes.Contains(tail, []byte("PK\x05\x06")) {
+	plausible := false
+	for i := bytes.LastIndex(tail, []byte("PK\x05\x06")); i >= 0; i = bytes.LastIndex(tail[:i], []byte("PK\x05\x06")) {
+		if i+22 <= len(tail) && int(binary.LittleEndian.Uint16(tail[i+20:i+22])) == len(tail)-i-22 {
+			plausible = true
+			break
+		}
+	}
+	if !plausible {
 		return false
 	}
 	zr, err := zip.NewReader(f, size)
 	if err != nil {
-		return false
+		return true
 	}
 	for _, zf := range zr.File {
 		if strings.HasSuffix(strings.ToLower(zf.Name), ".pkl") {
