@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"os"
 	"strings"
 	"time"
 )
@@ -98,6 +99,37 @@ func (c *Client) nodeFiles(ref Ref, commit string, f File) []File {
 		out = append(out, nf)
 	}
 	return out
+}
+
+// revokedBlobs is the revocation list of the cached index, verified, even
+// once it expired: bytes do not become safe when an index ages, and a newer
+// index that withdraws a revocation replaces it.
+func (c *Client) revokedBlobs() map[string]string {
+	p, ps := c.indexPaths()
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	sig, err := os.ReadFile(ps)
+	if err != nil {
+		return nil
+	}
+	ix, err := c.openIndexAt(data, string(sig), time.Now(), true)
+	if err != nil {
+		return nil
+	}
+	return ix.RevokedBlobs()
+}
+
+// revokedErr refuses a file whose bytes the index revoked.
+func revokedErr(revoked map[string]string, path, sha string) error {
+	reason, ok := revoked[sha]
+	if sha == "" || !ok {
+		return nil
+	}
+	return newErr(ExitVerify, "revoked", path+" is revoked by the lmget index").
+		why("%s (sha256 %s)", printable(reason), short(sha)).
+		fix("", "the project withdrew these bytes: do not use them, whatever source serves them")
 }
 
 // nodeDownFor is how long a node that failed is skipped by the same client:

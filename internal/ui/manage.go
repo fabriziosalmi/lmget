@@ -100,9 +100,9 @@ func IndexSummary(mode Mode, w io.Writer, ix *lmget.Index, ks lmget.KeyState) {
 		if ks.List != nil {
 			list = ks.List.Sequence
 		}
-		fmt.Fprintf(w, "lmget: index sequence=%d issued=%s expires=%s models=%d nodes=%d signed_by=%s key_list=%d revoked_keys=%d\n",
+		fmt.Fprintf(w, "lmget: index sequence=%d issued=%s expires=%s models=%d nodes=%d revoked_blobs=%d signed_by=%s key_list=%d revoked_keys=%d\n",
 			ix.Sequence, ix.Issued.UTC().Format(time.RFC3339), ix.Expires.UTC().Format(time.RFC3339), len(ix.Models), len(ix.Nodes),
-			ix.SignedBy(), list, ks.Revoked)
+			len(ix.Revoked), ix.SignedBy(), list, ks.Revoked)
 		for _, m := range ix.Models {
 			fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", clean(m.Ref), m.Commit, len(m.Files), clean(m.License))
 		}
@@ -115,6 +115,9 @@ func IndexSummary(mode Mode, w io.Writer, ix *lmget.Index, ks lmget.KeyState) {
 		fmt.Fprintf(&b, "    %s  %s  %s\n", clean(m.Ref), sDim.Render(m.Commit[:7]), sDim.Render(clean(m.License)))
 	}
 	fmt.Fprintf(&b, "    %s%d nodes\n", sLabel.Render("served by"), len(ix.Nodes))
+	if len(ix.Revoked) > 0 {
+		fmt.Fprintf(&b, "    %s%d blobs  %s\n", sLabel.Render("revoked"), len(ix.Revoked), sDim.Render("refused from any source; lmget doctor checks the store"))
+	}
 	fmt.Fprintf(&b, "    %s%s  %s\n", sLabel.Render("signed by"), ix.SignedBy(), sDim.Render(keys))
 	lipgloss.Fprint(w, b.String()+"\n")
 }

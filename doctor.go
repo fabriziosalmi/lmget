@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -69,6 +70,36 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 			add("models", "warn", fmt.Sprintf("%d of %d models have files missing from the store", missing, len(list)), "lmget ls shows which; lmget get <model> restores them")
 		} else {
 			add("models", "ok", fmt.Sprintf("%d models, all files present", len(list)), "")
+		}
+	}
+	// blobs the signed index revoked
+	if revoked := c.revokedBlobs(); len(revoked) > 0 {
+		var hits []string
+		models := map[string]bool{}
+		for sha := range revoked {
+			if _, err := os.Stat(c.store.BlobPath(sha)); err == nil {
+				hits = append(hits, short(sha))
+			}
+		}
+		if ms, _, err := c.store.Manifests(); err == nil {
+			for _, m := range ms {
+				for _, f := range m.Plan.Selected() {
+					if _, ok := revoked[f.SHA256]; ok {
+						models[m.Plan.Ref.Display()] = true
+					}
+				}
+			}
+		}
+		if len(hits) > 0 || len(models) > 0 {
+			var names []string
+			for n := range models {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			add("revoked", "fail", fmt.Sprintf("%d blobs in the store are revoked by the index; models using them: %s", len(hits), strings.Join(names, ", ")),
+				"lmget rm <model> for each of them")
+		} else {
+			add("revoked", "ok", fmt.Sprintf("none of the %d blobs the index revokes is in the store", len(revoked)), "")
 		}
 	}
 	if o.Verify {

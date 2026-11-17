@@ -35,6 +35,7 @@ type BuildOptions struct {
 	Valid    time.Duration // how long the index stays valid
 	Nodes    []string
 	Now      time.Time
+	Revoked  []IndexRevoked // blobs to withdraw; no model may use one
 }
 
 // BuildIndex writes an index from a lockfile. Every model is resolved again
@@ -49,7 +50,7 @@ func (c *Client) BuildIndex(ctx context.Context, l *Lock, o BuildOptions) (*Inde
 		o.Now = time.Now()
 	}
 	ix := &Index{Version: indexVersion, Sequence: o.Sequence, Issued: o.Now.UTC().Truncate(time.Second),
-		Expires: o.Now.Add(o.Valid).UTC().Truncate(time.Second), Nodes: o.Nodes}
+		Expires: o.Now.Add(o.Valid).UTC().Truncate(time.Second), Nodes: o.Nodes, Revoked: o.Revoked}
 	for _, lm := range l.Models {
 		ref, err := ParseRef(lm.Ref)
 		if err != nil {

@@ -67,6 +67,13 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	e.Plan = &snapshot
 	emit(e)
 	out := &Outcome{Plan: plan}
+	// before the dry run returns: lmget info says it too
+	revoked := c.revokedBlobs()
+	for _, f := range plan.Selected() {
+		if err := revokedErr(revoked, f.Path, f.SHA256); err != nil {
+			return nil, err
+		}
+	}
 	if r.DryRun {
 		out.Elapsed = time.Since(t0)
 		return out, nil
@@ -117,7 +124,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			emit(e)
 			continue
 		}
-		n, err := c.getFile(ctx, plan.Ref, plan.Commit, f, isPickle(f.Path, all), emit)
+		n, err := c.getFile(ctx, plan.Ref, plan.Commit, f, isPickle(f.Path, all), revoked, emit)
 		out.Fetched += n
 		if err != nil {
 			return nil, err
@@ -158,7 +165,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	return out, nil
 }
 
-func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, declaredPickle bool, emit func(Event)) (int64, error) {
+func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, declaredPickle bool, revoked map[string]string, emit func(Event)) (int64, error) {
 	key := f.SHA256
 	switch {
 	case key != "":
@@ -180,6 +187,9 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 		if s, ok := c.store.LookupGit(f.GitSHA1); ok {
 			f.SHA256 = s
 		}
+	}
+	if err := revokedErr(revoked, f.Path, f.SHA256); err != nil { // a git id the store already mapped
+		return 0, err
 	}
 	if f.SHA256 != "" && !f.mustFetch && c.store.Has(f.SHA256, f.Size) {
 		f.Cached = true
@@ -264,6 +274,9 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 	}
 	if sum == "" {
 		sum, err = c.verify(part, f)
+	}
+	if err == nil { // a file known by its git id only: its sha256 is known now
+		err = revokedErr(revoked, f.Path, sum)
 	}
 	if err == nil {
 		err = checkFormat(part, f.Path, declaredPickle)

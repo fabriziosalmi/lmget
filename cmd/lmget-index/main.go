@@ -43,8 +43,27 @@ func run(args []string) int {
 	out := fs.String("o", "", "output file (default stdout)")
 	var ns nodes
 	fs.Var(&ns, "node", "https URL of a node (repeatable)")
+	revokedPath := fs.String("revoked", "", "file of revoked blobs, one \"<sha256> <reason>\" per line (# comments)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
+	}
+	var revoked []lmget.IndexRevoked
+	if *revokedPath != "" {
+		b, err := os.ReadFile(*revokedPath)
+		if err != nil {
+			return fail(err)
+		}
+		for i, line := range strings.Split(string(b), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			sha, reason, _ := strings.Cut(line, " ")
+			if reason = strings.TrimSpace(reason); reason == "" {
+				return fail(fmt.Errorf("%s:%d: a revoked blob needs a reason", *revokedPath, i+1))
+			}
+			revoked = append(revoked, lmget.IndexRevoked{SHA256: strings.ToLower(sha), Reason: reason})
+		}
 	}
 	l, err := lmget.ReadLock(*lockPath)
 	if err != nil {
@@ -56,7 +75,7 @@ func run(args []string) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	ix, err := c.BuildIndex(ctx, l, lmget.BuildOptions{Sequence: *seq, Valid: *valid, Nodes: ns})
+	ix, err := c.BuildIndex(ctx, l, lmget.BuildOptions{Sequence: *seq, Valid: *valid, Nodes: ns, Revoked: revoked})
 	if err != nil {
 		return fail(err)
 	}
@@ -67,8 +86,8 @@ func run(args []string) int {
 	} else if err := os.WriteFile(*out, b, 0o644); err != nil {
 		return fail(err)
 	}
-	fmt.Fprintf(os.Stderr, "lmget-index: %d models, sequence %d, valid until %s\nsign it: minisign -S -s <key> -m %s\n",
-		len(ix.Models), ix.Sequence, ix.Expires.Format(time.DateOnly), map[bool]string{true: "<file>", false: *out}[*out == ""])
+	fmt.Fprintf(os.Stderr, "lmget-index: %d models, %d revoked blobs, sequence %d, valid until %s\nsign it: minisign -S -s <key> -m %s\n",
+		len(ix.Models), len(ix.Revoked), ix.Sequence, ix.Expires.Format(time.DateOnly), map[bool]string{true: "<file>", false: *out}[*out == ""])
 	return 0
 }
 

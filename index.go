@@ -117,7 +117,26 @@ type Index struct {
 	Expires  time.Time    `json:"expires"`
 	Nodes    []string     `json:"nodes"`
 	Models   []IndexModel `json:"models"`
-	signedBy string       // key number of the key whose signature verified
+	// Revoked are blobs the project withdrew (malicious or mislabeled
+	// content): lmget refuses to download or export them from any origin,
+	// and doctor reports them in the store. No model may list one.
+	Revoked  []IndexRevoked `json:"revoked,omitempty"`
+	signedBy string         // key number of the key whose signature verified
+}
+
+// IndexRevoked is one withdrawn blob and why.
+type IndexRevoked struct {
+	SHA256 string `json:"sha256"`
+	Reason string `json:"reason"`
+}
+
+// RevokedBlobs maps each revoked sha256 to its reason.
+func (ix *Index) RevokedBlobs() map[string]string {
+	out := make(map[string]string, len(ix.Revoked))
+	for _, r := range ix.Revoked {
+		out[r.SHA256] = r.Reason
+	}
+	return out
 }
 
 // SignedBy is the key number of the key that signed this index.
@@ -176,8 +195,15 @@ func (ix *Index) validate() error {
 		return errors.New("expires before it was issued")
 	case ix.Expires.Sub(ix.Issued) > MaxIndexValidity:
 		return fmt.Errorf("valid for %s, more than the %d days allowed", ix.Expires.Sub(ix.Issued).Round(time.Hour), int(MaxIndexValidity.Hours()/24))
-	case len(ix.Nodes) > 32 || len(ix.Models) > 10000:
-		return errors.New("too many nodes or models")
+	case len(ix.Nodes) > 32 || len(ix.Models) > 10000 || len(ix.Revoked) > 10000:
+		return errors.New("too many nodes, models or revoked blobs")
+	}
+	revoked := map[string]bool{}
+	for _, r := range ix.Revoked {
+		if !hex64.MatchString(r.SHA256) || revoked[r.SHA256] || r.Reason == "" || len(r.Reason) > 300 || printable(r.Reason) != r.Reason {
+			return fmt.Errorf("revoked blob %s: bad sha256 or reason, or listed twice", quote(r.SHA256))
+		}
+		revoked[r.SHA256] = true
 	}
 	for _, n := range ix.Nodes {
 		u, err := url.Parse(n)
@@ -209,6 +235,9 @@ func (ix *Index) validate() error {
 				(f.GitSHA1 != "" && !hex40.MatchString(f.GitSHA1)) || (f.BTIH2 != "" && !hex64.MatchString(f.BTIH2)) {
 				return fmt.Errorf("model %s: bad file %s", quote(m.Ref), quote(f.Path))
 			}
+			if revoked[f.SHA256] {
+				return fmt.Errorf("model %s: file %s is a revoked blob", quote(m.Ref), quote(f.Path))
+			}
 			paths[f.Path] = true
 		}
 	}
@@ -218,6 +247,13 @@ func (ix *Index) validate() error {
 // openIndex verifies a signed index with a key trusted now (keys.go) and
 // validates it.
 func (c *Client) openIndex(data []byte, sig string, now time.Time) (*Index, error) {
+	return c.openIndexAt(data, sig, now, false)
+}
+
+// openIndexAt is openIndex; with expiredOK an index past its expiry date is
+// returned too (its signature, keys and dates still checked), for what stays
+// true after it expires: its revocations.
+func (c *Client) openIndexAt(data []byte, sig string, now time.Time, expiredOK bool) (*Index, error) {
 	keys, _, err := c.trustedIndexKeys(now)
 	if err != nil {
 		return nil, err
@@ -250,7 +286,7 @@ func (c *Client) openIndex(data []byte, sig string, now time.Time) (*Index, erro
 				ix.Issued.UTC().Format(time.RFC3339), ix.Expires.UTC().Format(time.RFC3339), int(MaxIndexValidity.Hours()/24)).
 			fix("", "check this machine's clock")
 	}
-	if !now.Before(ix.Expires) {
+	if !now.Before(ix.Expires) && !expiredOK {
 		return nil, newErr(ExitVerify, "verify", "the index expired on "+ix.Expires.UTC().Format(time.DateOnly)).
 			why("an expired index may describe models that were withdrawn since").
 			fix("lmget index", "fetch the current one")
