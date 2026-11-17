@@ -91,6 +91,11 @@ func (s *Store) commit(part, sha256, gitOID string) error {
 			return err
 		}
 	}
+	// On Windows read-only is an attribute of the file, shared by its hard
+	// links, and removing the .part link clears it: set it again
+	if err := os.Chmod(dst, 0o444); err != nil {
+		return err
+	}
 	if gitOID != "" && hex40.MatchString(gitOID) {
 		return writeFileAtomic(filepath.Join(s.root, "index", "git-sha1", gitOID), []byte(sha256))
 	}
