@@ -31,9 +31,13 @@ func run(args []string) int {
 	if len(args) > 0 && args[0] == "keys" {
 		return runKeys(args[1:])
 	}
+	if len(args) > 0 && args[0] == "aliases" {
+		return runAliases(args[1:])
+	}
 	if len(args) == 0 || args[0] != "build" {
 		fmt.Fprint(os.Stderr, "usage: lmget-index build -lock lmget.lock -sequence N [-valid 720h] -node https://... [-node ...] [-o index.json]\n"+
-			"       lmget-index keys -sequence N [-valid 8760h] -index-key FILE [-index-key FILE ...] [-revoke NUMBER ...] [-o keys.json]\n")
+			"       lmget-index keys -sequence N [-valid 8760h] -index-key FILE [-index-key FILE ...] [-revoke NUMBER ...] [-o keys.json]\n"+
+			"       lmget-index aliases -in aliases.toml -sequence N [-valid 720h] [-o aliases.json]\n")
 		return 2
 	}
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
@@ -150,5 +154,47 @@ func runKeys(args []string) int {
 	}
 	fmt.Fprintf(os.Stderr, "lmget-index: key list %d: index keys %s, %d revoked, valid until %s\nsign it with the root key: minisign -S -s <root key> -m %s\n",
 		kl.Sequence, strings.Join(names, " "), len(kl.Revoked), kl.Expires.Format(time.DateOnly), map[bool]string{true: "<file>", false: *out}[*out == ""])
+	return 0
+}
+
+// runAliases builds the signed nickname list from the maintainer's
+// aliases.toml: every variant is resolved and checked at its source.
+func runAliases(args []string) int {
+	fs := flag.NewFlagSet("aliases", flag.ContinueOnError)
+	in := fs.String("in", "aliases.toml", "the nickname source")
+	seq := fs.Int64("sequence", 0, "sequence number, higher than the published list")
+	valid := fs.Duration("valid", 30*24*time.Hour, "how long the list stays valid (at most 60 days)")
+	out := fs.String("o", "", "output file (default stdout)")
+	if err := fs.Parse(args); err != nil || fs.NArg() > 0 || *seq < 1 {
+		fmt.Fprint(os.Stderr, "usage: lmget-index aliases -in aliases.toml -sequence N [-valid 720h] [-o aliases.json]\n")
+		return 2
+	}
+	src, err := lmget.ReadAliasSource(*in)
+	if err != nil {
+		return fail(err)
+	}
+	c, err := lmget.New(lmget.Options{NoMirror: true})
+	if err != nil {
+		return fail(err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	l, err := c.BuildAliases(ctx, src, *seq, *valid, time.Now())
+	if err != nil {
+		return fail(err)
+	}
+	b, _ := json.MarshalIndent(l, "", "  ")
+	b = append(b, '\n')
+	if *out == "" {
+		os.Stdout.Write(b)
+	} else if err := os.WriteFile(*out, b, 0o644); err != nil {
+		return fail(err)
+	}
+	n := 0
+	for _, a := range l.Aliases {
+		n += len(a.Variants)
+	}
+	fmt.Fprintf(os.Stderr, "lmget-index: %d nicknames, %d variants, sequence %d, valid until %s\nsign it: minisign -S -s <key> -m %s\n",
+		len(l.Aliases), n, l.Sequence, l.Expires.Format(time.DateOnly), map[bool]string{true: "<file>", false: *out}[*out == ""])
 	return 0
 }

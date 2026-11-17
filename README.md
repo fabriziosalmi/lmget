@@ -46,6 +46,36 @@ Flags and environment:
 - `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` are honored for every request.
 - `lmget --version` prints the version.
 
+## Nicknames
+
+```sh
+lmget qwen                  # proposes a Qwen3.5 variant for this machine and asks
+lmget qwen --yes            # takes the proposal without asking
+lmget info qwen             # shows the proposal and its plan, downloads nothing
+lmget qwen --for 4GB        # a variant whose weights fit in 4 GB
+lmget qwen --format gguf    # or safetensors, mlx, ollama
+lmget qwen --to ollama      # for that app
+```
+
+A name without `/` or `:` is a nickname. lmget reads this machine (memory, Apple Silicon, an NVIDIA GPU through `nvidia-smi`, a container's memory limit) and the apps installed (oMLX, LM Studio, Ollama), then proposes one variant:
+
+- The target is the first app installed that loads one of the family's formats (on Apple Silicon oMLX first, then LM Studio, then Ollama), else the Hugging Face cache. `--to` sets it.
+- The format is the best one that target loads: MLX for oMLX, MLX or GGUF for LM Studio, the registry's models for Ollama, safetensors for the Hugging Face cache.
+- The size is the largest variant whose weights fit the memory budget, and the disk: 60% of the memory on Apple Silicon, 85% of an NVIDIA GPU's memory for safetensors and GGUF, 50% of the memory otherwise. `--for` sets the budget.
+- The choice depends on the machine, not on what is free at the moment, so it is the same every time. When the memory free now is below the model's weights, lmget says so. It also names the next size up.
+
+Nothing is downloaded without a yes: on a terminal lmget asks, `--yes` answers in advance, and without a terminal (a script, CI) it stops and prints the concrete command, because a script should name its model. `lmget.lock` records the concrete model and commit, never the nickname, so `lmget sync` reproduces the same files on any machine.
+
+The project's nicknames are `aliases.json` next to the index, signed by the same keys; `lmget index` fetches it, and a nickname refreshes it once a day, using the cached copy when that fails. It is refused when the signature is not valid, when it is older than one already accepted, and when it has expired. Every variant in it was resolved at its source when the list was built: not gated, a license on the allowlist, no pickle selected, no code from the repository needed to load it (no `auto_map` in `config.json`), and files that match its format. The list is built from [`aliases.toml`](aliases.toml) in this repository.
+
+Your own nicknames go in `$LMGET_HOME/aliases.toml`, and win over the project's:
+
+```toml
+[aliases]
+mine = "hf:mlx-community/Qwen3.5-4B-4bit"
+asr  = "openai/whisper-small"
+```
+
 ## oMLX and LM Studio
 
 ```sh
@@ -168,6 +198,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 
 | type | fields |
 |---|---|
+| `nickname` | `name`, then either `ref` and `from` (the user's own nickname and its file) or `kind`, `family`, `machine` (`os`, `arch`, `apple_silicon`, `total_mem`, `avail_mem`, `gpu`, `vram_total`, `vram_free`, `container_cap`), `apps`, `choice` (`variant`, `target`, `budget`, `why[]`, `bigger`, `tight`) and `note` |
 | `resolve` | `ref` |
 | `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `oci`, `url`; `repo`, `revision`, `file`, `sha256`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free`, `from_index` (the plan came from the signed index) |
 | `file_start` | `file`, `total` |

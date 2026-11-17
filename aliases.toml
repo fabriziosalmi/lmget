@@ -1,0 +1,324 @@
+# The project's nicknames: "lmget qwen" picks the variant for the machine it
+# runs on. lmget-index aliases resolves every variant at its source and keeps
+# it only if it is not gated, has a license on the allowlist, selects no
+# pickle, needs no code from its repository (no auto_map), and matches its
+# format. Ollama variants declare their license: the registry gives none.
+
+[qwen]
+kind = "chat"
+family = "Qwen3.5"
+
+[[qwen.variant]]
+ref = "hf:Qwen/Qwen3.5-0.8B"
+params = "0.8B"
+format = "safetensors"
+
+[[qwen.variant]]
+ref = "hf:Qwen/Qwen3.5-2B"
+params = "2B"
+format = "safetensors"
+
+[[qwen.variant]]
+ref = "hf:Qwen/Qwen3.5-4B"
+params = "4B"
+format = "safetensors"
+
+[[qwen.variant]]
+ref = "hf:Qwen/Qwen3.5-9B"
+params = "9B"
+format = "safetensors"
+
+[[qwen.variant]]
+ref = "hf:mlx-community/Qwen3.5-0.8B-4bit"
+params = "0.8B"
+format = "mlx"
+quant = "4bit"
+
+[[qwen.variant]]
+ref = "hf:mlx-community/Qwen3.5-2B-4bit"
+params = "2B"
+format = "mlx"
+quant = "4bit"
+
+[[qwen.variant]]
+ref = "hf:mlx-community/Qwen3.5-9B-4bit"
+params = "9B"
+format = "mlx"
+quant = "4bit"
+
+[[qwen.variant]]
+ref = "hf:unsloth/Qwen3.5-0.8B-GGUF"
+params = "0.8B"
+format = "gguf"
+quant = "Q4_0"
+include = ["Qwen3.5-0.8B-Q4_0.gguf"]
+
+[[qwen.variant]]
+ref = "hf:unsloth/Qwen3.5-2B-GGUF"
+params = "2B"
+format = "gguf"
+quant = "Q4_0"
+include = ["Qwen3.5-2B-Q4_0.gguf"]
+
+[[qwen.variant]]
+ref = "hf:unsloth/Qwen3.5-4B-GGUF"
+params = "4B"
+format = "gguf"
+quant = "Q4_0"
+include = ["Qwen3.5-4B-Q4_0.gguf"]
+
+[[qwen.variant]]
+ref = "hf:unsloth/Qwen3.5-9B-GGUF"
+params = "9B"
+format = "gguf"
+quant = "Q4_0"
+include = ["Qwen3.5-9B-Q4_0.gguf"]
+
+[[qwen.variant]]
+ref = "ollama:qwen3.5:0.8b"
+params = "0.8B"
+format = "ollama"
+license = "apache-2.0"
+
+[[qwen.variant]]
+ref = "ollama:qwen3.5:2b"
+params = "2B"
+format = "ollama"
+license = "apache-2.0"
+
+[[qwen.variant]]
+ref = "ollama:qwen3.5:4b"
+params = "4B"
+format = "ollama"
+license = "apache-2.0"
+
+[[qwen.variant]]
+ref = "ollama:qwen3.5:9b"
+params = "9B"
+format = "ollama"
+license = "apache-2.0"
+
+[gemma]
+kind = "chat"
+family = "Gemma 4"
+
+[[gemma.variant]]
+ref = "hf:google/gemma-4-E2B-it"
+params = "E2B"
+format = "safetensors"
+
+[[gemma.variant]]
+ref = "hf:google/gemma-4-E4B-it"
+params = "E4B"
+format = "safetensors"
+
+[[gemma.variant]]
+ref = "hf:google/gemma-4-12B-it"
+params = "12B"
+format = "safetensors"
+
+[[gemma.variant]]
+ref = "hf:google/gemma-4-E4B-it-qat-q4_0-gguf"
+params = "E4B"
+format = "gguf"
+quant = "Q4_0 QAT"
+include = ["gemma-4-E4B_q4_0-it.gguf"]
+
+[[gemma.variant]]
+ref = "hf:google/gemma-4-12B-it-qat-q4_0-gguf"
+params = "12B"
+format = "gguf"
+quant = "Q4_0 QAT"
+include = ["gemma-4-12b-it-qat-q4_0.gguf"]
+
+[[gemma.variant]]
+ref = "ollama:gemma4:e4b"
+params = "E4B"
+format = "ollama"
+license = "apache-2.0"
+
+[smollm]
+kind = "chat"
+family = "SmolLM"
+
+[[smollm.variant]]
+ref = "hf:HuggingFaceTB/SmolLM2-360M-Instruct"
+params = "360M"
+format = "safetensors"
+include = ["model.safetensors", "*.json", "merges.txt", "vocab.json"]
+
+[[smollm.variant]]
+ref = "hf:HuggingFaceTB/SmolLM2-1.7B-Instruct"
+params = "1.7B"
+format = "safetensors"
+include = ["model.safetensors", "*.json", "merges.txt", "vocab.json"]
+
+[[smollm.variant]]
+ref = "hf:HuggingFaceTB/SmolLM3-3B"
+params = "3B"
+format = "safetensors"
+
+[[smollm.variant]]
+ref = "hf:mlx-community/SmolLM3-3B-4bit"
+params = "3B"
+format = "mlx"
+quant = "4bit"
+
+[[smollm.variant]]
+ref = "hf:HuggingFaceTB/SmolLM2-360M-Instruct-GGUF"
+params = "360M"
+format = "gguf"
+
+[[smollm.variant]]
+ref = "hf:HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF"
+params = "1.7B"
+format = "gguf"
+quant = "Q4_K_M"
+include = ["smollm2-1.7b-instruct-q4_k_m.gguf"]
+
+[[smollm.variant]]
+ref = "hf:ggml-org/SmolLM3-3B-GGUF"
+params = "3B"
+format = "gguf"
+quant = "Q4_K_M"
+include = ["SmolLM3-Q4_K_M.gguf"]
+
+[[smollm.variant]]
+ref = "ollama:smollm2:360m"
+params = "360M"
+format = "ollama"
+license = "apache-2.0"
+
+[[smollm.variant]]
+ref = "ollama:smollm2:1.7b"
+params = "1.7B"
+format = "ollama"
+license = "apache-2.0"
+
+[granite]
+kind = "chat"
+family = "Granite 4"
+
+[[granite.variant]]
+ref = "hf:ibm-granite/granite-4.1-3b"
+params = "3B"
+format = "safetensors"
+
+[[granite.variant]]
+ref = "hf:ibm-granite/granite-4.2-8b"
+params = "8B"
+format = "safetensors"
+
+[[granite.variant]]
+ref = "hf:ibm-granite/granite-4.1-3b-GGUF"
+params = "3B"
+format = "gguf"
+quant = "Q4_0"
+include = ["granite-4.1-3b-Q4_0.gguf"]
+
+[[granite.variant]]
+ref = "hf:ibm-granite/granite-4.2-8b-GGUF"
+params = "8B"
+format = "gguf"
+quant = "Q4_0"
+include = ["granite-4.2-8b-Q4_0.gguf"]
+
+[olmo]
+kind = "chat"
+family = "OLMo (open data)"
+
+[[olmo.variant]]
+ref = "hf:allenai/OLMo-2-0425-1B-Instruct"
+params = "1B"
+format = "safetensors"
+
+[[olmo.variant]]
+ref = "hf:allenai/Olmo-3-7B-Instruct"
+params = "7B"
+format = "safetensors"
+
+[gpt-oss]
+kind = "chat"
+family = "gpt-oss"
+
+[[gpt-oss.variant]]
+ref = "hf:openai/gpt-oss-20b"
+params = "20B"
+format = "safetensors"
+quant = "MXFP4"
+include = ["config.json", "generation_config.json", "model-*.safetensors", "model.safetensors.index.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "chat_template.jinja"]
+
+[[gpt-oss.variant]]
+ref = "hf:mlx-community/gpt-oss-20b-MXFP4-Q8"
+params = "20B"
+format = "mlx"
+quant = "MXFP4-Q8"
+
+[[gpt-oss.variant]]
+ref = "ollama:gpt-oss:20b"
+params = "20B"
+format = "ollama"
+license = "apache-2.0"
+
+[whisper]
+kind = "transcribe"
+family = "Whisper"
+
+[[whisper.variant]]
+ref = "hf:openai/whisper-tiny"
+params = "39M"
+format = "safetensors"
+include = ["*.safetensors", "*.json", "merges.txt"]
+
+[[whisper.variant]]
+ref = "hf:openai/whisper-small"
+params = "244M"
+format = "safetensors"
+include = ["*.safetensors", "*.json", "merges.txt"]
+
+[[whisper.variant]]
+ref = "hf:openai/whisper-large-v3-turbo"
+params = "809M"
+format = "safetensors"
+include = ["*.safetensors", "*.json", "merges.txt"]
+
+[embed]
+kind = "embed"
+family = "multilingual E5"
+
+[[embed.variant]]
+ref = "hf:intfloat/multilingual-e5-small"
+params = "118M"
+format = "safetensors"
+include = ["model.safetensors", "*.json", "sentencepiece.bpe.model"]
+
+[[embed.variant]]
+ref = "hf:intfloat/multilingual-e5-base"
+params = "278M"
+format = "safetensors"
+include = ["model.safetensors", "*.json", "sentencepiece.bpe.model"]
+
+[[embed.variant]]
+ref = "hf:intfloat/multilingual-e5-large"
+params = "560M"
+format = "safetensors"
+include = ["model.safetensors", "*.json", "sentencepiece.bpe.model"]
+
+[rerank]
+kind = "rerank"
+family = "BGE reranker"
+
+[[rerank.variant]]
+ref = "hf:BAAI/bge-reranker-v2-m3"
+params = "568M"
+format = "safetensors"
+include = ["model.safetensors", "*.json", "sentencepiece.bpe.model"]
+
+[siglip]
+kind = "image-embed"
+family = "SigLIP 2"
+
+[[siglip.variant]]
+ref = "hf:google/siglip2-base-patch16-224"
+params = "375M"
+format = "safetensors"

@@ -10,6 +10,12 @@
 /index.json.minisig
   Cache-Control: no-cache
   Content-Type: text/plain; charset=utf-8
+/aliases.json
+  Cache-Control: no-cache
+  Content-Type: application/json
+/aliases.json.minisig
+  Cache-Control: no-cache
+  Content-Type: text/plain; charset=utf-8
 /keys.json
   Cache-Control: no-cache
   Content-Type: application/json
