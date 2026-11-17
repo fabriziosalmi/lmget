@@ -37,7 +37,7 @@ What happens on every run:
 
 Flags and environment:
 
-- `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
+- `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to omlx` and `--to lmstudio` into those apps' models directories (see below); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
 - The Hugging Face cache is `$HF_HUB_CACHE`, else `$HF_HOME/hub`, else `$XDG_CACHE_HOME/huggingface/hub`, else `~/.cache/huggingface/hub`.
 - `--dry-run` stops after the plan, as `lmget info` does.
 - `--conns N` sets the parallel connections per file (default 8).
@@ -45,6 +45,20 @@ Flags and environment:
 - `--plain` writes plain log lines even on a terminal, and so does `TERM=dumb`; `--json` writes events (see below).
 - `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` are honored for every request.
 - `lmget --version` prints the version.
+
+## oMLX and LM Studio
+
+```sh
+lmget mlx-community/Qwen3.5-0.8B-4bit --to omlx
+lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_0*' --to lmstudio
+```
+
+Both apps keep models as `<models directory>/<org>/<name>`, and lmget links the files there (hard links on the same disk, symlinks into the store otherwise).
+
+- oMLX: the directory is `$LMGET_OMLX_DIR`, else `model.model_dir` in `~/.omlx/settings.json` (only that key is read), else `~/.omlx/models`. oMLX finds a model by its `config.json` and `*.safetensors`, so a selection without them is refused. oMLX lists the model by its directory name. Checked with oMLX 0.8.0rc1, which also reads the Hugging Face cache: an MLX model exported with the default `--to hf` shows up there too, named `<org>--<name>`.
+- LM Studio: the directory is `$LMGET_LMSTUDIO_DIR`, else `~/.lmstudio/models`. A directory moved in the app is kept in no documented file, so set the variable then. The layout follows LM Studio's documentation; it has not been checked against the app yet.
+
+A model in an app directory has one revision at a time: updating it replaces the links lmget made and removes the ones the new revision no longer has, so the app never loads two revisions mixed. Files that lmget did not create are left alone, and one in the way stops the export. `lmget rm` removes only lmget's links.
 
 ## Ollama
 

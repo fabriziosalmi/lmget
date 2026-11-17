@@ -13,10 +13,15 @@ import (
 
 // Target is where a pulled model is made visible.
 //
-//	hf        the Hugging Face cache (transformers, mlx-lm and huggingface_hub read it)
+//	hf        the Hugging Face cache (transformers, mlx-lm, vLLM and huggingface_hub read it)
 //	ollama    Ollama's models directory (ollama run reads it)
+//	omlx      oMLX's models directory, as <dir>/<org>/<name>
+//	lmstudio  LM Studio's models directory, as <dir>/<org>/<name>
 //	dir:PATH  a plain directory with the repository's file names
 //	none      store only
+//
+// For omlx and lmstudio, Path is the app's models directory, resolved on this
+// machine; a lock records only the kind.
 type Target struct {
 	Kind string `json:"kind"`
 	Path string `json:"path,omitempty"`
@@ -30,6 +35,12 @@ func ParseTarget(s string) (Target, error) {
 		return Target{Kind: "none"}, nil
 	case s == "ollama":
 		return Target{Kind: "ollama"}, nil
+	case s == "omlx" || s == "lmstudio":
+		dir, err := AppModelsDir(s)
+		if err != nil {
+			return Target{}, err
+		}
+		return Target{Kind: s, Path: dir}, nil
 	case strings.HasPrefix(s, "dir:") && len(s) > 4:
 		p, err := filepath.Abs(s[4:])
 		if err != nil {
@@ -40,6 +51,8 @@ func ParseTarget(s string) (Target, error) {
 	return Target{}, newErr(ExitUsage, "usage", "unknown target "+quote(s)).
 		fix("--to hf", "Hugging Face cache (default)").
 		fix("--to ollama", "Ollama's models directory (Ollama models)").
+		fix("--to omlx", "oMLX's models directory").
+		fix("--to lmstudio", "LM Studio's models directory").
 		fix("--to dir:./models/name", "plain directory").
 		fix("--to none", "store only")
 }
@@ -123,9 +136,11 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 		}
 		return c.exportHF(plan)
 	case "dir":
-		return c.exportDir(plan, t.Path)
+		return c.exportDir(plan, t.Path, false)
 	case "ollama":
 		return c.exportOllama(plan)
+	case "omlx", "lmstudio":
+		return c.exportApp(plan, t)
 	}
 	return "", nil, nil
 }
@@ -195,13 +210,19 @@ func (c *Client) exportHF(plan *Plan) (string, []string, error) {
 	return snap, links, nil
 }
 
-func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
+// exportDir links the plan's files under root. With replaceOwn (an app's
+// models directory, one revision per model), links lmget made earlier to
+// other stored bytes are replaced, and its links to files the plan no longer
+// has are removed, so the app never loads two revisions mixed; files lmget
+// did not create are never touched.
+func (c *Client) exportDir(plan *Plan, root string, replaceOwn bool) (string, []string, error) {
 	var links []string
 	// the target is the one the user chose (or a lock target already checked
 	// to be inside the project): create it, so the checks below can resolve it
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return root, nil, diskErr(err)
 	}
+	own := c.ownLinkCheck()
 	for _, f := range plan.Selected() {
 		dst := filepath.Join(root, filepath.FromSlash(f.Path))
 		src := c.store.BlobPath(f.SHA256)
@@ -215,12 +236,18 @@ func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
 			continue
 		}
 		if _, err := os.Lstat(dst); err == nil {
-			if hasContent(dst, f.Size, f.SHA256) {
+			switch {
+			case replaceOwn && own(dst):
+				if err := os.Remove(dst); err != nil {
+					return root, links, diskErr(err)
+				}
+			case hasContent(dst, f.Size, f.SHA256):
 				continue // identical bytes already there (e.g. from another store): leave them
+			default:
+				return root, links, newErr(ExitFailure, "export", dst+" already exists").
+					why("lmget does not overwrite files it did not create").
+					fix("", "remove it, or export to another directory")
 			}
-			return root, links, newErr(ExitFailure, "export", dst+" already exists").
-				why("lmget does not overwrite files it did not create").
-				fix("", "remove it, or export to another directory")
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return root, links, diskErr(err)
@@ -232,6 +259,11 @@ func (c *Client) exportDir(plan *Plan, root string) (string, []string, error) {
 			return root, links, diskErr(err)
 		}
 		links = append(links, dst)
+	}
+	if replaceOwn {
+		if err := pruneOwn(root, plan, own); err != nil {
+			return root, links, err
+		}
 	}
 	return root, links, nil
 }
