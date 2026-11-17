@@ -25,9 +25,11 @@ mkdir -p "$out"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
+for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
 	os=${target%/*}
 	arch=${target#*/}
+	exe=
+	[ "$os" = windows ] && exe=.exe # a tar.gz too: Windows 10 and later have tar
 	name="lmget_${version#v}_${os}_${arch}"
 	mkdir -p "$work/$name"
 	# the flags are fixed here, not taken from the environment or from
@@ -36,7 +38,7 @@ for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64; do
 	(cd "$root" && CGO_ENABLED=0 GOENV=off GOWORK=off GOFLAGS= GOAMD64=v1 GOARM64=v8.0 GOEXPERIMENT= \
 		GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -tags=purego_utp \
 		-ldflags "-s -w -buildid= -X github.com/fabriziosalmi/lmget.Version=$version" \
-		-o "$work/$name/lmget" ./cmd/lmget)
+		-o "$work/$name/lmget$exe" ./cmd/lmget)
 	cp "$root/LICENSE" "$root/README.md" "$work/$name/"
 	python3 -I "$root/scripts/archive.py" "$epoch" "$work/$name" "$out/$name.tar.gz"
 done
