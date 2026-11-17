@@ -116,3 +116,147 @@ footer {
   color: var(--dim);
   font-size: 0.875rem;
 }
+
+section {
+  margin-block-start: 2.5rem;
+}
+
+.block {
+  position: relative;
+}
+
+.block pre {
+  padding-inline-end: 5rem; /* room for the copy button */
+  white-space: pre-wrap; /* wrapped on screen only: the copied text keeps its lines */
+  overflow-wrap: break-word;
+}
+
+.copy {
+  position: absolute;
+  inset-block-start: 0.6rem;
+  inset-inline-end: 0.6rem;
+}
+
+.copy-button {
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--dim);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.copy-button:hover,
+.copy-button:focus-visible {
+  color: var(--fg);
+  border-color: var(--dim);
+}
+
+.copy-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.copy-button[data-copied] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.copy-button[data-failed] {
+  color: #ff8a80;
+  border-color: #ff8a80;
+}
+
+.tip {
+  position: absolute;
+  inset-block-start: calc(100% + 0.35rem);
+  inset-inline-end: 0;
+  font-size: 0.8125rem;
+  color: var(--accent);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tip:not(:empty) {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip {
+    transition: none;
+  }
+}
+
+.sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.note {
+  color: var(--dim);
+  font-size: 0.875rem;
+}
+
+.note a,
+.note code {
+  color: var(--fg);
+}
+
+pre.out {
+  font-size: 0.8125rem;
+}
+
+pre:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ok {
+  color: var(--accent);
+}
+
+.table {
+  overflow-x: auto;
+}
+
+table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+th,
+td {
+  padding: 0.4rem 0.75rem 0.4rem 0;
+  text-align: start;
+  border-block-end: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+td:first-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+th {
+  color: var(--dim);
+  font-weight: 600;
+}
+
+.num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}

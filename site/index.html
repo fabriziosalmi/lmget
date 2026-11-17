@@ -8,28 +8,69 @@
 <meta name="description" content="A command-line tool that downloads open model weights from their sources and checks every file against the hash the source publishes.">
 <link rel="stylesheet" href="/site.css">
 <link rel="icon" href="/lmget-dark.svg" type="image/svg+xml">
+<script type="module" src="/app.js"></script>
 </head>
 <body>
 <main>
   <h1><img src="/lmget-dark.svg" alt="lmget" width="212" height="64"></h1>
   <p class="lead">Get open models from their sources, verified.</p>
 
-  <ul>
-    <li>Checks every file against the hash its source publishes, and refuses pickle content hidden under another name.</li>
-    <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look.</li>
-    <li>When a source fails, a signed index and mirror nodes keep indexed models available.</li>
-  </ul>
+  <section aria-labelledby="install">
+    <h2 id="install">Install</h2>
+    <div class="block">
+      <pre><code id="install-cmd">curl -fsSL https://lmget.org/install.sh | sh</code></pre>
+      <span class="copy" hidden>
+        <button type="button" class="copy-button" command="--copy" commandfor="install-cmd">Copy<span class="sr"> install command</span></button>
+        <span class="tip" role="status"></span>
+      </span>
+    </div>
+    <p class="note">For macOS and Linux, amd64 and arm64. The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed, its build provenance, then installs into <code>~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>.</p>
+  </section>
 
-  <pre><code>lmget Qwen/Qwen3-0.6B        <span class="dim"># download, verify, link</span>
-lmget info Qwen/Qwen3-0.6B   <span class="dim"># the plan only</span>
-lmget ollama:smollm2:135m    <span class="dim"># ready for ollama run</span></code></pre>
+  <section aria-labelledby="use">
+    <h2 id="use">Use</h2>
+    <div class="block">
+      <pre><code id="use-cmd">lmget Qwen/Qwen3-0.6B
+lmget info Qwen/Qwen3-0.6B
+lmget ollama:smollm2:135m</code></pre>
+      <span class="copy" hidden>
+        <button type="button" class="copy-button" command="--copy" commandfor="use-cmd">Copy<span class="sr"> example commands</span></button>
+        <span class="tip" role="status"></span>
+      </span>
+    </div>
+    <p class="note">The first downloads, verifies and links into the Hugging Face cache. <code>info</code> shows the plan and downloads nothing. The third lands in Ollama, ready for <code>ollama run</code>.</p>
+  </section>
 
-  <p>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</p>
+  <section aria-labelledby="run">
+    <h2 id="run">A real run</h2>
+    <pre class="out" tabindex="0" aria-label="Output of a real lmget run"><code><span class="dim">$</span> lmget sentence-transformers/all-MiniLM-L6-v2 --include config.json --include tokenizer.json --include model.safetensors --to none --plain
+lmget: resolve hf:sentence-transformers/all-MiniLM-L6-v2
+lmget: plan sentence-transformers/all-MiniLM-L6-v2 commit=1110a243fdf4706b3f48f1d95db1a4f5529b4d41 license=apache-2.0 files=4 bytes=91335425 to_fetch=91335425
+lmget: skip 26 files (not included)
+lmget: <span class="ok">verified</span> 1_Pooling/config.json sha256=4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23
+lmget: <span class="ok">verified</span> config.json sha256=953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41
+lmget: <span class="ok">verified</span> model.safetensors sha256=53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db
+lmget: <span class="ok">verified</span> tokenizer.json sha256=be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037
+lmget: done bytes=91335425 fetched=91335425 elapsed=13.8s</code></pre>
+    <p class="note">lmget v0.1.0, recorded on 2026-11-17. Each sha256 is the one Hugging Face publishes for that file at that commit.</p>
+  </section>
 
-  <h2>Install</h2>
-  <p>Download the archive for macOS or Linux from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>, then check where it was built:</p>
-  <pre><code>gh attestation verify lmget_*.tar.gz --repo fabriziosalmi/lmget \
-  --signer-workflow fabriziosalmi/lmget/.github/workflows/release.yml</code></pre>
+  <section aria-labelledby="what">
+    <h2 id="what">What it does</h2>
+    <ul>
+      <li>Checks every file against the hash its source publishes, and refuses pickle content hidden under another name.</li>
+      <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look.</li>
+      <li>When a source fails, a signed index and mirror nodes keep indexed models available.</li>
+      <li>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="mirror">
+    <h2 id="mirror">Mirrored models</h2>
+    <div id="index-panel">
+      <p class="note">The <a href="/index.json">signed index</a> lists the models the project mirrors, with every file's sha256 and the nodes that serve them. lmget verifies its minisign signature before using it.</p>
+    </div>
+  </section>
 
   <nav aria-label="Project links">
     <a href="https://github.com/fabriziosalmi/lmget">Source</a>

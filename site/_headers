@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
 /index.json
@@ -11,6 +11,9 @@
 /keys.json
   Cache-Control: no-cache
   Content-Type: application/json
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
 /keys.json.minisig
   Cache-Control: no-cache
   Content-Type: text/plain; charset=utf-8
