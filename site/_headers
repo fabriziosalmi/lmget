@@ -22,6 +22,9 @@
 /install.sh
   Content-Type: text/plain; charset=utf-8
   Cache-Control: no-cache
+/install.ps1
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
 /keys.json.minisig
   Cache-Control: no-cache
   Content-Type: text/plain; charset=utf-8

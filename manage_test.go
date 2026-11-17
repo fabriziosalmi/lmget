@@ -213,7 +213,7 @@ func TestRemoveKeepsOllamaLayersAnotherTagUses(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	tagDir := filepath.Join(models, "manifests", hostOf(srv.URL), "library", "fam")
+	tagDir := filepath.Join(models, "manifests", testRegistry, "library", "fam")
 	smallBlobs := tagBlobs(t, models, filepath.Join(tagDir, "small"))
 	if _, err := c.Remove(small); err != nil {
 		t.Fatal(err)
@@ -488,6 +488,7 @@ func TestRemoveRefusesWhileAManifestIsUnreadable(t *testing.T) {
 }
 
 func TestRemoveKeepsTheManifestWhenALinkCannotBeRemoved(t *testing.T) {
+	skipOnWindows(t, "a read-only mode on a directory does not stop deletes there")
 	f := &fakeHF{files: modelFiles()}
 	srv := httptest.NewServer(f.handler())
 	defer srv.Close()

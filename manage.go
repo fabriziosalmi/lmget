@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -84,14 +83,6 @@ func (c *Client) Stats() StoreStats {
 		}
 	}
 	return st
-}
-
-// allocated is the space a file really uses: partial downloads are sparse.
-func allocated(fi os.FileInfo) int64 {
-	if s, ok := fi.Sys().(*syscall.Stat_t); ok {
-		return s.Blocks * 512
-	}
-	return fi.Size()
 }
 
 // RemoveResult reports what Remove did.
@@ -191,14 +182,6 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 
 type inode struct{ dev, ino uint64 }
 
-func inodeOf(fi os.FileInfo) (inode, bool) {
-	s, ok := fi.Sys().(*syscall.Stat_t)
-	if !ok {
-		return inode{}, false
-	}
-	return inode{uint64(s.Dev), uint64(s.Ino)}, true
-}
-
 func (c *Client) blobInodes(p *Plan) map[inode]bool {
 	out := map[inode]bool{}
 	for _, f := range p.Selected() {
@@ -206,7 +189,7 @@ func (c *Client) blobInodes(p *Plan) map[inode]bool {
 			continue
 		}
 		if fi, err := os.Stat(c.store.BlobPath(f.SHA256)); err == nil {
-			if in, ok := inodeOf(fi); ok {
+			if in, ok := inodeOf(c.store.BlobPath(f.SHA256), fi); ok {
 				out[in] = true
 			}
 		}
@@ -266,7 +249,7 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan,
 				t = filepath.Clean(t)
 				mine = strings.HasPrefix(t, storeBlobs) || (ex.Kind == "hf" && strings.HasPrefix(t, repoBlobs))
 			}
-		} else if in, ok := inodeOf(fi); ok && fi.Mode().IsRegular() {
+		} else if in, ok := inodeOf(l, fi); ok && fi.Mode().IsRegular() {
 			mine = owned[in]
 			if !mine && ex.Kind == "ollama" && plan.Ref.Source == "ollama" {
 				// the tag file is a copy of the manifest, whose sha256 is the commit
@@ -416,10 +399,7 @@ func (c *Client) gc() (gcResult, error) {
 		if err != nil {
 			continue
 		}
-		links := uint64(1)
-		if s, ok := fi.Sys().(*syscall.Stat_t); ok {
-			links = uint64(s.Nlink)
-		}
+		links := linkCount(p, fi)
 		if err := os.Remove(p); err != nil {
 			return r, diskErr(err)
 		}

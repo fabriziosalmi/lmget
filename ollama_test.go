@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -107,12 +109,28 @@ func smolLayers() []layer {
 	}
 }
 
+// testRegistry is the fake Ollama registry's name.
+const testRegistry = "registry.test"
+
 func newOllamaClient(t *testing.T, srv *httptest.Server, home string) *Client {
 	t.Helper()
 	t.Setenv("HF_TOKEN_PATH", filepath.Join(t.TempDir(), "none"))
 	t.Setenv("HF_HOME", t.TempDir())
+	// the registry has a name without a port, as registry.ollama.ai does: the
+	// name becomes a directory, and ':' cannot be in one on Windows. Every
+	// connection goes to the fake server.
+	addr := srv.Listener.Addr().String()
+	tr := srv.Client().Transport.(*http.Transport).Clone()
+	tr.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, addr)
+	}
+	scheme := "http://"
+	if srv.TLS != nil {
+		scheme = "https://"
+		tr.TLSClientConfig.ServerName = "example.com" // a name httptest's certificate holds: still verified
+	}
 	c, err := New(Options{Home: home, HFEndpoint: "https://hf.invalid", HFToken: "hf_secret_for_hf_only",
-		OllamaRegistry: srv.URL, HTTP: srv.Client(), Conns: 4, ChunkSize: 128 << 10})
+		OllamaRegistry: scheme + testRegistry, HTTP: &http.Client{Transport: tr}, Conns: 4, ChunkSize: 128 << 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,12 +208,12 @@ func TestOllamaPullExportsWhatOllamaReads(t *testing.T) {
 			t.Fatalf("blob %s missing or wrong: %v", h[:12], err)
 		}
 	}
-	tag := filepath.Join(models, "manifests", hostOf(srv.URL), "library", "smollm2", "135m")
+	tag := filepath.Join(models, "manifests", testRegistry, "library", "smollm2", "135m")
 	b, err := os.ReadFile(tag)
 	if err != nil || !bytes.Equal(b, man) {
 		t.Fatalf("tag file missing or not the manifest bytes: %v", err)
 	}
-	if fi, _ := os.Stat(tag); fi.Mode().Perm() != 0o644 {
+	if fi, _ := os.Stat(tag); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o644 {
 		t.Fatalf("tag file mode %v, want 0644: Ollama rewrites it", fi.Mode().Perm())
 	}
 	tfi, _ := os.Lstat(tag)
@@ -206,7 +224,7 @@ func TestOllamaPullExportsWhatOllamaReads(t *testing.T) {
 	if sfi.Mode().Perm() != 0o444 {
 		t.Fatalf("the stored manifest is %v, want read-only", sfi.Mode().Perm())
 	}
-	if out.RunAs != hostOf(srv.URL)+"/library/smollm2:135m" {
+	if out.RunAs != testRegistry+"/library/smollm2:135m" {
 		t.Fatalf("RunAs %q", out.RunAs)
 	}
 	if f.auth.Load() {
@@ -388,7 +406,7 @@ func TestOllamaLockSyncsOfflineAndAfterTheTagMoves(t *testing.T) {
 	if f.manifests.Load() != m0 || f.blobHits.Load() != b0 {
 		t.Fatal("an offline sync used the network")
 	}
-	if _, err := os.Stat(filepath.Join(models, "manifests", hostOf(srv.URL), "library", "smollm2", "135m")); err != nil {
+	if _, err := os.Stat(filepath.Join(models, "manifests", testRegistry, "library", "smollm2", "135m")); err != nil {
 		t.Fatal("sync did not restore the tag file")
 	}
 	// 2. the tag moves on and a layer is missing from the store: the verified
@@ -449,7 +467,7 @@ func TestOllamaRemoveLeavesOllamasOwnFiles(t *testing.T) {
 	other := filepath.Join(models, "blobs", "sha256-"+strings.Repeat("e", 64))
 	os.MkdirAll(filepath.Dir(other), 0o755)
 	os.WriteFile(other, []byte("ollama's"), 0o644)
-	tag := filepath.Join(models, "manifests", hostOf(srv.URL), "library", "smollm2", "135m")
+	tag := filepath.Join(models, "manifests", testRegistry, "library", "smollm2", "135m")
 	os.MkdirAll(filepath.Dir(tag), 0o755)
 	os.WriteFile(tag, man, 0o644)
 	c := newOllamaClient(t, srv, t.TempDir())
@@ -525,7 +543,7 @@ func TestOllamaLockCannotRelabelAnotherModelsManifest(t *testing.T) {
 	if AsError(err).Code != ExitVerify {
 		t.Fatalf("got %v, want the relabelled lock refused (exit %d)", err, ExitVerify)
 	}
-	tag := filepath.Join(models, "manifests", hostOf(srv.URL), "library", "trusted", "latest")
+	tag := filepath.Join(models, "manifests", testRegistry, "library", "trusted", "latest")
 	if b, err := os.ReadFile(tag); err == nil && bytes.Equal(b, evil) {
 		t.Fatal("ollama:trusted now runs someone/evil")
 	}

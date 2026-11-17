@@ -3,12 +3,11 @@ package lmget
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
-	"syscall"
 )
 
 // Target is where a pulled model is made visible.
@@ -225,9 +224,21 @@ func (c *Client) exportHF(plan *Plan) (string, []string, error) {
 		}
 		created := false
 		if cur, err := os.Readlink(dst); err != nil || cur != rel {
+			if same(storeBlob, dst) { // a link to the blob from an earlier run on Windows
+				links = append(links, dst)
+				continue
+			}
 			os.Remove(dst)
 			if err := os.Symlink(rel, dst); err != nil {
-				return snap, links, diskErr(err)
+				// Windows without Developer Mode cannot make symlinks; there
+				// huggingface_hub keeps the file itself in the snapshot, and so
+				// does lmget, as a hard link to the store
+				if runtime.GOOS != "windows" {
+					return snap, links, diskErr(err)
+				}
+				if err := linkOrSymlink(storeBlob, dst); err != nil {
+					return snap, links, diskErr(err)
+				}
 			}
 			created = true
 		}
@@ -368,9 +379,8 @@ func linkOrSymlink(src, dst string) error {
 	}
 	// only when a hard link is impossible here; a missing source is an error,
 	// not a reason to leave a dangling symlink
-	if errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.EPERM) || errors.Is(err, syscall.EMLINK) ||
-		errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.EOPNOTSUPP) {
-		return os.Symlink(src, dst)
+	if cannotHardlink(err) {
+		return linkFallback(src, dst)
 	}
 	return err
 }

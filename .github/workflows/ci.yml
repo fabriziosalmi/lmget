@@ -33,3 +33,54 @@ jobs:
           ./scripts/release-build.sh v0.0.0 dist-a
           ./scripts/release-build.sh v0.0.0 dist-b
           cmp dist-a/checksums.txt dist-b/checksums.txt
+      - name: lmget builds for the BSDs (built, not released)
+        run: |
+          for t in freebsd/amd64 openbsd/amd64 netbsd/amd64; do
+            GOOS=${t%/*} GOARCH=${t#*/} go build -o /dev/null ./cmd/lmget
+          done
+
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: vet
+        run: go vet ./...
+      - name: tests
+        run: go test -count=1 ./...
+      - name: builds for arm64 too
+        env:
+          GOARCH: arm64
+        run: go build -o NUL ./cmd/lmget
+      - name: install.ps1 installs a verified archive and refuses a bad one
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = 'lmget_0.0.0-ci_windows_amd64'
+          $rel = Join-Path $env:RUNNER_TEMP 'rel'
+          New-Item -ItemType Directory -Force (Join-Path $rel $name) | Out-Null
+          go build -trimpath -ldflags "-X github.com/fabriziosalmi/lmget.Version=v0.0.0-ci" -o (Join-Path $rel "$name\lmget.exe") ./cmd/lmget
+          tar -czf (Join-Path $rel "$name.tar.gz") -C $rel $name
+          $h = (Get-FileHash -Algorithm SHA256 (Join-Path $rel "$name.tar.gz")).Hash.ToLowerInvariant()
+          "$h  $name.tar.gz" | Set-Content -Encoding ascii (Join-Path $rel 'checksums.txt')
+          $srv = Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1','--directory',$rel -PassThru
+          Start-Sleep -Seconds 3
+          $env:LMGET_VERSION = 'v0.0.0-ci'
+          $env:LMGET_RELEASE_URL = 'http://127.0.0.1:8765'
+          $env:LMGET_INSTALL_DIR = Join-Path $env:RUNNER_TEMP 'bin'
+          ./site/install.ps1
+          $v = & (Join-Path $env:LMGET_INSTALL_DIR 'lmget.exe') --version
+          if ($v -ne 'lmget v0.0.0-ci') { throw "installed version: $v" }
+          # a checksum that does not match: refused, nothing installed
+          "$('0' * 64)  $name.tar.gz" | Set-Content -Encoding ascii (Join-Path $rel 'checksums.txt')
+          $env:LMGET_INSTALL_DIR = Join-Path $env:RUNNER_TEMP 'bin2'
+          $refused = $false
+          try { ./site/install.ps1 } catch { $refused = $true; Write-Host "refused as expected: $_" }
+          if (-not $refused) { throw 'a bad checksum was accepted' }
+          if (Test-Path (Join-Path $env:LMGET_INSTALL_DIR 'lmget.exe')) { throw 'installed despite a bad checksum' }
+          Stop-Process -Id $srv.Id

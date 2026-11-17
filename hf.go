@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -145,6 +147,9 @@ func isLocalSlash(p string) bool {
 	}
 	for _, s := range strings.Split(p, "/") {
 		if s == ".." || s == "" || isGitName(s) {
+			return false
+		}
+		if runtime.GOOS == "windows" && windowsUnsafeName(s) {
 			return false
 		}
 	}
@@ -290,4 +295,24 @@ func licenseRaw(v any) string {
 		return strings.Join(s, ", ")
 	}
 	return ""
+}
+
+var windowsReserved = regexp.MustCompile(`(?i)^(con|prn|aux|nul|conin\$|conout\$|com[0-9\x{00b9}\x{00b2}\x{00b3}]|lpt[0-9\x{00b9}\x{00b2}\x{00b3}])(\..*)?$`)
+
+// windowsUnsafeName reports a path segment Windows would not store as
+// written: a device name (NUL, COM1, ..., with any extension), a ':' that
+// opens an alternate data stream, a character Windows forbids, a trailing
+// dot or space Windows drops (so two names land on one file), or an 8.3
+// short name such as GIT~1, which can stand for .git.
+func windowsUnsafeName(s string) bool {
+	if windowsReserved.MatchString(s) || strings.ContainsAny(s, `<>:"|?*\`) ||
+		strings.HasSuffix(s, ".") || strings.HasSuffix(s, " ") {
+		return true
+	}
+	if i := strings.LastIndex(s, "~"); i > 0 && i < len(s)-1 {
+		if _, err := strconv.Atoi(strings.SplitN(s[i+1:], ".", 2)[0]); err == nil {
+			return true // a short name: it may alias any long one, .git included
+		}
+	}
+	return false
 }

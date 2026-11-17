@@ -2,6 +2,7 @@ package lmget
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -137,7 +138,7 @@ func TestRunAsksOllama(t *testing.T) {
 
 func TestEngineAddresses(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("LMGET_OMLX_URL", "")
 	t.Setenv("OLLAMA_HOST", "")
 	if e, _ := EngineFor("ollama", ""); e.URL != "http://127.0.0.1:11434" {
@@ -157,11 +158,13 @@ func TestEngineAddresses(t *testing.T) {
 	os.MkdirAll(filepath.Join(home, "Library", "Application Support", "oMLX"), 0o755)
 	os.WriteFile(filepath.Join(home, "Library", "Application Support", "oMLX", "base-path"), []byte(base+"\n"), 0o644)
 	os.MkdirAll(base, 0o755)
-	os.WriteFile(filepath.Join(base, "settings.json"), []byte(`{"server":{"host":"127.0.0.1","port":1234},"auth":{"api_key":"never-read"},"model":{"model_dir":"/m"}}`), 0o600)
+	mdir := filepath.Join(home, "m")
+	mj, _ := json.Marshal(mdir)
+	os.WriteFile(filepath.Join(base, "settings.json"), []byte(`{"server":{"host":"127.0.0.1","port":1234},"auth":{"api_key":"never-read"},"model":{"model_dir":`+string(mj)+`}}`), 0o600)
 	if e, _ := EngineFor("omlx", ""); e.URL != "http://127.0.0.1:1234" || e.key != "" {
 		t.Fatalf("oMLX from its moved settings: %s (key %q)", e.URL, e.key)
 	}
-	if d, err := AppModelsDir("omlx"); err != nil || d != "/m" {
+	if d, err := AppModelsDir("omlx"); err != nil || d != mdir {
 		t.Fatalf("oMLX models dir from the moved settings: %s %v", d, err)
 	}
 	for u, remote := range map[string]bool{"http://127.0.0.1:1234": false, "http://localhost:8000": false, "http://[::1]:8000": false, "http://gpu.lan:8000": true, "https://api.example.org": true} {

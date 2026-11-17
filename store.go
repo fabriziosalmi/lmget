@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -91,6 +91,11 @@ func (s *Store) commit(part, sha256, gitOID string) error {
 			return err
 		}
 	}
+	// On Windows read-only is an attribute of the file, shared by its hard
+	// links, and removing the .part link clears it: set it again
+	if err := os.Chmod(dst, 0o444); err != nil {
+		return err
+	}
 	if gitOID != "" && hex40.MatchString(gitOID) {
 		return writeFileAtomic(filepath.Join(s.root, "index", "git-sha1", gitOID), []byte(sha256))
 	}
@@ -144,7 +149,7 @@ func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
 		if !validOCIRepo(ref.Repo) {
 			return "", fmt.Errorf("not an OCI repository: %q", ref.Repo)
 		}
-		return filepath.Join(s.root, "refs", "oci", filepath.FromSlash(ref.Repo), commit+".json"), nil
+		return filepath.Join(s.root, "refs", "oci", filepath.FromSlash(ociDirName(ref.Repo, runtime.GOOS)), commit+".json"), nil
 	}
 	if _, err := validRef(ref.Source, ref.Repo, "main", ref.Repo); err != nil {
 		return "", err
@@ -297,22 +302,14 @@ func (s *Store) flock(name string, exclusive, wait bool) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	how := syscall.LOCK_SH
-	if exclusive {
-		how = syscall.LOCK_EX
-	}
-	if !wait {
-		how |= syscall.LOCK_NB
-	}
-	if err := syscall.Flock(int(f.Fd()), how); err != nil {
+	if err := lockFile(f, exclusive, wait); err != nil {
 		f.Close()
-		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil, errBusy
-		}
 		return nil, err
 	}
-	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+	return func() { unlockFile(f); f.Close() }, nil
 }
+
+var errIsSymlink = errors.New("is a symlink")
 
 var errBusy = newErr(ExitFailure, "busy", "another lmget is using the store").
 	why("a download or sync is running in another process").
@@ -350,4 +347,15 @@ func writeFileAtomicMode(path string, b []byte, mode os.FileMode) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// ociDirName is where an OCI repository's manifests go in the store. On
+// Windows a registry's port (localhost:5000) cannot be in a directory name;
+// '%' is in no valid OCI name, so the encoding is unambiguous. The
+// reference itself is read from the manifest, never from the path.
+func ociDirName(repo, goos string) string {
+	if goos == "windows" {
+		return strings.ReplaceAll(repo, ":", "%3A")
+	}
+	return repo
 }
