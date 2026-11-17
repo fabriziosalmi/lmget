@@ -2,6 +2,8 @@ package lmget
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -116,5 +118,38 @@ func TestANodeDoesNotResumeAnotherOriginsChunks(t *testing.T) {
 	}
 	if !u.store.Has(big.SHA256, big.Size) {
 		t.Fatal("the file is not in the store")
+	}
+}
+
+// Audit run 5: a primary source is an origin too. A URL server that claimed
+// a Hugging Face file's sha256 and stopped leaves chunks (with an empty
+// origin, as before this fix, or its own host) that a later Hugging Face
+// download must not complete.
+func TestAURLServersPartialIsNotResumedByHuggingFace(t *testing.T) {
+	for _, left := range []string{"", "src:evil.example"} {
+		f := &fakeHF{files: modelFiles()}
+		srv := httptest.NewServer(f.handler())
+		c := newTestClient(t, srv, t.TempDir())
+		var big fakeFile
+		for _, x := range f.files {
+			if len(x.data) > len(big.data) {
+				big = x
+			}
+		}
+		sum := sha256.Sum256(big.data)
+		part, state := c.store.tmpPaths(hex.EncodeToString(sum[:]))
+		os.MkdirAll(filepath.Dir(part), 0o755)
+		os.WriteFile(part, make([]byte, len(big.data)), 0o644) // not the file
+		chunk := c.opt.ChunkSize
+		done := make([]bool, (int64(len(big.data))+chunk-1)/chunk)
+		for i := range done {
+			done[i] = true
+		}
+		b, _ := json.Marshal(fetchState{Size: int64(len(big.data)), Chunk: chunk, Done: done, Origin: left})
+		os.WriteFile(state, b, 0o644)
+		if _, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil); err != nil {
+			t.Errorf("origin %q left behind: the Hugging Face pull failed: %v", left, err)
+		}
+		srv.Close()
 	}
 }
