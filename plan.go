@@ -4,7 +4,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"syscall"
 )
 
 // File is one file of a resolved model.
@@ -188,12 +187,4 @@ func (p *Plan) Selected() []File {
 		}
 	}
 	return out
-}
-
-func diskFree(dir string) int64 {
-	var s syscall.Statfs_t
-	if err := syscall.Statfs(dir, &s); err != nil {
-		return -1
-	}
-	return int64(s.Bavail) * int64(s.Bsize)
 }

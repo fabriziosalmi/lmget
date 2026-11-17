@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -192,17 +191,6 @@ func (c *Client) Doctor(ctx context.Context, o DoctorOptions) []Check {
 	return cs
 }
 
-func sameDevice(a, b string) bool {
-	fa, err1 := os.Stat(a)
-	fb, err2 := os.Stat(b)
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	sa, ok1 := fa.Sys().(*syscall.Stat_t)
-	sb, ok2 := fb.Sys().(*syscall.Stat_t)
-	return ok1 && ok2 && sa.Dev == sb.Dev
-}
-
 // verifyBlobs re-hashes every blob; a blob whose content no longer matches
 // its name is moved to <store>/quarantine.
 func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, stuck []string, err error) {
@@ -243,10 +231,10 @@ func (c *Client) verifyBlobs(ctx context.Context) (bad []string, n int, stuck []
 		}
 		if hex.EncodeToString(h.Sum(nil)) != name {
 			if fi, err := os.Stat(filepath.Join(dir, name)); err == nil {
-				if bad, ok := inodeOf(fi); ok {
+				if bad, ok := inodeOf(filepath.Join(dir, name), fi); ok {
 					for _, l := range links {
 						if li, err := os.Lstat(l); err == nil && li.Mode().IsRegular() {
-							if in, ok := inodeOf(li); ok && in == bad {
+							if in, ok := inodeOf(l, li); ok && in == bad {
 								if err := os.Remove(l); err != nil {
 									stuck = append(stuck, l)
 								}

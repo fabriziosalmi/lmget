@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"syscall"
 
 	"github.com/BurntSushi/toml"
 )
@@ -75,9 +74,9 @@ func (l *Lock) Path() string { return l.path }
 func ReadLock(path string) (*Lock, error) {
 	// one open, without following a symlink, then checks on that descriptor:
 	// nothing can be swapped between the check and the read
-	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	f, err := openNoFollow(path)
 	if err != nil {
-		if errors.Is(err, syscall.ELOOP) {
+		if errors.Is(err, errIsSymlink) {
 			return nil, lockErr(path, "is a symlink; lmget only reads and writes a regular lockfile")
 		}
 		return nil, err // fs.ErrNotExist passes through for callers
@@ -191,15 +190,11 @@ func (l *Lock) Write() error {
 // lmget.lock goes through here, so two lmget runs cannot lose each other's
 // updates.
 func UpdateLock(path string, create bool, fn func(*Lock) (bool, error)) (bool, error) {
-	d, err := os.Open(filepath.Dir(path))
+	unlock, err := lockDir(filepath.Dir(path))
 	if err != nil {
 		return false, err
 	}
-	defer d.Close()
-	if err := syscall.Flock(int(d.Fd()), syscall.LOCK_EX); err != nil {
-		return false, err
-	}
-	defer syscall.Flock(int(d.Fd()), syscall.LOCK_UN)
+	defer unlock()
 	l, err := ReadLock(path)
 	if create && errors.Is(err, fs.ErrNotExist) {
 		l, err = NewLock(path), nil

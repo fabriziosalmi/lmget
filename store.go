@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -297,22 +296,14 @@ func (s *Store) flock(name string, exclusive, wait bool) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	how := syscall.LOCK_SH
-	if exclusive {
-		how = syscall.LOCK_EX
-	}
-	if !wait {
-		how |= syscall.LOCK_NB
-	}
-	if err := syscall.Flock(int(f.Fd()), how); err != nil {
+	if err := lockFile(f, exclusive, wait); err != nil {
 		f.Close()
-		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil, errBusy
-		}
 		return nil, err
 	}
-	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+	return func() { unlockFile(f); f.Close() }, nil
 }
+
+var errIsSymlink = errors.New("is a symlink")
 
 var errBusy = newErr(ExitFailure, "busy", "another lmget is using the store").
 	why("a download or sync is running in another process").

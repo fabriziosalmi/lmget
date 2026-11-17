@@ -151,7 +151,7 @@ func (c *Client) ownLinkCheck() func(path string) bool {
 			}
 			return filepath.Dir(filepath.Clean(t)) == blobs
 		}
-		in, ok := inodeOf(fi)
+		in, ok := inodeOf(path, fi)
 		if !ok || !fi.Mode().IsRegular() {
 			return false
 		}
@@ -160,7 +160,7 @@ func (c *Client) ownLinkCheck() func(path string) bool {
 			entries, _ := os.ReadDir(blobs)
 			for _, e := range entries {
 				if bi, err := e.Info(); err == nil {
-					if n, ok := inodeOf(bi); ok {
+					if n, ok := inodeOf(filepath.Join(blobs, e.Name()), bi); ok {
 						inodes[n] = true
 					}
 				}

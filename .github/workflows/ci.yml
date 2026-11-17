@@ -33,3 +33,27 @@ jobs:
           ./scripts/release-build.sh v0.0.0 dist-a
           ./scripts/release-build.sh v0.0.0 dist-b
           cmp dist-a/checksums.txt dist-b/checksums.txt
+      - name: lmget builds for the BSDs (built, not released)
+        run: |
+          for t in freebsd/amd64 openbsd/amd64 netbsd/amd64; do
+            GOOS=${t%/*} GOARCH=${t#*/} go build -o /dev/null ./cmd/lmget
+          done
+
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: vet
+        run: go vet ./...
+      - name: tests
+        run: go test -count=1 ./...
+      - name: builds for arm64 too
+        env:
+          GOARCH: arm64
+        run: go build -o NUL ./cmd/lmget
