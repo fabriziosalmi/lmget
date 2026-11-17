@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -100,18 +101,14 @@ func zipWithPickle(t *testing.T) []byte {
 
 // A zip with a pickle appended after a GGUF or safetensors header is a
 // pickle: zip readers find the archive from the end of the file.
+// The zip is the last tensor's data, so the file is otherwise well formed.
 func TestAZipAppendedToAnotherFormatIsAPickle(t *testing.T) {
-	st := make([]byte, 8)
-	binary.LittleEndian.PutUint64(st, 2)
-	st = append(st, "{}"...)
-	for name, prefix := range map[string][]byte{
-		"model.gguf":        append([]byte("GGUF\x03\x00\x00\x00"), make([]byte, 4096)...),
-		"model.safetensors": st,
-	} {
+	z := zipWithPickle(t)
+	for name, b := range map[string][]byte{"model.gguf": ggufAround(z), "model.safetensors": stAround(z)} {
 		p := filepath.Join(t.TempDir(), name)
-		os.WriteFile(p, append(append([]byte(nil), prefix...), zipWithPickle(t)...), 0o644)
-		if err := checkFormat(p, name, false); err == nil {
-			t.Errorf("%s with a zip holding data.pkl appended: passed the format check", name)
+		os.WriteFile(p, b, 0o644)
+		if err := checkFormat(p, name, false); err == nil || !strings.Contains(AsError(err).Why, "pickle") {
+			t.Errorf("%s with a zip holding data.pkl at its end: %v", name, err)
 		}
 	}
 }
@@ -119,14 +116,11 @@ func TestAZipAppendedToAnotherFormatIsAPickle(t *testing.T) {
 // The end-of-archive signature in ordinary weights, with nothing a zip
 // reader can open behind it, is not a reason to refuse a file.
 func TestAnEndOfZipSignatureInWeightsIsNotAPickle(t *testing.T) {
-	st := make([]byte, 8)
-	binary.LittleEndian.PutUint64(st, 2)
-	st = append(st, "{}"...)
 	random := make([]byte, 1<<20)
 	rand.Read(random)
 	copy(random[len(random)-5000:], "PK\x05\x06")
 	p := filepath.Join(t.TempDir(), "model.safetensors")
-	os.WriteFile(p, append(st, random...), 0o644)
+	os.WriteFile(p, stAround(random), 0o644)
 	if err := checkFormat(p, "model.safetensors", false); err != nil {
 		t.Fatalf("refused: %v", err)
 	}
@@ -167,15 +161,13 @@ func TestATailZipGoCannotReadIsAPickle(t *testing.T) {
 	end := bytes.LastIndex(z, []byte("PK\x05\x06"))
 	binary.LittleEndian.PutUint16(z[end+8:], 2)  // entries on this disk: 2, the directory has 1
 	binary.LittleEndian.PutUint16(z[end+10:], 2) // total entries
-	st := make([]byte, 8)
-	binary.LittleEndian.PutUint64(st, 2)
-	st = append(st, "{}"...)
+	b := stAround(z)
 	p := filepath.Join(t.TempDir(), "model.safetensors")
-	os.WriteFile(p, append(st, z...), 0o644)
-	if _, err := zip.NewReader(bytes.NewReader(append(st, z...)), int64(len(st)+len(z))); err == nil {
+	os.WriteFile(p, b, 0o644)
+	if _, err := zip.NewReader(bytes.NewReader(b), int64(len(b))); err == nil {
 		t.Fatal("Go reads this archive: the test proves nothing")
 	}
-	if err := checkFormat(p, "model.safetensors", false); err == nil {
-		t.Fatal("a safetensors file with an unreadable zip holding a pickle at its tail passed the format check")
+	if err := checkFormat(p, "model.safetensors", false); err == nil || !strings.Contains(AsError(err).Why, "pickle") {
+		t.Fatalf("a safetensors file with an unreadable zip holding a pickle at its tail: %v", err)
 	}
 }

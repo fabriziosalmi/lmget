@@ -42,16 +42,12 @@ func checkFormat(p, name string, declaredPickle bool) error {
 	}
 	switch ext {
 	case ".safetensors":
-		if len(head) < 9 {
-			return bad("too short for a safetensors header")
-		}
-		hlen := binary.LittleEndian.Uint64(head[:8])
-		if hlen == 0 || hlen > 100<<20 || int64(hlen) > size-8 || head[8] != '{' {
-			return bad("the safetensors header is missing or malformed")
+		if why := checkSafetensors(f, size); why != "" {
+			return bad(why)
 		}
 	case ".gguf":
-		if len(head) < 4 || string(head[:4]) != "GGUF" {
-			return bad("it does not start with the GGUF magic")
+		if why := checkGGUF(f, size); why != "" {
+			return bad(why)
 		}
 	}
 	return nil

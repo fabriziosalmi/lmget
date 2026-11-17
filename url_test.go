@@ -235,7 +235,7 @@ func torchZip(t *testing.T) []byte {
 }
 
 func TestFormatCheckRefusesDisguisedFiles(t *testing.T) {
-	gguf := append([]byte("GGUF\x03\x00\x00\x00"), randBytes(1000)...)
+	gguf := fakeGGUF(1000)
 	pickle := append([]byte{0x80, 0x04, 0x95}, randBytes(1000)...)
 	cases := []struct {
 		name string
@@ -250,6 +250,9 @@ func TestFormatCheckRefusesDisguisedFiles(t *testing.T) {
 		{"tokenizer.model", torchZip(t), false}, // same, torch zip form
 		{"model.gguf", randBytes(1000), false},
 		{"model.gguf", gguf, true},
+		{"model.safetensors", stFile(`{}`, 1000), false},       // well-formed JSON, bytes no tensor owns
+		{"model.gguf", gguf[:len(gguf)-1], false},              // its one tensor runs past the end
+		{"model.gguf", ggufAround(make([]byte, 31<<10)), true}, // over one read-ahead buffer of data
 		{"model.safetensors", fakeSafetensors(1000), true},
 		{"pytorch_model.bin", torchZip(t), true}, // named as what it is
 		{"weights.pt", pickle, true},

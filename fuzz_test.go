@@ -30,6 +30,8 @@ func FuzzWalkPickle(f *testing.F) {
 // and name.
 func FuzzCheckFormat(f *testing.F) {
 	f.Add([]byte("GGUF\x03\x00\x00\x00"), ".gguf")
+	f.Add(fakeGGUF(64), ".gguf")
+	f.Add(fakeSafetensors(16), ".safetensors")
 	f.Add([]byte("\x02\x00\x00\x00\x00\x00\x00\x00{}"), ".safetensors")
 	f.Add(realPickles["proto4"], ".bin")
 	f.Add([]byte("PK\x03\x04"), ".pt")

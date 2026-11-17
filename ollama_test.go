@@ -97,8 +97,6 @@ func (f *fakeOllama) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func fakeGGUF(n int) []byte { return append([]byte("GGUF\x03\x00\x00\x00"), randBytes(n)...) }
-
 func smolLayers() []layer {
 	return []layer{
 		{"model", fakeGGUF(700 << 10)},
