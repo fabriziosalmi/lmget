@@ -249,3 +249,48 @@ func TestAFailingOriginNeverLeavesChunksTheSourceResumes(t *testing.T) {
 		srv.Close()
 	}
 }
+
+// An origin or a node whose URL sits under the HF endpoint still gets no
+// token: the token is for the source only.
+func TestNoTokenToAnOriginUnderTheHFEndpoint(t *testing.T) {
+	t.Setenv("HF_HUB_CACHE", t.TempDir())
+	files := modelFiles()
+	f := &fakeHF{files: files}
+	inner := f.handler()
+	var mu sync.Mutex
+	var auth []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/mirror/blobs/sha256/") {
+			mu.Lock()
+			auth = append(auth, r.Header.Get("Authorization"))
+			mu.Unlock()
+			for _, ff := range files {
+				if strings.HasSuffix(r.URL.Path, sha(ff.data)) {
+					http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(ff.data))
+					return
+				}
+			}
+			http.NotFound(w, r)
+			return
+		}
+		inner.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+	newTestClient(t, srv, t.TempDir())
+	c, err := New(Options{Home: t.TempDir(), HFEndpoint: srv.URL, HFToken: "hf_secret", Conns: 4, ChunkSize: 256 << 10,
+		Origins: []string{srv.URL + "/mirror"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(auth) == 0 {
+		t.Fatal("the origin was not asked")
+	}
+	for _, a := range auth {
+		if a != "" {
+			t.Fatal("the origin under the HF endpoint received the token")
+		}
+	}
+}

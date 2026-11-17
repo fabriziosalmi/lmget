@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -194,9 +195,12 @@ func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size
 		if err != nil {
 			return nil, err
 		}
-		if f.ociRepo != "" {
-			req.Header.Set("User-Agent", c.opt.UserAgent) // registry blobs: never the HF token
-		} else {
+		switch {
+		case f.ociRepo != "" || strings.HasPrefix(f.From, UserOrigin) || strings.HasPrefix(f.From, NodeOrigin):
+			// registry blobs, user origins and index nodes: never the HF token,
+			// even when their URL happens to sit under the HF endpoint
+			req.Header.Set("User-Agent", c.opt.UserAgent)
+		default:
 			c.authorize(req)
 		}
 		if ranged {
