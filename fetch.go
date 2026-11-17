@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"sync"
@@ -46,10 +47,20 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 	if _, err := os.Stat(part); err != nil {
 		os.Remove(statePath) // a state without its partial file describes nothing
 	}
+	reused := false
 	if b, err := os.ReadFile(statePath); err == nil {
 		var old fetchState
 		if json.Unmarshal(b, &old) == nil && old.Size == f.Size && old.Chunk > 0 && old.Origin == origin {
-			st = old
+			st, reused = old, true
+		}
+	}
+	// a state this fetch does not resume (another origin's, or any state for a
+	// stream that cannot resume) goes before the first byte is written: its
+	// done chunks would otherwise describe bytes this origin overwrites, and a
+	// later fetch from the state's origin would complete them (audit run 6)
+	if !reused || f.noRanges {
+		if err := os.Remove(statePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return diskErr(err)
 		}
 	}
 	n := int((f.Size + st.Chunk - 1) / st.Chunk)

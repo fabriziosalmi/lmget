@@ -1,7 +1,9 @@
 package lmget
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -189,5 +191,61 @@ func TestParseOrigins(t *testing.T) {
 	}
 	if _, err := parseOrigins([]string{strings.Repeat("https://a.example ", maxOrigins+1)}); err == nil {
 		t.Error("more than the maximum number of origins accepted")
+	}
+}
+
+// Audit run 6: an origin that writes into an interrupted source download and
+// drops must not leave the source's state describing chunks it overwrote.
+// The pull that follows must succeed from the source, in both origin modes.
+func TestAFailingOriginNeverLeavesChunksTheSourceResumes(t *testing.T) {
+	for _, mode := range []string{"ranged", "noranges"} {
+		t.Setenv("HF_HUB_CACHE", t.TempDir())
+		f := &fakeHF{files: modelFiles()}
+		srv := httptest.NewServer(f.handler())
+		home := t.TempDir()
+		c := newTestClient(t, srv, home)
+		ctx, cancel := context.WithCancel(context.Background())
+		stopAt := func(total int64) {
+			if total > 1500<<10 {
+				cancel()
+			}
+		}
+		f.onByte.Store(&stopAt)
+		if _, err := c.Pull(ctx, Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil); AsError(err).Code != ExitInterrupted {
+			t.Fatalf("%s: the first pull was not interrupted: %v", mode, err)
+		}
+		f.onByte.Store(nil)
+		size := len(f.files[0].data)
+		hostile := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Range") == "bytes=0-0" && mode == "ranged" {
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes 0-0/%d", size))
+				w.WriteHeader(http.StatusPartialContent)
+				w.Write([]byte{0xEE})
+				return
+			}
+			var from, to int
+			if mode == "ranged" {
+				fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-%d", &from, &to)
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", from, to, size))
+				w.Header().Set("Content-Length", fmt.Sprint(to-from+1))
+				w.WriteHeader(http.StatusPartialContent)
+			} else {
+				w.Header().Set("Content-Length", fmt.Sprint(size))
+				w.WriteHeader(http.StatusOK)
+			}
+			w.Write(bytes.Repeat([]byte{0xEE}, 4096))
+			w.(http.Flusher).Flush()
+			panic(http.ErrAbortHandler) // drop the connection mid-chunk
+		}))
+		c2, err := New(Options{Home: home, HFEndpoint: srv.URL, Conns: 4, ChunkSize: 256 << 10, Origins: []string{hostile.URL}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c2.retryBase = time.Millisecond
+		if _, err := c2.Pull(context.Background(), Request{Ref: Ref{"hf", "org/m", "main", "", ""}, Target: Target{Kind: "none"}}, nil); err != nil {
+			t.Errorf("%s: the source's resumed pull failed after the origin dropped: %v", mode, err)
+		}
+		hostile.Close()
+		srv.Close()
 	}
 }

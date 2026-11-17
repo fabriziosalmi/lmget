@@ -56,7 +56,9 @@ func (c *Client) fromOrigins(ctx context.Context, f File, part, state string, cn
 		of.url = o + "/blobs/sha256/" + f.SHA256
 		of.ifRange, of.ociRepo = "", ""
 		of.attempts = 2
-		of.From = UserOrigin + hostOf(o)
+		// the whole base URL: two origins on one host keep apart their
+		// partial downloads and their down marks
+		of.From = UserOrigin + strings.TrimPrefix(strings.TrimPrefix(o, "https://"), "http://")
 		if c.nodeIsDown(of.From) || ctx.Err() != nil {
 			continue
 		}
