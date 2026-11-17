@@ -1,0 +1,11 @@
+# gitleaks: the default rules, plus one exception. Lines that show a public
+# sha256 digest of a published file (sha256=<64 hex>, as lmget prints it and
+# the site quotes it) are not secrets; the word "tokenizer" next to one made
+# the generic-api-key rule fire.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "public sha256 digests of published model files"
+regexTarget = "line"
+regexes = ['''sha256=[0-9a-f]{64}''']
