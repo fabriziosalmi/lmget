@@ -63,7 +63,7 @@ func run() lmget.ExitCode {
 			"  lmget Qwen/Qwen3-0.6B --lock          # record it in ./lmget.lock\n" +
 			"  lmget sync                            # reproduce ./lmget.lock exactly\n" +
 			"  lmget Qwen/Qwen3-0.6B --json | jq -c 'select(.type==\"file_done\")'",
-		Args:          cobra.MaximumNArgs(1),
+		Args:          oneModel("lmget", "Qwen/Qwen3-0.6B", true),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       lmget.Version,
@@ -78,7 +78,7 @@ func run() lmget.ExitCode {
 	get := &cobra.Command{
 		Use:   "get <model>",
 		Short: "Resolve, download, verify and export a model (same as lmget <model>)",
-		Args:  cobra.ExactArgs(1),
+		Args:  oneModel("lmget get", "Qwen/Qwen3-0.6B", false),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f.toChanged = cmd.Flags().Changed("to")
 			return pull(args[0], f.dryRun)
@@ -87,7 +87,7 @@ func run() lmget.ExitCode {
 	info := &cobra.Command{
 		Use:   "info <model>",
 		Short: "Show the plan: files, sizes, hashes, license, checks. Downloads nothing",
-		Args:  cobra.ExactArgs(1),
+		Args:  oneModel("lmget info", "Qwen/Qwen3-0.6B", false),
 		RunE:  func(cmd *cobra.Command, args []string) error { return pull(args[0], true) },
 	}
 	sync := &cobra.Command{
@@ -104,7 +104,7 @@ func run() lmget.ExitCode {
 	ls := &cobra.Command{
 		Use:   "ls",
 		Short: "List the models in the store, their size and where they are exported",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { code = doLs(f); return nil },
 	}
 	rm := &cobra.Command{
@@ -113,13 +113,13 @@ func run() lmget.ExitCode {
 		Long: "rm removes the links lmget created for the model (only while they still point at\n" +
 			"lmget's data), forgets the model, and deletes the blobs no other model references.\n" +
 			"<model>@<commit> removes one commit; without it, every stored commit of the repository.",
-		Args: cobra.ExactArgs(1),
+		Args: oneModel("lmget rm", "", false),
 		RunE: func(cmd *cobra.Command, args []string) error { code = doRm(f, args[0]); return nil },
 	}
 	doctor := &cobra.Command{
 		Use:   "doctor",
 		Short: "Check the store, the export targets, the network and the token",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE:  func(cmd *cobra.Command, args []string) error { code = doDoctor(f); return nil },
 	}
 	index := &cobra.Command{
@@ -128,7 +128,7 @@ func run() lmget.ExitCode {
 		Long: "The index lists the models the project mirrors, with every file's sha256 and the\n" +
 			"nodes that serve them, signed with minisign. lmget verifies the signature, refuses\n" +
 			"an older or expired index, and keeps the verified copy in the store.",
-		Args: cobra.NoArgs,
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error { code = doIndex(f); return nil },
 	}
 	doctor.Flags().BoolVar(&f.verify, "verify", false, "re-hash every blob; corrupt ones are moved to quarantine")
@@ -154,15 +154,57 @@ func run() lmget.ExitCode {
 	root.PersistentFlags().BoolVar(&f.plain, "plain", false, "plain log lines even on a terminal")
 	root.PersistentFlags().StringVar(&f.lockfile, "lockfile", lmget.DefaultLockName, "lockfile path")
 	root.AddCommand(get, info, sync, ls, rm, doctor, index)
+	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
+			Fixes: []lmget.Fix{{Cmd: c.CommandPath() + " --help"}}}
+	})
 	root.SetVersionTemplate("lmget {{.Version}}\n")
 
 	if err := root.Execute(); err != nil {
 		e := &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
 			Fixes: []lmget.Fix{{Cmd: "lmget --help"}}}
+		errors.As(err, &e) // an argument error already says what to do
 		printErr(e)
 		return e.Code
 	}
 	return code
+}
+
+// oneModel checks that a command got exactly one model (or none, when
+// optional: lmget alone shows the help). With more, the usual cause is a
+// glob the shell expanded because it was not quoted.
+func oneModel(cmd, example string, optional bool) cobra.PositionalArgs {
+	return func(c *cobra.Command, args []string) error {
+		switch {
+		case len(args) == 1, len(args) == 0 && optional:
+			return nil
+		case len(args) == 0:
+			e := &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: cmd + " needs a model",
+				Why: "a Hugging Face repository (org/name), ollama:<name>, oci://<image> or an https URL"}
+			if example != "" {
+				e.Fixes = append(e.Fixes, lmget.Fix{Cmd: cmd + " " + example})
+			} else {
+				e.Why = "a model in the store, as lmget ls lists it"
+				e.Fixes = append(e.Fixes, lmget.Fix{Cmd: "lmget ls", Note: "the models in the store"})
+			}
+			e.Fixes = append(e.Fixes, lmget.Fix{Cmd: cmd + " --help"})
+			return e
+		}
+		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage",
+			Msg:   fmt.Sprintf("%s takes one model, got %d: %s", cmd, len(args), strings.Join(args, " ")),
+			Why:   "one model per command; an unquoted glob is expanded by the shell before lmget sees it",
+			Fixes: []lmget.Fix{{Cmd: cmd + " org/name --include '*Q4_K_M*'", Note: "quote globs"}}}
+	}
+}
+
+// noArgs is cobra.NoArgs with an lmget error.
+func noArgs(c *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage",
+		Msg:   fmt.Sprintf("lmget %s takes no arguments, got %s", c.Name(), strings.Join(args, " ")),
+		Fixes: []lmget.Fix{{Cmd: "lmget " + c.Name() + " --help"}}}
 }
 
 func outputMode(f flags) ui.Mode {
