@@ -22,6 +22,8 @@ const aliasRefresh = 24 * time.Hour
 
 // nickname is what a nickname resolved to.
 type nickname struct {
+	name    string
+	choice  *lmget.HistoryChoice
 	ref     lmget.Ref
 	include []string // the variant's files, unless the user gave --include
 	to      string   // "" when the user's --to (or the default) stands
@@ -38,7 +40,7 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 	if ref, ok := local[name]; ok {
 		say(mode, "nickname", map[string]any{"name": name, "ref": ref.Display(), "from": c.LocalAliasesPath()},
 			fmt.Sprintf("%s = %s (your nickname, %s)", name, ref.Display(), c.LocalAliasesPath()))
-		return &nickname{ref: ref}, nil
+		return &nickname{name: name, ref: ref}, nil
 	}
 
 	list, note := publicAliases(c)
@@ -69,10 +71,36 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 			return nil, err
 		}
 	}
+	// what the user chose last time for this nickname, unless they say now
+	var remembered string
+	if f.forSize == "" && f.format == "" {
+		h, _ := c.History()
+		if last := lmget.LastNicknameChoice(h, name); last != nil {
+			opt.Budget, opt.Format = last.Choice.For, last.Choice.Format
+			var what []string
+			if last.Choice.For > 0 {
+				what = append(what, "--for "+lmget.HumanBytes(last.Choice.For))
+			}
+			if last.Choice.Format != "" {
+				what = append(what, "--format "+last.Choice.Format)
+			}
+			remembered = strings.Join(what, " and ") + " as you chose on " + last.Time.Local().Format(time.DateOnly) + " (history)"
+		}
+	}
 	ch, err := lmget.ChooseVariant(a, m, apps, opt)
+	if err != nil && remembered != "" {
+		// last time's choice does not fit any more (another target, less
+		// disk): it must not lock the user out, so lmget decides afresh
+		opt.Budget, opt.Format, remembered = 0, "", ""
+		ch, err = lmget.ChooseVariant(a, m, apps, opt)
+	}
 	if err != nil {
 		return nil, err
 	}
+	if remembered != "" {
+		ch.Why = append(ch.Why, remembered)
+	}
+	hc := &lmget.HistoryChoice{Variant: ch.Variant.Ref, Format: opt.Format, For: opt.Budget, Answer: "flag"}
 	showChoice(mode, name, a, m, apps, ch, note)
 
 	if !dry && !f.yes {
@@ -82,7 +110,10 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 				Fixes: []lmget.Fix{{Cmd: "lmget " + name + " --yes", Note: "accept the choice"},
 					{Cmd: "lmget " + strings.TrimPrefix(ch.Variant.Ref, "hf:") + " --to " + ch.Target, Note: "or name the model itself"}}}
 		}
+		hc.Answer = "yes"
 		if !confirm(os.Stdin, os.Stderr) {
+			hc.Answer = "no"
+			c.AppendHistory(lmget.HistoryEntry{Command: "get", Nickname: name, Choice: hc, Exit: int(lmget.ExitUsage)})
 			return nil, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: "nothing downloaded",
 				Fixes: []lmget.Fix{{Cmd: "lmget " + name + " --for 4GB", Note: "a smaller variant"},
 					{Cmd: "lmget " + name + " --format gguf", Note: "another format"}}}
@@ -92,7 +123,7 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 	if err != nil {
 		return nil, err
 	}
-	n := &nickname{ref: ref}
+	n := &nickname{name: name, choice: hc, ref: ref}
 	if len(f.include) == 0 {
 		n.include = ch.Variant.Include
 	}

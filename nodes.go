@@ -135,6 +135,24 @@ func (c *Client) nodeFiles(ref Ref, commit string, f File) []File {
 		nf.From = NodeOrigin + hostOf(n)
 		out = append(out, nf)
 	}
+	if len(c.opt.NodePreference) > 0 {
+		rank := map[string]int{}
+		for i, h := range c.opt.NodePreference {
+			rank[NodeOrigin+h] = i + 1
+		}
+		slices.SortStableFunc(out, func(a, b File) int {
+			ra, rb := rank[a.From], rank[b.From]
+			switch {
+			case ra != 0 && rb != 0:
+				return ra - rb
+			case ra != 0:
+				return -1
+			case rb != 0:
+				return 1
+			}
+			return 0
+		})
+	}
 	return out
 }
 

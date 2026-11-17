@@ -162,7 +162,16 @@ func run() lmget.ExitCode {
 	root.PersistentFlags().BoolVar(&f.json, "json", false, "emit one JSON event per line (schema v1)")
 	root.PersistentFlags().BoolVar(&f.plain, "plain", false, "plain log lines even on a terminal")
 	root.PersistentFlags().StringVar(&f.lockfile, "lockfile", lmget.DefaultLockName, "lockfile path")
-	root.AddCommand(get, info, sync, ls, rm, doctor, index)
+	history := &cobra.Command{
+		Use:   "history [clear]",
+		Short: "Show what lmget did here, or clear it (LMGET_HISTORY=off turns it off)",
+		Long: "lmget keeps a local record of its pulls (model, commit, bytes, origins, speed, how\n" +
+			"it ended, and how you took a nickname's proposal) in history.jsonl in the store, so it\n" +
+			"can order the index nodes by measured speed and remember your choice for a nickname.\n" +
+			"It holds no token, prompt or path outside the store, and goes nowhere.",
+		RunE: func(cmd *cobra.Command, args []string) error { code = doHistory(f, args); return nil },
+	}
+	root.AddCommand(get, info, sync, ls, rm, doctor, index, history)
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
 			Fixes: []lmget.Fix{{Cmd: c.CommandPath() + " --help"}}}
@@ -297,6 +306,7 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	preferFasterNodes(c)
 	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry, AcceptLicenseChange: f.acceptLic}
 	if locking && statErr == nil { // a model already in the lockfile keeps the license recorded there
 		l, err := lmget.ReadLock(f.lockfile)
@@ -320,7 +330,11 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 			return f.lockfile, nil
 		}
 	}
-	_, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts)
+	out, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts)
+	recordPull(c, "get", req, out, code, nick)
+	if code == lmget.ExitOK && !dry {
+		staleHint(c, mode)
+	}
 	return code
 }
 
@@ -361,6 +375,7 @@ func doSync(f flags, args []string) lmget.ExitCode {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	preferFasterNodes(c)
 	if mode == ui.ModeTTY {
 		verb := "sync"
 		if f.update {
@@ -384,7 +399,9 @@ func doSync(f flags, args []string) lmget.ExitCode {
 			}
 			return f.lockfile, nil
 		}}
-		if _, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts); code != lmget.ExitOK {
+		out, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts)
+		recordPull(c, "sync", req, out, code, nil)
+		if code != lmget.ExitOK {
 			return code
 		}
 	}
@@ -419,6 +436,7 @@ func doRm(f flags, arg string) lmget.ExitCode {
 	if err != nil {
 		return fail(mode, err)
 	}
+	c.AppendHistory(lmget.HistoryEntry{Command: "rm", Ref: ref.String()})
 	note := ""
 	if l, err := lmget.ReadLock(f.lockfile); err == nil {
 		for _, m := range l.Models {

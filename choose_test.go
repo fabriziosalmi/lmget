@@ -145,3 +145,18 @@ func TestFormatsForAppleSiliconLMStudio(t *testing.T) {
 		t.Errorf("LM Studio elsewhere: %v", f)
 	}
 }
+
+// Found live on 2026-11-17: whisper went into oMLX's directory. The apps run
+// chat models; other kinds go to the Hugging Face cache unless --to says so.
+func TestNonChatKindsGoToTheHFCache(t *testing.T) {
+	a := Alias{Kind: "transcribe", Family: "Whisper", Variants: []AliasVariant{
+		{Ref: "hf:openai/whisper-tiny", Params: "39M", Format: "safetensors", Bytes: 155e6, License: "mit"},
+	}}
+	c, err := ChooseVariant(a, mac16, []string{"omlx", "lmstudio"}, ChoiceOptions{})
+	if err != nil || c.Target != "hf" {
+		t.Fatalf("a transcriber went to %q (%v)", c.Target, err)
+	}
+	if c, err := ChooseVariant(a, mac16, []string{"omlx"}, ChoiceOptions{Target: "omlx"}); err != nil || c.Target != "omlx" {
+		t.Fatalf("--to omlx was not honoured: %q %v", c.Target, err)
+	}
+}
