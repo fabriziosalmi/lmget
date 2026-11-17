@@ -73,8 +73,8 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 	}
 	// what the user chose last time for this nickname, unless they say now
 	var remembered string
+	h, _ := c.History()
 	if f.forSize == "" && f.format == "" {
-		h, _ := c.History()
 		if last := lmget.LastNicknameChoice(h, name); last != nil {
 			opt.Budget, opt.Format = last.Choice.For, last.Choice.Format
 			var what []string
@@ -85,6 +85,18 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 				what = append(what, "--format "+last.Choice.Format)
 			}
 			remembered = strings.Join(what, " and ") + " as you chose on " + last.Time.Local().Format(time.DateOnly) + " (history)"
+		}
+	}
+	// a variant an app could not load for memory lately: stay below it
+	var tooBig string
+	if f.forSize == "" {
+		for ref, when := range lmget.MemoryCeiling(h, name, time.Now()) {
+			for _, v := range a.Variants {
+				if v.Ref == ref && (opt.Budget == 0 || v.Bytes <= opt.Budget) {
+					opt.Budget = v.Bytes - 1
+					tooBig = strings.TrimPrefix(ref, "hf:") + " did not fit in memory on " + when.Local().Format(time.DateOnly) + " (history)"
+				}
+			}
 		}
 	}
 	ch, err := lmget.ChooseVariant(a, m, apps, opt)
@@ -99,6 +111,9 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 	}
 	if remembered != "" {
 		ch.Why = append(ch.Why, remembered)
+	}
+	if tooBig != "" {
+		ch.Why = append(ch.Why, tooBig)
 	}
 	hc := &lmget.HistoryChoice{Variant: ch.Variant.Ref, Format: opt.Format, For: opt.Budget, Answer: "flag"}
 	showChoice(mode, name, a, m, apps, ch, note)

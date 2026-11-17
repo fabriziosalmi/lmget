@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -42,6 +43,9 @@ type flags struct {
 	yes         bool   // accept a nickname's choice
 	forSize     string // --for: memory a nickname's model may use
 	format      string // --format: a nickname's format
+	endpoint    string // run: an OpenAI-compatible server
+	modelID     string // run: the name the app knows the model by
+	maxTokens   int    // run: the longest answer
 }
 
 func main() { os.Exit(int(run())) }
@@ -171,7 +175,31 @@ func run() lmget.ExitCode {
 			"It holds no token, prompt or path outside the store, and goes nowhere.",
 		RunE: func(cmd *cobra.Command, args []string) error { code = doHistory(f, args); return nil },
 	}
-	root.AddCommand(get, info, sync, ls, rm, doctor, index, history)
+	run := &cobra.Command{
+		Use:   "run <model> [prompt...]",
+		Short: "Get a model, link it into the app that runs it, and ask it (lmget runs no model itself)",
+		Long: "run does what lmget get does, links the model where oMLX, LM Studio or Ollama loads\n" +
+			"it (or uses --endpoint, an OpenAI-compatible server), and sends the prompt to that\n" +
+			"running app. The answer goes to stdout. The prompt can also come on stdin.",
+		Example: "  lmget run qwen \"what model are you?\"\n" +
+			"  lmget run ollama:smollm2:135m \"hello\"\n" +
+			"  echo \"summarize: ...\" | lmget run qwen --yes",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			f.toChanged = cmd.Flags().Changed("to")
+			code = doRun(f, args)
+			return nil
+		},
+	}
+	rf := run.Flags()
+	rf.StringVar(&f.to, "to", "hf", "the app to run it in: omlx, lmstudio, ollama (default: an installed one that loads it)")
+	rf.StringVar(&f.endpoint, "endpoint", "", "an OpenAI-compatible server to ask instead (vLLM, llama-server); the model goes to the Hugging Face cache")
+	rf.StringVar(&f.modelID, "model-id", "", "the name the app knows the model by (default: found in its model list)")
+	rf.IntVar(&f.maxTokens, "max-tokens", 512, "the longest answer, in tokens")
+	rf.BoolVarP(&f.yes, "yes", "y", false, "with a nickname: accept the proposed model without asking")
+	rf.StringVar(&f.forSize, "for", "", "with a nickname: memory the model may use, e.g. 8GB")
+	rf.StringVar(&f.format, "format", "", "with a nickname: safetensors, mlx, gguf or ollama")
+	rf.IntVar(&f.conns, "conns", 8, "parallel connections per file")
+	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run)
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
 			Fixes: []lmget.Fix{{Cmd: c.CommandPath() + " --help"}}}
@@ -248,7 +276,26 @@ func fail(mode ui.Mode, err error) lmget.ExitCode {
 }
 
 func doPull(f flags, arg string, dry bool) lmget.ExitCode {
+	_, code := pullModel(f, arg, dry, "get", os.Stdout, nil)
+	return code
+}
+
+// pulled is a pull that went through: what run needs to ask the model.
+type pulled struct {
+	c    *lmget.Client
+	out  *lmget.Outcome
+	req  lmget.Request
+	nick *nickname
+}
+
+// pullModel is lmget get: nickname, target, lock, pull, history. chooseTo,
+// when set, picks the target of a model whose --to was not given (run needs
+// an app, not the Hugging Face cache). The path and the plan rows go to
+// stdout, which run points elsewhere: its stdout is the model's answer.
+func pullModel(f flags, arg string, dry bool, command string, stdout io.Writer,
+	chooseTo func(*lmget.Client, lmget.Ref, lmget.Selection) (string, error)) (*pulled, lmget.ExitCode) {
 	mode := outputMode(f)
+	fail := func(mode ui.Mode, err error) (*pulled, lmget.ExitCode) { return nil, fail(mode, err) }
 	var nick *nickname
 	if lmget.IsAliasName(arg) {
 		c, err := lmget.New(lmget.Options{})
@@ -282,13 +329,22 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 	case ref.Source == "oci" && !f.toChanged:
 		to = "dir:./" + path.Base(ref.Repo) // no runtime reads OCI models from a cache lmget knows
 	}
-	target, err := lmget.ParseTarget(to)
-	if err != nil {
-		return fail(mode, err)
-	}
 	sel := lmget.Selection{Include: f.include, Exclude: f.exclude, AllowPickle: f.allowPickle}
 	if ref.File != "" { // .../resolve/<rev>/<file>: that file only, recorded as a selection
 		sel.Include = []string{lmget.GlobEscape(ref.File)}
+	}
+	if chooseTo != nil && !f.toChanged {
+		c, err := lmget.New(lmget.Options{})
+		if err != nil {
+			return fail(mode, err)
+		}
+		if to, err = chooseTo(c, ref, sel); err != nil {
+			return fail(mode, err)
+		}
+	}
+	target, err := lmget.ParseTarget(to)
+	if err != nil {
+		return fail(mode, err)
 	}
 	_, statErr := os.Stat(f.lockfile)
 	locking := !dry && (f.lock || statErr == nil)
@@ -330,12 +386,12 @@ func doPull(f flags, arg string, dry bool) lmget.ExitCode {
 			return f.lockfile, nil
 		}
 	}
-	out, code := ui.Run(ctx, mode, c, req, os.Stdout, os.Stderr, opts)
-	recordPull(c, "get", req, out, code, nick)
-	if code == lmget.ExitOK && !dry {
+	out, code := ui.Run(ctx, mode, c, req, stdout, os.Stderr, opts)
+	recordPull(c, command, req, out, code, nick)
+	if code == lmget.ExitOK && !dry && command == "get" {
 		staleHint(c, mode)
 	}
-	return code
+	return &pulled{c: c, out: out, req: req, nick: nick}, code
 }
 
 func doSync(f flags, args []string) lmget.ExitCode {

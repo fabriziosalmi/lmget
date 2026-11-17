@@ -93,6 +93,26 @@ mine = "hf:mlx-community/Qwen3.5-4B-4bit"
 asr  = "openai/whisper-small"
 ```
 
+## lmget run
+
+```sh
+lmget run qwen "what model are you?"            # a nickname: proposal, yes, download, ask
+lmget run ollama:smollm2:135m "hello"
+lmget run mlx-community/Qwen3.5-0.8B-4bit "hi" --to omlx
+lmget run Qwen/Qwen3-0.6B "hi" --endpoint http://127.0.0.1:8000   # vLLM, llama-server, ...
+echo "summarize this" | lmget run qwen --yes
+```
+
+`run` does what `lmget get` does, links the model where an app loads it, and sends the prompt to that running app; lmget itself runs no model. The answer goes to stdout, the reasoning of a model that thinks aloud to stderr, and with `--json` both come as one `answer` event (`app`, `url`, `model`, `text`, `first_token_s`, `total_s`). `--max-tokens` caps the answer (default 512).
+
+- The app: for a nickname, the one the proposal names; for an Ollama model, Ollama; for a Hugging Face model, the first installed app among oMLX and LM Studio that can load the files. `--to` names it. `--endpoint` asks an OpenAI-compatible server instead, and puts the model in the Hugging Face cache, where such servers read it.
+- The address: oMLX's `server.host` and `server.port` in its settings (only those keys are read), else `127.0.0.1:8000`, or `LMGET_OMLX_URL`; LM Studio at `127.0.0.1:1234`, or `LMGET_LMSTUDIO_URL`; Ollama at `OLLAMA_HOST`, else `127.0.0.1:11434`. An app is recognised by how it answers, not by its port: a server on that port that is another app is refused. When the address is not this machine, lmget says that the prompt goes there.
+- oMLX discovers models when it starts. After linking a model, lmget asks oMLX to look again (`/admin/api/reload`), which oMLX allows with its API key, given to lmget in `LMGET_OMLX_API_KEY`, or on loopback with its key verification turned off; otherwise lmget says to restart oMLX. lmget never reads another app's keys. `LMGET_LMSTUDIO_API_KEY` and `LMGET_RUN_API_KEY` (for `--endpoint`) are sent when set.
+- When the app has not enough memory, lmget says so in the app's words and records it in the history; for 7 days a nickname then proposes a variant smaller than the one that did not fit, and says why.
+- The prompt and the answer are never written to the history.
+
+Checked live on 2026-11-17 with oMLX 0.8.0rc1 on an M4 Pro with 16 GB: the model was linked, oMLX reloaded and listed it, and its memory guard refused the prompt (it needed about 1.17 GB, the machine had 0.07 GB free); lmget reported it as a memory error. Ollama and LM Studio are covered by tests against simulated servers only.
+
 ## oMLX and LM Studio
 
 ```sh
@@ -226,6 +246,7 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 
 | type | fields |
 |---|---|
+| `answer` | `lmget run` only: `app`, `url`, `model`, `text`, `first_token_s`, `total_s` |
 | `nickname` | `name`, then either `ref` and `from` (the user's own nickname and its file) or `kind`, `family`, `machine` (`os`, `arch`, `apple_silicon`, `total_mem`, `avail_mem`, `gpu`, `vram_total`, `vram_free`, `container_cap`), `apps`, `choice` (`variant`, `target`, `budget`, `why[]`, `bigger`, `tight`) and `note` |
 | `resolve` | `ref` |
 | `plan` | `plan`: `ref` (`source`: `hf`, `ollama`, `oci`, `url`; `repo`, `revision`, `file`, `sha256`), `commit`, `license`, `gated`, `hash_from` (URLs: `user`, `server`, `first`), `files[]` (`path`, `size`, `sha256`, `git_sha1`, `cached`, `skipped`), `bytes`, `to_fetch`, `pickle`, `disk_free`, `from_index` (the plan came from the signed index) |

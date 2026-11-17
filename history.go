@@ -215,6 +215,19 @@ func LastNicknameChoice(h []HistoryEntry, name string) *HistoryEntry {
 	return nil
 }
 
+// MemoryCeiling returns, from the last 7 days of lmget run, the variants
+// of a nickname that an app could not load for lack of memory: a proposal
+// stays below the smallest of them.
+func MemoryCeiling(h []HistoryEntry, name string, now time.Time) map[string]time.Time {
+	out := map[string]time.Time{}
+	for _, e := range h {
+		if e.Command == "run" && e.Nickname == name && e.Error == "memory" && e.Choice != nil && now.Sub(e.Time) < 7*24*time.Hour {
+			out[e.Choice.Variant] = e.Time
+		}
+	}
+	return out
+}
+
 // PreferNodes sets the order in which index nodes are asked (see
 // Options.NodePreference).
 func (c *Client) PreferNodes(hosts []string) { c.opt.NodePreference = hosts }
