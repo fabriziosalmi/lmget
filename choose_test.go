@@ -1,6 +1,7 @@
 package lmget
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,7 @@ func qwenAlias() Alias {
 		v("hf:Qwen/Qwen3.5-4B", "4B", "safetensors", 9.34),
 		v("hf:Qwen/Qwen3.5-9B", "9B", "safetensors", 19.33),
 		v("hf:mlx-community/Qwen3.5-0.8B-4bit", "0.8B", "mlx", 0.65),
+		v("hf:lmstudio-community/Qwen3.5-4B-MLX-4bit", "4B", "mlx", 3.03),
 		v("hf:mlx-community/Qwen3.5-9B-4bit", "9B", "mlx", 5.98),
 		v("hf:unsloth/Qwen3.5-4B-GGUF", "4B", "gguf", 2.58),
 		v("hf:unsloth/Qwen3.5-9B-GGUF", "9B", "gguf", 5.38),
@@ -22,7 +24,8 @@ func qwenAlias() Alias {
 }
 
 var (
-	mac16  = Machine{OS: "darwin", Arch: "arm64", AppleSilicon: true, TotalMem: 16e9, AvailMem: 8e9}
+	mac16  = Machine{OS: "darwin", Arch: "arm64", AppleSilicon: true, TotalMem: 17.18e9, AvailMem: 8e9} // 16 GiB, as macOS reports it
+	mac32  = Machine{OS: "darwin", Arch: "arm64", AppleSilicon: true, TotalMem: 34.36e9, AvailMem: 20e9}
 	pc8    = Machine{OS: "linux", Arch: "amd64", TotalMem: 8e9, AvailMem: 6e9}
 	gpu24  = Machine{OS: "linux", Arch: "amd64", TotalMem: 64e9, AvailMem: 40e9, GPU: "RTX", VRAMTotal: 24e9}
 	box512 = Machine{OS: "linux", Arch: "amd64", TotalMem: 512e6, ContainerCap: true}
@@ -37,13 +40,14 @@ func TestChooseVariant(t *testing.T) {
 		ref    string
 		target string
 	}{
-		{"Mac with oMLX: the largest MLX in 60% of 16 GB", mac16, []string{"omlx", "ollama"}, ChoiceOptions{}, "hf:mlx-community/Qwen3.5-9B-4bit", "omlx"},
+		{"Mac with oMLX: the largest MLX in 30% of 16 GB, not the 9B", mac16, []string{"omlx", "ollama"}, ChoiceOptions{}, "hf:lmstudio-community/Qwen3.5-4B-MLX-4bit", "omlx"},
 		{"--for picks smaller", mac16, []string{"omlx"}, ChoiceOptions{Budget: 1e9}, "hf:mlx-community/Qwen3.5-0.8B-4bit", "omlx"},
 		{"--to ollama", mac16, []string{"omlx"}, ChoiceOptions{Target: "ollama"}, "ollama:qwen3.5:4b", "ollama"},
 		{"PC with LM Studio: GGUF in half of 8 GB", pc8, []string{"lmstudio"}, ChoiceOptions{}, "hf:unsloth/Qwen3.5-4B-GGUF", "lmstudio"},
 		{"PC without apps: the HF cache, safetensors", pc8, nil, ChoiceOptions{}, "hf:Qwen/Qwen3.5-0.8B", "hf"},
 		{"NVIDIA 24 GB: safetensors in 85% of the VRAM", gpu24, nil, ChoiceOptions{}, "hf:Qwen/Qwen3.5-9B", "hf"},
-		{"--format gguf skips an app that cannot load it", mac16, []string{"omlx", "lmstudio"}, ChoiceOptions{Format: "gguf"}, "hf:unsloth/Qwen3.5-9B-GGUF", "lmstudio"},
+		{"--format gguf skips an app that cannot load it", mac16, []string{"omlx", "lmstudio"}, ChoiceOptions{Format: "gguf"}, "hf:unsloth/Qwen3.5-4B-GGUF", "lmstudio"},
+		{"a 32 GB Mac takes the 9B", mac32, []string{"omlx"}, ChoiceOptions{}, "hf:mlx-community/Qwen3.5-9B-4bit", "omlx"},
 		{"disk too small for the largest", mac16, []string{"omlx"}, ChoiceOptions{DiskFree: 2e9}, "hf:mlx-community/Qwen3.5-0.8B-4bit", "omlx"},
 	}
 	for _, tc := range cases {
@@ -72,7 +76,7 @@ func TestChooseVariantSaysWhatIsShortOrBigger(t *testing.T) {
 		t.Error("1.5 GB free under a 6 GB model is not reported")
 	}
 	c, err = ChooseVariant(qwenAlias(), mac16, []string{"omlx"}, ChoiceOptions{Budget: 1e9})
-	if err != nil || c.Bigger == nil || c.Bigger.Ref != "hf:mlx-community/Qwen3.5-9B-4bit" {
+	if err != nil || c.Bigger == nil || c.Bigger.Ref != "hf:lmstudio-community/Qwen3.5-4B-MLX-4bit" {
 		t.Fatalf("the next size up is not named: %+v %v", c.Bigger, err)
 	}
 	if c.Tight {
@@ -158,5 +162,22 @@ func TestNonChatKindsGoToTheHFCache(t *testing.T) {
 	}
 	if c, err := ChooseVariant(a, mac16, []string{"omlx"}, ChoiceOptions{Target: "omlx"}); err != nil || c.Target != "omlx" {
 		t.Fatalf("--to omlx was not honoured: %q %v", c.Target, err)
+	}
+}
+
+// Found live: "the smallest is 5.15 GB, over 5.15 GB" and a --for 16GB out
+// of nowhere. Sizes that round alike get one more decimal, and --for names
+// the smallest variant.
+func TestNoFitSaysByHowMuch(t *testing.T) {
+	a := Alias{Kind: "chat", Family: "Gemma 4", Variants: []AliasVariant{
+		{Ref: "hf:google/gemma-4-E4B-it-qat-q4_0-gguf", Params: "E4B", Format: "gguf", Bytes: 5_154_000_000, License: "apache-2.0"},
+	}}
+	_, err := ChooseVariant(a, mac16, nil, ChoiceOptions{Budget: 5_153_960_755})
+	e := AsError(err)
+	if e == nil || !strings.Contains(e.Why, "5.154 GB, over 5.154 GB") && !strings.Contains(e.Why, "5.154 GB, over 5.153 GB") {
+		t.Fatalf("why: %q", e.Why)
+	}
+	if fmt.Sprint(e.Fixes) == "" || !strings.Contains(fmt.Sprint(e.Fixes), "--for 6GB") {
+		t.Fatalf("fixes: %v", e.Fixes)
 	}
 }

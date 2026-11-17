@@ -88,8 +88,11 @@ func budgetFor(m Machine, format string) (int64, string) {
 		return m.VRAMTotal * 85 / 100, fmt.Sprintf("85%% of the %s of the %s", HumanBytes(m.VRAMTotal), m.GPU)
 	}
 	if m.AppleSilicon {
-		// unified memory: macOS lets the GPU wire about two thirds of it
-		return m.TotalMem * 60 / 100, fmt.Sprintf("60%% of %s unified memory", HumanBytes(m.TotalMem))
+		// unified memory, shared with macOS, the apps and the model's
+		// context cache. On a 16 GB Mac, an 8B model at 4 bits (4.35 GB)
+		// runs and a 9B one (5.98 GB) does not, in Fab's experience: 30%
+		// (5.15 GB there) keeps the first and leaves out the second
+		return m.TotalMem * 30 / 100, fmt.Sprintf("30%% of %s unified memory", HumanBytes(m.TotalMem))
 	}
 	what := "RAM"
 	if m.ContainerCap {
@@ -119,6 +122,7 @@ func ChooseVariant(a Alias, m Machine, apps []string, o ChoiceOptions) (Choice, 
 		targets = append(append([]string{}, apps...), "hf")
 	}
 	var why []string
+	var smallest int64 // the smallest variant that did not fit, for the --for suggestion
 	for _, t := range targets {
 		formats := formatsFor(t, m)
 		if o.Format != "" {
@@ -153,7 +157,11 @@ func ChooseVariant(a Alias, m Machine, apps []string, o ChoiceOptions) (Choice, 
 				}
 			}
 			if pick < 0 {
-				why = append(why, fmt.Sprintf("%s for %s: the smallest is %s, over %s (%s)", f, TargetName(t), HumanBytes(vs[0].Bytes), HumanBytes(budget), from))
+				a, b := apart(vs[0].Bytes, budget)
+				why = append(why, fmt.Sprintf("%s for %s: the smallest is %s, over %s (%s)", f, TargetName(t), a, b, from))
+				if smallest == 0 || vs[0].Bytes < smallest {
+					smallest = vs[0].Bytes
+				}
 				continue
 			}
 			c := Choice{Variant: vs[pick], Target: t, Budget: budget}
@@ -181,7 +189,21 @@ func ChooseVariant(a Alias, m Machine, apps []string, o ChoiceOptions) (Choice, 
 	if len(why) > 0 {
 		e = e.why("%s", strings.Join(why, "; "))
 	}
-	return Choice{}, e.fix("--for 16GB", "allow more memory").fix("--format gguf", "or another format")
+	if smallest > 0 {
+		need := fmt.Sprintf("--for %dGB", (smallest+999_999_999)/1_000_000_000)
+		e = e.fix(need, "allow the smallest variant ("+HumanBytes(smallest)+"), if this machine can take it")
+	}
+	return Choice{}, e.fix("--format gguf", "or another format")
+}
+
+// apart prints two sizes so that they read different when they are: one
+// decimal more when the usual one makes them look equal.
+func apart(a, b int64) (string, string) {
+	sa, sb := HumanBytes(a), HumanBytes(b)
+	if sa == sb && a != b {
+		return fmt.Sprintf("%.3f GB", float64(a)/1e9), fmt.Sprintf("%.3f GB", float64(b)/1e9)
+	}
+	return sa, sb
 }
 
 // TargetName is how lmget names a target to people.
