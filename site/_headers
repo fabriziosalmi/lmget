@@ -4,8 +4,6 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), midi=(), accelerometer=(), gyroscope=(), magnetometer=(), interest-cohort=(), browsing-topics=(), clipboard-read=(), clipboard-write=(self)
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
-  ! NEL
-  ! Report-To
 /index.json
   Cache-Control: no-cache
   Content-Type: application/json
