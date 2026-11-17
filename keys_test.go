@@ -57,6 +57,12 @@ func (rt *rotation) publishKeys(by signer, kl KeyList) {
 }
 
 // update publishes an index of seq signed by s and fetches it.
+func (rt *rotation) publishAndUpdate(s signer, ix Index) error {
+	publish(rt.is, s, ix)
+	_, err := rt.c.UpdateIndex(context.Background())
+	return err
+}
+
 func (rt *rotation) update(s signer, seq int64) error {
 	publish(rt.is, s, sampleIndex(seq))
 	_, err := rt.c.UpdateIndex(context.Background())
@@ -311,7 +317,11 @@ func TestAFailedIndexWriteCannotLetThePreviousIndexBack(t *testing.T) {
 	p, _ := rt.c.indexPaths()
 	os.Remove(p)
 	os.Mkdir(p, 0o755) // the data cannot be written: a crash at that point
-	if err := rt.update(rt.k1, 6); err == nil {
+	// one index 6, published twice: built twice, its dates could fall in two
+	// different seconds, and two different indexes with one sequence are
+	// rightly refused (the cause of a flaky run on 2026-11-17)
+	six := sampleIndex(6)
+	if err := rt.publishAndUpdate(rt.k1, six); err == nil {
 		t.Fatal("the index was written over a directory")
 	}
 	os.Remove(p)
@@ -319,7 +329,7 @@ func TestAFailedIndexWriteCannotLetThePreviousIndexBack(t *testing.T) {
 	if _, err := rt.c.UpdateIndex(context.Background()); codeOf(err) != ExitVerify || !strings.Contains(err.Error(), "older") {
 		t.Fatalf("the previous index after a failed write: %v", err)
 	}
-	if err := rt.update(rt.k1, 6); err != nil {
+	if err := rt.publishAndUpdate(rt.k1, six); err != nil {
 		t.Fatalf("the genuine newer index is refused: %v", err)
 	}
 }

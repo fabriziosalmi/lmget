@@ -205,3 +205,31 @@ func fileData(t *testing.T, f *fakeHF, p string) []byte {
 	t.Fatalf("no fake file %s", p)
 	return nil
 }
+
+// Found by the 2026-11-17 docs review: a target that cannot hold the model
+// was refused only after the download. Now nothing is fetched.
+func TestATargetThatCannotHoldTheModelCostsNoDownload(t *testing.T) {
+	gguf := []fakeFile{{path: "m-Q4_K_M.gguf", data: fakeGGUF(5000), lfs: true}}
+	for name, tc := range map[string]struct {
+		files  []fakeFile
+		target Target
+	}{
+		"hf model to Ollama":      {modelFiles(), Target{Kind: "ollama"}},
+		"GGUF-only model to oMLX": {gguf, Target{Kind: "omlx", Path: t.TempDir()}},
+		"selection to Ollama dir": {modelFiles(), Target{Kind: "ollama"}},
+	} {
+		f := &fakeHF{files: tc.files}
+		srv := httptest.NewServer(f.handler())
+		c := newTestClient(t, srv, t.TempDir())
+		_, err := c.Pull(t.Context(), Request{Ref: hfRef("org/m"), Target: tc.target}, nil)
+		srv.Close()
+		if AsError(err).Code != ExitUsage {
+			t.Errorf("%s: got %v, want a usage error", name, err)
+		}
+		for _, x := range tc.files {
+			if c.store.Has(sha(x.data), int64(len(x.data))) {
+				t.Errorf("%s: %s was downloaded before the refusal", name, x.path)
+			}
+		}
+	}
+}

@@ -95,6 +95,10 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		return nil, newErr(ExitUsage, "usage", "no files selected").
 			fix("lmget info "+r.Ref.Display(), "list the files, then adjust --include / --exclude")
 	}
+	// before a single byte: a target that cannot hold the model wastes none
+	if err := TargetAccepts(plan, r.Target); err != nil {
+		return nil, err
+	}
 	// keep a margin so a full disk never ends half way through
 	if margin := int64(512 << 20); plan.DiskFree >= 0 && plan.ToFetch+margin > plan.DiskFree {
 		return nil, newErr(ExitDisk, "disk", "not enough free space").

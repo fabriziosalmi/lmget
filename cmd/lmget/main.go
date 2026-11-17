@@ -12,6 +12,7 @@ import (
 	"path"
 	"strings"
 	"syscall"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func run() lmget.ExitCode {
 
 	root := &cobra.Command{
 		Use:   "lmget <model>",
-		Short: "Get open models from any source, verified.",
+		Short: "Get open models from their sources, verified.",
 		Long: "lmget resolves a model at its source, shows what it will download, fetches it with\n" +
 			"resumable parallel requests, verifies every file against the hash the source publishes,\n" +
 			"and links it where your tools look for it (the Hugging Face cache by default).",
@@ -229,7 +230,7 @@ func outputMode(f flags) ui.Mode {
 func fail(mode ui.Mode, err error) lmget.ExitCode {
 	e := lmget.AsError(err)
 	if mode == ui.ModeJSON {
-		b, _ := json.Marshal(map[string]any{"v": lmget.SchemaVersion, "type": "error", "error": e})
+		b, _ := json.Marshal(map[string]any{"v": lmget.SchemaVersion, "type": "error", "time": time.Now().UTC(), "error": e})
 		fmt.Fprintln(os.Stdout, string(b))
 	} else {
 		printErr(e)
