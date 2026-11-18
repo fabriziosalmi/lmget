@@ -276,6 +276,9 @@ func (c *Client) fetchRange(ctx context.Context, f File, out *os.File, off, size
 				req.Header.Set("If-Range", f.ifRange)
 			}
 		}
+		if f.s3 { // a private bucket: signed for each attempt, so the date stays fresh
+			c.s3.sign(req, time.Now())
+		}
 		return req, nil
 	}
 	var resp *http.Response

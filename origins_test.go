@@ -171,7 +171,7 @@ func TestALyingOriginIsSkipped(t *testing.T) {
 	o.mu.Lock()
 	before := len(o.asked)
 	o.mu.Unlock()
-	if _, _, ok := c.fromOrigins(context.Background(), File{Path: "x", Size: 3, SHA256: strings.Repeat("a", 64)}, t.TempDir()+"/p", t.TempDir()+"/s", &counters{}); ok {
+	if _, _, ok, _ := c.fromOrigins(context.Background(), File{Path: "x", Size: 3, SHA256: strings.Repeat("a", 64)}, t.TempDir()+"/p", t.TempDir()+"/s", &counters{}); ok {
 		t.Fatal("a skipped origin served a file")
 	}
 	if len(o.asked) != before {

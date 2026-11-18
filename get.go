@@ -277,7 +277,9 @@ func (c *Client) getFile(ctx context.Context, ref Ref, commit string, f *File, d
 	} else {
 		// first the user's origins; a plan from the index has no source URL
 		err = noOrigin()
-		if of, s, ok := c.fromOrigins(ctx, *f, part, state, &cnt); ok {
+		if of, s, ok, oerr := c.fromOrigins(ctx, *f, part, state, &cnt); oerr != nil {
+			err = oerr
+		} else if ok {
 			f.From, sum, err = of.From, s, nil
 		} else if f.url != "" {
 			cnt.done.Store(0)

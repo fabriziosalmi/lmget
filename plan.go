@@ -31,6 +31,8 @@ type File struct {
 	data []byte
 	// ociRepo: the blob is on an OCI registry and needs its pull token
 	ociRepo string
+	// s3: the blob is in a private bucket (an s3:// origin): every request is signed
+	s3 bool
 }
 
 // Selected reports whether the file will be fetched or exported.
