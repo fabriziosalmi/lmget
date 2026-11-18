@@ -3,16 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <title>lmget: get open models from their sources, verified</title>
 <meta name="description" content="A command-line tool that downloads open model weights from their sources and checks every file against the hash its source publishes, or the one you pin.">
 <link rel="stylesheet" href="/site.css">
-<link rel="icon" href="/lmget-dark.svg" type="image/svg+xml">
+<link rel="icon" href="/lmget-light.svg" type="image/svg+xml" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/lmget-dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)">
 <script type="module" src="/app.js"></script>
 </head>
 <body>
 <main>
-  <h1><img src="/lmget-dark.svg" alt="lmget" width="212" height="64"></h1>
+  <h1><picture><source srcset="/lmget-dark.svg" media="(prefers-color-scheme: dark)"><img src="/lmget-light.svg" alt="lmget" width="212" height="64"></picture></h1>
   <p class="lead">Get open models from their sources, verified.</p>
 
   <section aria-labelledby="install">
@@ -67,6 +70,13 @@ lmget: done bytes=91335425 fetched=91335425 elapsed=13.8s</code></pre>
       <li>When Hugging Face fails, a signed index and mirror nodes keep the models it lists available, even to a first run.</li>
       <li>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</li>
     </ul>
+  </section>
+
+  <section aria-labelledby="nicknames">
+    <h2 id="nicknames">Nicknames</h2>
+    <div id="aliases-panel">
+      <p class="note">The <a href="/aliases.json">signed nickname list</a> maps names such as <code>qwen</code> to the variants of a model family; lmget picks the one that fits the machine and asks before downloading.</p>
+    </div>
   </section>
 
   <section aria-labelledby="mirror">

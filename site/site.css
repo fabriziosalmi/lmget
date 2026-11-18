@@ -1,15 +1,28 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
+  /* dark: OLED black */
   --bg: #000;
   --fg: #e8e8e8;
-  --dim: #9a9a9a;
+  --dim: #9a9a9a; /* 7.6:1 on black */
   --accent: #3ddc97;
   --rule: #1f1f1f;
+  --bad: #ff8a80;
   background: var(--bg);
   color: var(--fg);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 100%;
   line-height: 1.6;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fff;
+    --fg: #111;
+    --dim: #595959; /* 7:1 on white */
+    --accent: #0a7a4b; /* 5.4:1 on white: text-safe */
+    --rule: #e5e5e5;
+    --bad: #b3261e;
+  }
 }
 
 body {
@@ -167,8 +180,8 @@ section {
 }
 
 .copy-button[data-failed] {
-  color: #ff8a80;
-  border-color: #ff8a80;
+  color: var(--bad);
+  border-color: var(--bad);
 }
 
 .tip {
@@ -263,4 +276,169 @@ th {
 .num {
   text-align: end;
   font-variant-numeric: tabular-nums;
+}
+
+/* --- entrance: install first, then use; a thread of light runs along each
+   terminal's border and both fade together once both are in. Opacity and
+   transform only, so nothing on the page moves. --- */
+
+@property --trace {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes block-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes trace-run {
+  to {
+    --trace: 360deg;
+  }
+}
+
+@keyframes trace-life {
+  0% {
+    opacity: 0;
+  }
+  15%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  section .block {
+    animation: block-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  section .block::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: 6px;
+    background: conic-gradient(from var(--trace), transparent 0deg, var(--accent) 50deg, transparent 110deg, transparent 360deg);
+    /* only the 1px ring: the padding box minus the content box */
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    animation:
+      trace-run 1.4s linear infinite,
+      trace-life 2.4s ease-in-out forwards;
+  }
+
+  /* the second block starts 0.5 s later and its light lasts 0.5 s less:
+     both fade out at the same moment */
+  #use ~ .block {
+    animation-delay: 0.5s;
+  }
+
+  #use ~ .block::before {
+    animation-duration: 1.4s, 1.9s;
+    animation-delay: 0.5s, 0.5s;
+  }
+}
+
+/* --- the signed index, as data --- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0 0 1.25rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.stat-value {
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.stat-label {
+  color: var(--dim);
+  font-size: 0.8125rem;
+}
+
+.stat.warn .stat-value {
+  color: var(--bad);
+}
+
+/* one segment per model, as wide as its share of the bytes */
+.strip {
+  display: flex;
+  gap: 2px;
+  block-size: 6px;
+  margin: 0 0 1rem;
+}
+
+.strip span {
+  flex-basis: 0;
+  min-inline-size: 2px;
+  background: var(--fg);
+  opacity: 0.22;
+  border-radius: 1px;
+  transition: opacity 0.15s;
+}
+
+.strip span[data-on] {
+  background: var(--accent);
+  opacity: 1;
+}
+
+tr[data-on] td {
+  color: var(--accent);
+}
+
+td.mono {
+  font-weight: 600;
+}
+
+.dimmed {
+  color: var(--dim);
+}
+
+/* text columns wrap; numbers stay on one line */
+.wrap-text td:not(.num) {
+  white-space: normal;
+}
+
+/* on a phone the formats column gives its room to the sizes */
+@media (max-width: 30rem) {
+  .wrap-text th:nth-child(3),
+  .wrap-text td:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip span {
+    transition: none;
+  }
+}
+
+th:last-child,
+td:last-child {
+  padding-inline-end: 0;
 }
