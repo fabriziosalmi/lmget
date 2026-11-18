@@ -7,6 +7,9 @@
   --accent: #3ddc97;
   --rule: #1f1f1f;
   --bad: #ff8a80;
+  --faint: #6f6f6f;
+  --panel: #0a0a0a;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: var(--bg);
   color: var(--fg);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -22,17 +25,19 @@
     --accent: #0a7a4b; /* 5.4:1 on white: text-safe */
     --rule: #e5e5e5;
     --bad: #b3261e;
+    --faint: #8a8a8a;
+    --panel: #fafafa;
   }
 }
 
 body {
   margin: 0;
-  padding: clamp(1.5rem, 1rem + 4vw, 4rem) 1.25rem;
 }
 
 main {
   max-inline-size: 64ch;
   margin-inline: auto;
+  padding: 0 1.25rem clamp(1.5rem, 1rem + 4vw, 4rem);
 }
 
 h1 {
@@ -115,7 +120,7 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-nav {
+main > nav {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1.5rem;
@@ -447,23 +452,265 @@ td:last-child {
   padding-inline-end: 0;
 }
 
-/* the flow diagram: as wide as the page allows, never wider than drawn */
-/* wider than the text column, centred on it: drawn at 960px, its small
-   labels stay legible; on narrow screens it takes the width there is */
+/* --- the top bar and the hero: the system sans for prose, the monospace
+   for what you type and for data --- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-inline-size: 70rem;
+  margin-inline: auto;
+  padding: 0 1.25rem;
+  block-size: 3.75rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+}
+
+.bar::after {
+  /* the hairline runs the full width, under a centred bar */
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 3.75rem;
+  border-block-end: 1px solid var(--rule);
+}
+
+.brand img {
+  display: block;
+  inline-size: auto;
+  block-size: 1.375rem;
+}
+
+.bar nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.bar nav a {
+  color: var(--dim);
+  text-decoration: none;
+}
+
+.bar nav a:hover,
+.bar nav a:focus-visible {
+  color: var(--fg);
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  max-inline-size: 70rem;
+  margin-inline: auto;
+  padding: clamp(4rem, 2rem + 6vw, 6.5rem) 1.25rem 0;
+  text-align: center;
+  font-family: var(--sans);
+}
+
+.pill {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--dim);
+  font: 500 0.8125rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-decoration: none;
+}
+
+.pill b {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.pill:hover,
+.pill:focus-visible {
+  color: var(--fg);
+  border-color: var(--dim);
+}
+
+.hero h1 {
+  max-inline-size: 13em;
+  margin: 0.25rem 0 0;
+  font-size: clamp(2.5rem, 1.2rem + 5vw, 4.75rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.sub {
+  max-inline-size: 34em;
+  margin: 0;
+  color: var(--dim);
+  font-size: clamp(1.0625rem, 0.95rem + 0.5vw, 1.25rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.hero .install {
+  inline-size: min(33rem, 100%);
+  margin-block-start: 0.75rem;
+  text-align: start;
+}
+
+.hero .install pre {
+  margin: 0;
+  padding: 0.95rem 5.5rem 0.95rem 1.1rem;
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 0.9375rem;
+}
+
+.hero .install pre::before {
+  content: "$ ";
+  color: var(--faint);
+}
+
+.hero .install .copy {
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+}
+
+.hero .install .copy-button {
+  padding: 0.45rem 0.85rem;
+  border-radius: 7px;
+  color: var(--fg);
+  font-family: var(--sans);
+  font-weight: 500;
+}
+
+.hero .install .tip {
+  font-family: var(--sans);
+}
+
+.alt {
+  margin: -0.75rem 0 0;
+  color: var(--dim);
+  font-size: 0.875rem;
+}
+
+.alt code {
+  color: var(--fg);
+  font-size: 0.8125rem;
+}
+
+.nw {
+  white-space: nowrap;
+}
+
+.hero pre,
+.hero code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+/* the facts: read from the signed files, one cell each */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  inline-size: 100%;
+  margin-block-start: 3.5rem;
+  border-block-start: 1px solid var(--rule);
+  text-align: start;
+}
+
+.facts[hidden] {
+  display: none;
+}
+
+.facts .stat {
+  gap: 0.5rem;
+  padding: 1.75rem 1.5rem 2rem 0;
+}
+
+.facts .stat + .stat {
+  padding-inline-start: 1.5rem;
+  border-inline-start: 1px solid var(--rule);
+}
+
+.facts .stat-value {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.facts .stat-label {
+  font-size: 0.875rem;
+}
+
+.facts-source {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--faint);
+  font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.facts-source a {
+  color: inherit;
+}
+
+/* the flow diagram: drawn at 960px wide (360px for phones), under a hairline */
 .flow {
-  inline-size: min(960px, calc(100vw - 2.5rem));
-  margin: 0 0 2.5rem calc(50% - min(480px, calc(50vw - 1.25rem)));
+  margin: 2.5rem 0 0;
+  padding: clamp(3rem, 2rem + 3vw, 4.5rem) 1.25rem;
+  border-block-start: 1px solid var(--rule);
 }
 
 .flow img {
   display: block;
   inline-size: 100%;
+  max-inline-size: 960px;
   block-size: auto;
+  margin-inline: auto;
 }
 
 @media (max-width: 720px) {
-  .flow {
-    inline-size: min(360px, 100%);
-    margin-inline: auto;
+  .bar nav a.opt {
+    display: none;
+  }
+
+  .hero .install pre {
+    padding: 0.75rem 5rem 0.75rem 0.95rem;
+    font-size: 0.8125rem;
+  }
+
+  .hero .install pre::before {
+    content: none;
+  }
+
+  .facts {
+    grid-template-columns: 1fr 1fr;
+    margin-block-start: 2.5rem;
+  }
+
+  .facts .stat {
+    padding: 1.25rem 0.75rem 1.25rem 0;
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .facts .stat + .stat {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
+  .facts .stat:nth-child(even) {
+    padding-inline-start: 1rem;
+    border-inline-start: 1px solid var(--rule);
+  }
+
+  .facts .stat:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .facts-source {
+    padding-block-start: 1rem;
+  }
+
+  .flow img {
+    max-inline-size: 360px;
   }
 }
