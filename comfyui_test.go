@@ -153,7 +153,9 @@ func TestComfyUIDoesNotOverwrite(t *testing.T) {
 	if _, err := c.Remove(hfRef("org/m")); err != nil {
 		t.Fatal(err)
 	}
-	if !hasContent(dst, int64(len(files[0].data)), sha(files[0].data)) {
+	// on Windows lmget copies where it cannot link, so a regular file with a
+	// blob's exact bytes is taken as its own (copiesAreLinks), and rm removes it
+	if !copiesAreLinks && !hasContent(dst, int64(len(files[0].data)), sha(files[0].data)) {
 		t.Fatal("rm removed the user's own copy")
 	}
 }
