@@ -680,6 +680,8 @@ tr[data-on] .org {
 
 :root {
   --intro-from: #fff;
+  /* ease-in: the other colour holds, then gives way fast at the end */
+  --intro-ease: cubic-bezier(0.5, 0, 0.75, 0);
 }
 
 @media (prefers-color-scheme: light) {
@@ -696,7 +698,7 @@ tr[data-on] .org {
     z-index: 1;
     background: var(--intro-from);
     pointer-events: none;
-    animation: intro-veil 0.5s cubic-bezier(0.2, 0, 0, 1) 0.6s both;
+    animation: intro-veil 0.5s var(--intro-ease) 0.6s both;
   }
 
   .intro .hero .install {
@@ -708,7 +710,7 @@ tr[data-on] .org {
   .intro .flow,
   .intro main,
   .intro .foot {
-    animation: intro-in 0.5s cubic-bezier(0.2, 0, 0, 1) 0.6s both;
+    animation: intro-in 0.5s var(--intro-ease) 0.6s both;
   }
 }
 
