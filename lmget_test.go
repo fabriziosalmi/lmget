@@ -39,6 +39,7 @@ type fakeHF struct {
 	noLicense atomic.Bool             // the card declares no license
 	private   atomic.Bool             // a private repository
 	gatedAs   string                  // "auto" or "manual": a gated repository
+	masked    bool                    // the tree hides LFS hashes, as for a gated repository without a token
 	id        string                  // the repository's own spelling, if not the one asked for
 }
 
@@ -89,6 +90,9 @@ func (f *fakeHF) handler() http.Handler {
 				e := map[string]any{"type": "file", "path": ff.path, "size": len(ff.data), "oid": gitID(ff.data)}
 				if ff.lfs {
 					e["lfs"] = map[string]any{"oid": sha(ff.data), "size": len(ff.data)}
+					if f.masked {
+						e["lfs"] = map[string]any{"oid": strings.Repeat("*", 64), "size": len(ff.data)}
+					}
 				}
 				entries = append(entries, e)
 			}

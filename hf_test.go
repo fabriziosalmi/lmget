@@ -164,3 +164,17 @@ func TestTheRepositorysOwnSpellingIsUsed(t *testing.T) {
 		t.Fatal("an answer for another repository was accepted")
 	}
 }
+
+// A gated repository listed to a request without a token has its hashes
+// replaced by asterisks: lmget says so and downloads nothing.
+func TestMaskedHashesAskForAToken(t *testing.T) {
+	f := &fakeHF{files: modelFiles(), gatedAs: "auto", masked: true}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	_, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil)
+	e := AsError(err)
+	if e == nil || e.Code != ExitAuth || !strings.Contains(e.Fixes[0].Cmd, "HF_TOKEN") || f.served.Load() != 0 {
+		t.Fatalf("masked hashes: %v, %d bytes downloaded", err, f.served.Load())
+	}
+}
