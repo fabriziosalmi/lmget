@@ -1,0 +1,70 @@
+name: setup action
+
+# The setup action (setup/action.yml) on the runners people use: it installs
+# a release checked by checksum and provenance, refuses a malformed version,
+# and with a lockfile restores, syncs and caches the store.
+
+on:
+  pull_request:
+    paths: ['setup/**', '.github/workflows/setup-action.yml']
+  push:
+    branches: [main]
+    paths: ['setup/**', '.github/workflows/setup-action.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  attestations: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./setup
+        with:
+          version: v0.3.2
+          cache: 'false'
+      - name: the installed lmget is the release asked for
+        shell: bash
+        env:
+          OUT: ${{ steps.setup.outputs.version }}
+        run: |
+          test "$(lmget --version)" = "lmget v0.3.2"
+          test "$OUT" = v0.3.2
+          test -n "$LMGET_HOME"
+      - id: bad
+        uses: ./setup
+        continue-on-error: true
+        with:
+          version: 'v1;touch pwned'
+          cache: 'false'
+      - name: a malformed version fails the step and runs nothing
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.bad.outcome }}
+        run: |
+          test "$OUTCOME" = failure
+          test ! -e pwned
+
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./setup
+        with:
+          version: latest
+          lockfile: setup/testdata/lmget.lock
+          sync: 'true'
+      - name: the locked model is in the store
+        run: lmget ls --plain | grep -q 'prajjwal1/bert-tiny'

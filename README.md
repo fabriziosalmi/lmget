@@ -25,6 +25,30 @@ irm https://lmget.org/install.ps1 | iex
 
 For macOS and Linux, amd64 and arm64. The [script](site/install.sh) downloads the latest release, checks the archive against the release's `checksums.txt` and, when the GitHub CLI (`gh`) is installed and signed in, its build provenance attestation, then installs `lmget` into `~/.local/bin` (`LMGET_INSTALL_DIR` changes it, `LMGET_VERSION=v0.1.0` picks a release). It uses no sudo and writes nothing else. The archives are also on the [releases page](https://github.com/fabriziosalmi/lmget/releases), and `go install github.com/fabriziosalmi/lmget/cmd/lmget@latest` builds it from source (a source build reports its version as `dev`). The [PowerShell script](site/install.ps1) does the same on Windows and installs `lmget.exe` into `%LOCALAPPDATA%\Programs\lmget` (`LMGET_INSTALL_DIR` changes it); it does not change your PATH, it says how. Both scripts take `LMGET_RELEASE_URL` to download from a mirror (with `LMGET_VERSION`); `checksums.txt` then comes from the mirror too, so only the attestation check proves where the archive was built. The maintainer tools `lmget-index` and `lmget-node` are not in the archives: build them from source. lmget also builds on FreeBSD, OpenBSD and NetBSD, with no release.
 
+With Scoop, from this repository, which is its own bucket (`bucket/lmget.json`, checked by CI with Scoop on Windows Server 2025):
+
+```powershell
+scoop bucket add lmget https://github.com/fabriziosalmi/lmget
+scoop install lmget
+```
+
+In a container, from the releases after v0.3.2: `ghcr.io/fabriziosalmi/lmget`, for linux/amd64 and linux/arm64, the release binary on a distroless base (CA certificates, a nonroot user, no shell), with its build provenance attested. The store is `/home/nonroot/.lmget`; mount a volume there to keep it.
+
+```sh
+docker run --rm -v lmget:/home/nonroot/.lmget ghcr.io/fabriziosalmi/lmget info Qwen/Qwen3-0.6B
+```
+
+In GitHub Actions, the [setup action](setup/action.yml) installs a release, checked against `checksums.txt` and its build provenance (it refuses to install when either fails), and keeps the store between runs, keyed by the hash of `lmget.lock`:
+
+```yaml
+- uses: fabriziosalmi/lmget/setup@<commit or tag>
+  with:
+    version: v0.3.2     # the lmget release to install, or latest
+    sync: 'true'        # run lmget sync on ./lmget.lock (lockfile: changes the path)
+```
+
+The action is in the repository from the commit after v0.3.2, so `@v0.3.2` does not have it: until the next release, pin a commit of `main` by its SHA. The `version` input is independent of that ref.
+
 On Windows, lmget is tested by CI on Windows Server 2025 (the whole test suite, and `install.ps1` against a good and a bad checksum), not yet on a Windows desktop. There: a model is hard-linked where it is exported when the store and the target are on one drive, and copied otherwise, since symlinks need Developer Mode; lmget checks the free space of that drive before copying, and knows its copies by their bytes: `rm` removes them, an update replaces them, and the Hugging Face snapshot is not copied again. Keeping the store (`LMGET_HOME`) on the drive of your caches avoids the copies. In the Hugging Face cache the snapshot holds the files themselves, as `huggingface_hub` does on Windows without symlinks. Read-only is an attribute shared by all hard links of a file there, and removing one clears it: lmget sets it again on a blob each time it checks it. File paths that Windows would not store as written are refused: device names (`NUL`, `COM1`, ...), `:`, `<>"|?*`, a trailing dot or space, and 8.3 short names such as `GIT~1`.
 
 ## Usage

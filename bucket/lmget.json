@@ -1,0 +1,37 @@
+{
+    "version": "0.3.2",
+    "description": "Get open models from their sources, verified",
+    "homepage": "https://lmget.org",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/fabriziosalmi/lmget/releases/download/v0.3.2/lmget_0.3.2_windows_amd64.tar.gz",
+            "hash": "7af93a0c00ba71e3331f8464022e053ccead2838e158b98594cdebbd8d64e3ce",
+            "extract_dir": "lmget_0.3.2_windows_amd64"
+        },
+        "arm64": {
+            "url": "https://github.com/fabriziosalmi/lmget/releases/download/v0.3.2/lmget_0.3.2_windows_arm64.tar.gz",
+            "hash": "75088dfceb6c2c0785b6a684c9d98493e101daa46def07fb9548153ba401e2c5",
+            "extract_dir": "lmget_0.3.2_windows_arm64"
+        }
+    },
+    "bin": "lmget.exe",
+    "checkver": {
+        "github": "https://github.com/fabriziosalmi/lmget"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/fabriziosalmi/lmget/releases/download/v$version/lmget_$version_windows_amd64.tar.gz",
+                "extract_dir": "lmget_$version_windows_amd64"
+            },
+            "arm64": {
+                "url": "https://github.com/fabriziosalmi/lmget/releases/download/v$version/lmget_$version_windows_arm64.tar.gz",
+                "extract_dir": "lmget_$version_windows_arm64"
+            }
+        },
+        "hash": {
+            "url": "$baseurl/checksums.txt"
+        }
+    }
+}
