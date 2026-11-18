@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 392" width="960" height="392" role="img" aria-labelledby="t d">
+  <title id="t">How lmget gets a model</title>
+  <desc id="d">Sources on the left: Hugging Face, ModelScope as a second origin, the Ollama registry, OCI registries and https URLs, with the project's mirror nodes when the source fails. In the middle, lmget pins the commit, checks every file against its published sha256, walks the file headers and refuses hidden pickle code, and stores each file once by hash. On the right, where it links the model: the Hugging Face cache, Ollama, oMLX, LM Studio or a directory, and lmget run asks the app and returns the answer.</desc>
+  <style>
+    :root { --fg: #111; --dim: #595959; --rule: #d9d9d9; --acc: #0a7a4b; --panel: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fg: #e8e8e8; --dim: #9a9a9a; --rule: #2e2e2e; --acc: #3ddc97; --panel: #000000; }
+    }
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: var(--fg); }
+    .h { font-size: 13px; fill: var(--dim); }
+    .l { font-size: 14px; }
+    .s { font-size: 11.5px; fill: var(--dim); }
+    .box { fill: none; stroke: var(--rule); stroke-width: 1; }
+    .dash { stroke-dasharray: 4 4; }
+    .core { fill: none; stroke: var(--fg); stroke-width: 1.25; }
+    .wire { fill: none; stroke: var(--rule); stroke-width: 1.25; }
+    .go { fill: none; stroke: var(--acc); stroke-width: 1.25; }
+    .tick { fill: none; stroke: var(--acc); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+    .acc { fill: var(--acc); }
+    .arrow { fill: var(--acc); }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path class="arrow" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+    <marker id="g" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path style="fill: var(--rule)" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+  </defs>
+
+  <!-- column heads -->
+  <text class="h" x="40" y="34">sources</text>
+  <text class="h" x="340" y="34">lmget</text>
+  <text class="h" x="700" y="34">where your tools look</text>
+
+  <!-- sources -->
+  <g>
+    <rect class="box" x="40" y="52" width="220" height="38" rx="6"/>
+    <text class="l" x="56" y="76">Hugging Face</text>
+    <rect class="box" x="40" y="100" width="220" height="38" rx="6"/>
+    <text class="l" x="56" y="124">ModelScope <tspan class="s">second origin</tspan></text>
+    <rect class="box" x="40" y="148" width="220" height="38" rx="6"/>
+    <text class="l" x="56" y="172">Ollama registry</text>
+    <rect class="box" x="40" y="196" width="220" height="38" rx="6"/>
+    <text class="l" x="56" y="220">OCI registries</text>
+    <rect class="box" x="40" y="244" width="220" height="38" rx="6"/>
+    <text class="l" x="56" y="268">https URLs</text>
+    <rect class="box dash" x="40" y="302" width="220" height="38" rx="6"/>
+    <text class="l" x="56" y="326">mirror nodes <tspan class="s">if the source fails</tspan></text>
+  </g>
+
+  <!-- wires in -->
+  <g>
+    <path class="wire" d="M260,71 C300,71 300,196 336,196" marker-end="url(#g)"/>
+    <path class="wire" d="M260,119 C300,119 300,196 336,196"/>
+    <path class="wire" d="M260,167 C300,167 300,196 336,196"/>
+    <path class="wire" d="M260,215 C300,215 300,196 336,196"/>
+    <path class="wire" d="M260,263 C300,263 300,196 336,196"/>
+    <path class="wire dash" d="M260,321 C300,321 300,196 336,196"/>
+  </g>
+
+  <!-- lmget -->
+  <rect class="core" x="340" y="52" width="280" height="288" rx="10"/>
+  <text x="362" y="88" style="font-size: 22px; font-weight: 700;">lmget</text>
+  <text class="l" x="362" y="120"><tspan style="fill: var(--dim)">$</tspan> lmget qwen</text>
+  <line x1="362" y1="138" x2="598" y2="138" style="stroke: var(--rule)"/>
+
+  <g>
+    <path class="tick" d="M364,163 l4,4 l8,-9"/>
+    <text class="l" x="386" y="167">commit pinned</text>
+    <text class="s" x="386" y="183">every file listed first</text>
+
+    <path class="tick" d="M364,207 l4,4 l8,-9"/>
+    <text class="l" x="386" y="211">sha256 verified</text>
+    <text class="s" x="386" y="227">the hash the source publishes</text>
+
+    <path class="tick" d="M364,251 l4,4 l8,-9"/>
+    <text class="l" x="386" y="255">content checked</text>
+    <text class="s" x="386" y="271">headers walked, pickle refused</text>
+
+    <path class="tick" d="M364,295 l4,4 l8,-9"/>
+    <text class="l" x="386" y="299">stored once by hash</text>
+    <text class="s" x="386" y="315">resumable, never stored twice</text>
+  </g>
+
+  <!-- wires out -->
+  <g>
+    <path class="go" d="M620,196 C660,196 660,71 696,71" marker-end="url(#a)"/>
+    <path class="go" d="M620,196 C660,196 660,119 696,119" marker-end="url(#a)"/>
+    <path class="go" d="M620,196 C660,196 660,167 696,167" marker-end="url(#a)"/>
+    <path class="go" d="M620,196 C660,196 660,215 696,215" marker-end="url(#a)"/>
+    <path class="go" d="M620,196 C660,196 660,263 696,263" marker-end="url(#a)"/>
+    <path class="go dash" d="M620,196 C660,196 660,321 696,321" marker-end="url(#a)"/>
+  </g>
+
+  <!-- destinations -->
+  <g>
+    <rect class="box" x="700" y="52" width="220" height="38" rx="6"/>
+    <text class="l" x="716" y="76">Hugging Face cache</text>
+    <rect class="box" x="700" y="100" width="220" height="38" rx="6"/>
+    <text class="l" x="716" y="124">Ollama</text>
+    <rect class="box" x="700" y="148" width="220" height="38" rx="6"/>
+    <text class="l" x="716" y="172">oMLX</text>
+    <rect class="box" x="700" y="196" width="220" height="38" rx="6"/>
+    <text class="l" x="716" y="220">LM Studio</text>
+    <rect class="box" x="700" y="244" width="220" height="38" rx="6"/>
+    <text class="l" x="716" y="268">a directory</text>
+    <rect class="box dash" x="700" y="302" width="220" height="38" rx="6"/>
+    <text class="l" x="716" y="326">lmget run <tspan class="s">the answer</tspan></text>
+  </g>
+
+  <!-- footnote -->
+  <text class="s" x="40" y="372">Every byte is verified, whatever host served it. Nothing is trusted for being there.</text>
+</svg>

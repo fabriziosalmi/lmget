@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 684" width="360" height="684" role="img" aria-labelledby="t d">
+  <title id="t">How lmget gets a model</title>
+  <desc id="d">Sources at the top: Hugging Face, ModelScope as a second origin, the Ollama registry, OCI registries and https URLs, with the project's mirror nodes when the source fails. In the middle, lmget pins the commit, checks every file against its published sha256, walks the file headers and refuses hidden pickle code, and stores each file once by hash. At the bottom, where it links the model: the Hugging Face cache, Ollama, oMLX, LM Studio or a directory, and lmget run asks the app and returns the answer.</desc>
+  <style>
+    :root { --fg: #111; --dim: #595959; --rule: #d9d9d9; --acc: #0a7a4b; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fg: #e8e8e8; --dim: #9a9a9a; --rule: #2e2e2e; --acc: #3ddc97; }
+    }
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; fill: var(--fg); }
+    .h { font-size: 13px; fill: var(--dim); }
+    .l { font-size: 13.5px; }
+    .s { font-size: 11.5px; fill: var(--dim); }
+    .box { fill: none; stroke: var(--rule); stroke-width: 1; }
+    .dash { stroke-dasharray: 4 4; }
+    .core { fill: none; stroke: var(--fg); stroke-width: 1.25; }
+    .wire { fill: none; stroke: var(--rule); stroke-width: 1.25; }
+    .go { fill: none; stroke: var(--acc); stroke-width: 1.25; }
+    .tick { fill: none; stroke: var(--acc); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path style="fill: var(--acc)" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+    <marker id="g" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path style="fill: var(--rule)" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+  </defs>
+
+  <text class="h" x="10" y="20">sources</text>
+  <rect class="box" x="10" y="32" width="164" height="34" rx="6"/>
+  <text class="l" x="22" y="54">Hugging Face</text>
+  <rect class="box" x="186" y="32" width="164" height="34" rx="6"/>
+  <text class="l" x="198" y="54">ModelScope</text>
+  <rect class="box" x="10" y="74" width="164" height="34" rx="6"/>
+  <text class="l" x="22" y="96">Ollama registry</text>
+  <rect class="box" x="186" y="74" width="164" height="34" rx="6"/>
+  <text class="l" x="198" y="96">OCI registries</text>
+  <rect class="box" x="10" y="116" width="164" height="34" rx="6"/>
+  <text class="l" x="22" y="138">https URLs</text>
+  <rect class="box dash" x="186" y="116" width="164" height="34" rx="6"/>
+  <text class="l" x="198" y="138">mirror nodes</text>
+  <text class="s" x="10" y="168">ModelScope: a second origin.</text>
+  <text class="s" x="10" y="182">Mirror nodes: when the source fails.</text>
+
+  <path class="wire" d="M180,196 L180,222" marker-end="url(#g)"/>
+
+  <rect class="core" x="10" y="226" width="340" height="260" rx="10"/>
+  <text x="30" y="260" style="font-size: 21px; font-weight: 700;">lmget</text>
+  <text class="l" x="30" y="290"><tspan style="fill: var(--dim)">$</tspan> lmget qwen</text>
+  <line x1="30" y1="306" x2="330" y2="306" style="stroke: var(--rule)"/>
+  <path class="tick" d="M32,329 l4,4 l8,-9"/>
+  <text class="l" x="54" y="333">commit pinned</text>
+  <text class="s" x="54" y="349">every file listed first</text>
+  <path class="tick" d="M32,371 l4,4 l8,-9"/>
+  <text class="l" x="54" y="375">sha256 verified</text>
+  <text class="s" x="54" y="391">the hash the source publishes</text>
+  <path class="tick" d="M32,413 l4,4 l8,-9"/>
+  <text class="l" x="54" y="417">content checked</text>
+  <text class="s" x="54" y="433">headers walked, pickle refused</text>
+  <path class="tick" d="M32,455 l4,4 l8,-9"/>
+  <text class="l" x="54" y="459">stored once by hash</text>
+  <text class="s" x="54" y="475">resumable, never stored twice</text>
+
+  <path class="go" d="M180,486 L180,512" marker-end="url(#a)"/>
+
+  <text class="h" x="10" y="532">where your tools look</text>
+  <rect class="box" x="10" y="544" width="164" height="34" rx="6"/>
+  <text class="l" x="22" y="566">HF cache</text>
+  <rect class="box" x="186" y="544" width="164" height="34" rx="6"/>
+  <text class="l" x="198" y="566">Ollama</text>
+  <rect class="box" x="10" y="586" width="164" height="34" rx="6"/>
+  <text class="l" x="22" y="608">oMLX</text>
+  <rect class="box" x="186" y="586" width="164" height="34" rx="6"/>
+  <text class="l" x="198" y="608">LM Studio</text>
+  <rect class="box" x="10" y="628" width="164" height="34" rx="6"/>
+  <text class="l" x="22" y="650">a directory</text>
+  <rect class="box dash" x="186" y="628" width="164" height="34" rx="6"/>
+  <text class="l" x="198" y="650">lmget run</text>
+  <text class="s" x="10" y="680">Every byte is verified, whatever host served it.</text>
+</svg>
