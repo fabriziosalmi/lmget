@@ -217,6 +217,11 @@ func (c *Client) UpdateAliases(ctx context.Context) (*AliasList, error) {
 	if err != nil {
 		return nil, err
 	}
+	unlock, err := c.store.flock(signedLock, true, true) // check and write as one step
+	if err != nil {
+		return nil, diskErr(err)
+	}
+	defer unlock()
 	p, ps, hp := c.aliasPaths()
 	sum := sha256.Sum256(data)
 	var seq int64

@@ -213,7 +213,8 @@ var pickleOps = map[byte]pickleOp{
 }
 
 // walkPickle reports whether r starts with a well-formed opcode stream that
-// reaches STOP and imports or calls code. Bytes after STOP are ignored, as
+// reaches STOP and imports or calls code, or that is still well-formed after
+// the opcode limit. Bytes after STOP are ignored, as
 // pickle.load ignores them.
 func walkPickle(r *io.SectionReader, size int64) bool {
 	const maxLine = 1 << 16
@@ -275,5 +276,8 @@ func walkPickle(r *io.SectionReader, size int64) bool {
 			return code && steps > 1
 		}
 	}
-	return false
+	// a million well-formed opcodes and still no STOP: no data format reads
+	// like that, and a pickle can pad its harmless start to push the call it
+	// makes past any limit, so this counts as one
+	return true
 }

@@ -151,6 +151,9 @@ func (c *Client) ownLinkCheck() func(path string) bool {
 			}
 			return filepath.Dir(filepath.Clean(t)) == blobs
 		}
+		if c.store.storedCopy(path, fi) { // a copy lmget made on another drive (Windows)
+			return true
+		}
 		in, ok := inodeOf(path, fi)
 		if !ok || !fi.Mode().IsRegular() {
 			return false

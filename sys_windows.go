@@ -128,6 +128,13 @@ func linkFallback(src, dst string) error {
 		return err
 	}
 	defer in.Close()
+	// the copy lands on another drive than the store, whose space the pull
+	// checked: check this one too
+	if fi, err := in.Stat(); err == nil {
+		if free := diskFree(filepath.Dir(dst)); free >= 0 && fi.Size()+512<<20 > free {
+			return errors.New("not enough free space on the drive of " + filepath.Dir(dst) + " for a copy of " + fi.Name())
+		}
+	}
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err

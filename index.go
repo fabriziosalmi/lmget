@@ -356,6 +356,14 @@ func (c *Client) updateIndexAt(ctx context.Context, u string, keys bool) (*Index
 		return nil, err
 	}
 	sum := sha256.Sum256(data)
+	// check and write as one step: two lmget at once (one falling back to a
+	// node that still serves the previous index) must not both pass the
+	// check and leave the older one recorded last
+	unlock, err := c.store.flock(signedLock, true, true)
+	if err != nil {
+		return nil, diskErr(err)
+	}
+	defer unlock()
 	if seq, had, ok := c.highestIndex(); ok {
 		switch {
 		case ix.Sequence < seq:
@@ -364,6 +372,9 @@ func (c *Client) updateIndexAt(ctx context.Context, u string, keys bool) (*Index
 		case ix.Sequence == seq && had != hex.EncodeToString(sum[:]):
 			return nil, newErr(ExitVerify, "verify", "two different indexes carry the same sequence number")
 		}
+	}
+	if testHookIndexWrite != nil {
+		testHookIndexWrite(ix.Sequence)
 	}
 	p, ps := c.indexPaths()
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -448,3 +459,11 @@ func (c *Client) fetchSmall(ctx context.Context, u string, limit int64) ([]byte,
 	}
 	return b, nil
 }
+
+// signedLock serializes the check-then-write of the signed files the store
+// accepts (index, key list, nicknames).
+const signedLock = "signed.lock"
+
+// testHookIndexWrite, set by tests only, runs between the sequence check and
+// the writes of an index.
+var testHookIndexWrite func(seq int64)

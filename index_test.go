@@ -384,3 +384,48 @@ func TestACrashBeforeTheHighestRecordCannotRollBack(t *testing.T) {
 		t.Fatalf("replay of sequence 5 after a crash at 6 = %v; want a refusal", err)
 	}
 }
+
+// Found by the 2026-11-18 review: two lmget updating the index at once (one
+// reading a node that still serves the previous index) could both pass the
+// sequence check, and the older index was recorded last. B is held between
+// its check and its writes while A runs: A must wait, and 6 must win.
+func TestConcurrentIndexUpdatesKeepTheHighest(t *testing.T) {
+	cA, isA, s := indexSetup(t)
+	publish(isA, s, sampleIndex(4))
+	if _, err := cA.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	publish(isA, s, sampleIndex(6))
+	isB := &indexServer{}
+	srvB := httptest.NewTLSServer(isB)
+	defer srvB.Close()
+	publish(isB, s, sampleIndex(5))
+	cB, err := New(Options{Home: cA.store.Root(), HTTP: srvB.Client(), IndexURL: srvB.URL + "/index.json", IndexKeys: []string{s.pub}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	aDone := make(chan error, 1)
+	testHookIndexWrite = func(seq int64) {
+		if seq != 5 {
+			return
+		}
+		go func() { _, err := cA.UpdateIndex(context.Background()); aDone <- err }()
+		select { // A either finishes now (no lock) or waits for B
+		case <-aDone:
+			aDone <- nil
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	defer func() { testHookIndexWrite = nil }()
+	if _, err := cB.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	<-aDone
+	ix, err := cA.Index()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seq, _, _ := cA.highestIndex(); ix.Sequence != 6 || seq != 6 {
+		t.Fatalf("after two concurrent updates the store holds index %d, highest %d; want 6", ix.Sequence, seq)
+	}
+}
