@@ -39,7 +39,7 @@ var mcpVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
 
 // mcpTargets are the targets get accepts: the apps and the Hugging Face
 // cache, or the store alone.
-var mcpTargets = []string{"hf", "ollama", "omlx", "lmstudio", "jan", "localai", "exo", "comfyui", "none"}
+var mcpTargets = []string{"hf", "ollama", "omlx", "lmstudio", "jan", "localai", "exo", "colibri", "comfyui", "none"}
 
 type rpcIn struct {
 	JSONRPC string          `json:"jsonrpc"`

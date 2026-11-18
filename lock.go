@@ -302,7 +302,7 @@ func Lockable(ref Ref) error {
 // repository: it must not be able to send files anywhere else.
 func lockTargetSyntax(to string) error {
 	switch {
-	case to == "hf" || to == "none" || to == "ollama" || to == "omlx" || to == "lmstudio" || to == "jan" || to == "localai" || to == "exo" || to == "comfyui":
+	case to == "hf" || to == "none" || to == "ollama" || to == "omlx" || to == "lmstudio" || to == "jan" || to == "localai" || to == "exo" || to == "colibri" || to == "comfyui":
 		return nil
 	case strings.HasPrefix(to, "comfyui:") && comfyFolders[to[len("comfyui:"):]]:
 		return nil

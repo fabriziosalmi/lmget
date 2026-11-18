@@ -156,7 +156,7 @@ func run() lmget.ExitCode {
 			fs.BoolVarP(&f.yes, "yes", "y", false, "with a nickname: accept the proposed model without asking")
 		}
 		if c != info {
-			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, ollama, omlx, lmstudio, jan, localai, exo, comfyui[:FOLDER], dir:PATH, none (Ollama models default to ollama)")
+			fs.StringVar(&f.to, "to", "hf", "where to link the model: hf, ollama, omlx, lmstudio, jan, localai, exo, colibri, comfyui[:FOLDER], dir:PATH, none (Ollama models default to ollama)")
 			fs.BoolVar(&f.dryRun, "dry-run", false, "stop after the plan")
 			fs.BoolVar(&f.lock, "lock", false, "record the result in the lockfile, creating it if needed")
 		}

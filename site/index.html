@@ -51,7 +51,7 @@
       <div><dt><code>lmget qwen</code></dt><dd>A nickname: lmget reads this machine's memory and the apps installed, proposes the Qwen3.5 variant that fits, and asks before downloading.</dd></div>
       <div><dt><code>lmget Qwen/Qwen3-0.6B</code></dt><dd>Downloads, verifies and links into the Hugging Face cache.</dd></div>
       <div><dt><code>lmget info Qwen/Qwen3-0.6B</code></dt><dd>Shows the plan and downloads no weights.</dd></div>
-      <div><dt><code>lmget mlx-community/Qwen3.5-0.8B-4bit <span class="nw">--to omlx</span></code></dt><dd>Links into oMLX. <code class="nw">--to lmstudio</code>, <code class="nw">--to jan</code>, <code class="nw">--to localai</code>, <code class="nw">--to exo</code> and <code class="nw">--to comfyui</code> link into those apps.</dd></div>
+      <div><dt><code>lmget mlx-community/Qwen3.5-0.8B-4bit <span class="nw">--to omlx</span></code></dt><dd>Links into oMLX. <code class="nw">--to lmstudio</code>, <code class="nw">--to jan</code>, <code class="nw">--to localai</code>, <code class="nw">--to exo</code>, <code class="nw">--to colibri</code> and <code class="nw">--to comfyui</code> link into those apps.</dd></div>
       <div><dt><code>lmget ollama:smollm2:135m</code></dt><dd>Lands in Ollama, ready for <code class="nw">ollama run</code>.</dd></div>
     </dl>
   </section>
@@ -86,7 +86,7 @@
       <li><h3>Every file verified</h3><p>Checked against the hash its source publishes, or the one you pin.</p></li>
       <li><h3>No hidden pickle</h3><p>Pickle content under another name is refused; pickle weights are skipped when safetensors exist.</p></li>
       <li><h3>Stored once</h3><p>Parallel, resumable downloads, each file stored once by sha256.</p></li>
-      <li><h3>Where your tools look</h3><p>Linked into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo, ComfyUI or a directory.</p></li>
+      <li><h3>Where your tools look</h3><p>Linked into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo, colibri, ComfyUI or a directory.</p></li>
       <li><h3>Nicknames</h3><p><code>qwen</code>, <code>whisper</code> or <code>embed</code> pick the variant that fits the machine; the list is signed like the index.</p></li>
       <li><h3>When the source fails</h3><p>A signed index and mirror nodes keep the models it lists available, even to a first run.</p></li>
     </ul>
@@ -100,7 +100,7 @@
     <dl class="works">
       <div><dt>The Hugging Face cache <code>--to hf</code></dt><dd><span class="nw">transformers</span>, <span class="nw">sentence-transformers</span>, <span class="nw">llama.cpp -hf</span>, <span class="nw">Goose's local inference</span>, <span class="nw">Lemonade</span></dd></div>
       <div><dt>Ollama <code>--to ollama</code></dt><dd><span class="nw">Ollama</span>, <span class="nw">RamaLama's ollama://</span> models, and the apps that ask Ollama: <span class="nw">Open WebUI</span>, <span class="nw">Page Assist</span>, <span class="nw">Hollama</span>, <span class="nw">Oterm</span></dd></div>
-      <div><dt>Their own folders</dt><dd><span class="nw">oMLX</span>, <span class="nw">LM Studio</span>, <span class="nw">Jan</span>, <span class="nw">LocalAI</span>, <span class="nw">exo</span>, <span class="nw">ComfyUI</span></dd></div>
+      <div><dt>Their own folders</dt><dd><span class="nw">oMLX</span>, <span class="nw">LM Studio</span>, <span class="nw">Jan</span>, <span class="nw">LocalAI</span>, <span class="nw">exo</span>, <span class="nw">colibri</span>, <span class="nw">ComfyUI</span></dd></div>
       <div><dt>A plain directory <code>--to dir:PATH</code></dt><dd><span class="nw">Text Generation WebUI</span>, and apps given a file path: <span class="nw">KoboldCpp</span>, <span class="nw">llamafile</span>, <span class="nw">llama-server</span></dd></div>
       <div><dt>Through a server</dt><dd>Apps that keep no model files of their own use the models of the local server they ask, which lmget fills: <span class="nw">LobeChat</span>, <span class="nw">LibreChat</span>, <span class="nw">Cherry Studio</span>, <span class="nw">Chatbox</span>, <span class="nw">SillyTavern</span>, <span class="nw">Dify</span>, <span class="nw">Langflow</span></dd></div>
     </dl>
