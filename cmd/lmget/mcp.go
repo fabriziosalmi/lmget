@@ -183,7 +183,7 @@ func mcpTools() []map[string]any {
 	globs := func(desc string) map[string]any {
 		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": desc}
 	}
-	model := str("A model: org/name on Hugging Face (optionally @revision), ollama:name:tag, oci://registry/image:tag, an https URL, " +
+	model := str("A model: org/name on Hugging Face (optionally @revision), ollama:name:tag, hf.co/org/name:QUANT (a GGUF repository for Ollama), oci://registry/image:tag, an https URL, " +
 		"or a nickname such as qwen, whisper or embed, for which lmget picks the variant that fits this machine.")
 	common := map[string]any{
 		"model":        model,

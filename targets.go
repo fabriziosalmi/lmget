@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -81,6 +82,19 @@ func ggufWeights(plan *Plan) (weights []File, mmproj []File) {
 		}
 	}
 	return
+}
+
+// ggufQuantRe finds the quantization in a GGUF file name, as Hugging Face's
+// Ollama registry names its tags: Qwen3-0.6B-Q4_K_M.gguf is Q4_K_M.
+var ggufQuantRe = regexp.MustCompile(`(?i)[-_.]((?:I?Q[0-9][A-Z0-9_]*)|BF16|F16|F32)(?:-[0-9]{5}-of-[0-9]{5})?\.gguf$`)
+
+// ggufQuant is the quantization of a GGUF file name, Q4_K_M when the name
+// does not tell.
+func ggufQuant(name string) string {
+	if m := ggufQuantRe.FindStringSubmatch(path.Base(name)); m != nil {
+		return strings.ToUpper(m[1])
+	}
+	return "Q4_K_M"
 }
 
 // appAccepts is TargetAccepts for these three apps.

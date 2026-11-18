@@ -102,6 +102,11 @@ func ParseRef(s string) (Ref, error) {
 	if strings.HasPrefix(in, "https://") || strings.HasPrefix(in, "http://") {
 		return parseURLRef(in)
 	}
+	// Ollama's name for a GGUF repository on Hugging Face, as the model page's
+	// "Use this model: Ollama" gives it (ollama run hf.co/org/name:QUANT)
+	if len(in) > len(ollamaHF)+1 && strings.EqualFold(in[:len(ollamaHF)+1], ollamaHF+"/") {
+		return parseOllamaRef(in, s)
+	}
 	src := "hf"
 	if i := strings.Index(in, ":"); i > 0 && !strings.Contains(in[:i], "/") {
 		src, in = strings.ToLower(in[:i]), in[i+1:]

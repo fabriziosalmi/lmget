@@ -612,3 +612,139 @@ func TestOllamaExportRefusesALockWithoutEveryLayer(t *testing.T) {
 		t.Fatal("a tag file was written for a model with an unlinked layer")
 	}
 }
+
+func TestParseOllamaRefsOnHuggingFace(t *testing.T) {
+	ok := map[string]struct{ repo, tag, canon string }{
+		"hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M":         {"hf.co/unsloth/Qwen3-0.6B-GGUF", "Q4_K_M", "ollama:hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M"},
+		"HF.CO/org/m:q8_0":                             {"hf.co/org/m", "q8_0", "ollama:hf.co/org/m:q8_0"},
+		"ollama:hf.co/org/m":                           {"hf.co/org/m", "latest", "ollama:hf.co/org/m"},
+		"ollama:huggingface.co/org/m:IQ4_XS":           {"hf.co/org/m", "IQ4_XS", "ollama:hf.co/org/m:IQ4_XS"},
+		"ollama:hf.co/bartowski/Llama-3.2-1B-GGUF:F16": {"hf.co/bartowski/Llama-3.2-1B-GGUF", "F16", "ollama:hf.co/bartowski/Llama-3.2-1B-GGUF:F16"},
+	}
+	for in, want := range ok {
+		r, err := ParseRef(in)
+		if err != nil || r.Source != "ollama" || r.Repo != want.repo || r.Revision != want.tag || r.String() != want.canon {
+			t.Errorf("ParseRef(%q) = %+v %q, %v; want %+v", in, r, r.String(), err, want)
+			continue
+		}
+		if back, err := ParseRef(r.String()); err != nil || back != r {
+			t.Errorf("%q does not round-trip: %+v, %v", r.String(), back, err)
+		}
+	}
+	for _, in := range []string{"hf.co/a/b/c:Q4", "hf.co/../x:Q4", "hf.co/org/m:../x", "hf.co/:Q4", "hf.co/org:Q4",
+		"ollama:hf.co/org/m:", "hf.co/org/m:" + strings.Repeat("q", 129)} {
+		if _, err := ParseRef(in); err == nil || AsError(err).Code != ExitUsage {
+			t.Errorf("ParseRef(%q) accepted or wrong code: %v", in, err)
+		}
+	}
+	// a Hugging Face repository is still one, with or without its URL
+	for _, in := range []string{"unsloth/Qwen3-0.6B-GGUF", "https://hf.co/unsloth/Qwen3-0.6B-GGUF"} {
+		if r, err := ParseRef(in); err != nil || r.Source != "hf" {
+			t.Errorf("ParseRef(%q) = %+v, %v; want a Hugging Face repository", in, r, err)
+		}
+	}
+}
+
+// newHFRegistryClient is a client whose Hugging Face endpoint is the fake
+// registry f, as huggingface.co/v2 is for Ollama; the Ollama registry is a
+// name that resolves nowhere, so asking it fails the test.
+func newHFRegistryClient(t *testing.T, srv *httptest.Server, home string) *Client {
+	t.Helper()
+	t.Setenv("HF_TOKEN_PATH", filepath.Join(t.TempDir(), "none"))
+	t.Setenv("HF_HOME", t.TempDir())
+	addr := srv.Listener.Addr().String()
+	tr := srv.Client().Transport.(*http.Transport).Clone()
+	tr.DialContext = func(ctx context.Context, network, host string) (net.Conn, error) {
+		if !strings.HasPrefix(host, "hf.test") {
+			t.Errorf("connection to %s: only Hugging Face may be asked", host)
+			return nil, fmt.Errorf("no route to %s", host)
+		}
+		return (&net.Dialer{}).DialContext(ctx, network, addr)
+	}
+	tr.TLSClientConfig.ServerName = "example.com"
+	c, err := New(Options{Home: home, HFEndpoint: "https://hf.test", HFToken: "hf_token_for_hf",
+		OllamaRegistry: "https://registry.test", HTTP: &http.Client{Transport: tr}, Conns: 4, ChunkSize: 128 << 10, NoMirror: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func TestOllamaFromHuggingFace(t *testing.T) {
+	f := newFakeOllama()
+	man := f.publish("org/m-GGUF", "Q4_K_M", smolLayers()...)
+	srv := httptest.NewTLSServer(f)
+	defer srv.Close()
+	models := t.TempDir()
+	t.Setenv("OLLAMA_MODELS", models)
+	c := newHFRegistryClient(t, srv, t.TempDir())
+	ref := ollamaRef(t, "hf.co/org/m-GGUF:Q4_K_M")
+	out, err := c.Pull(context.Background(), Request{Ref: ref, Target: Target{Kind: "ollama"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Plan.Commit != sha(man) {
+		t.Fatal("the commit is the sha256 of the manifest Hugging Face served")
+	}
+	// where Ollama's own pull of hf.co/org/m-GGUF:Q4_K_M puts it
+	tag := filepath.Join(models, "manifests", "hf.co", "org", "m-GGUF", "Q4_K_M")
+	if b, err := os.ReadFile(tag); err != nil || !bytes.Equal(b, man) {
+		t.Fatalf("tag file missing or not the manifest: %v", err)
+	}
+	var m ollamaManifest
+	json.Unmarshal(man, &m)
+	for _, d := range append([]ollamaDescriptor{m.Config}, m.Layers...) {
+		h := strings.TrimPrefix(d.Digest, "sha256:")
+		if b, err := os.ReadFile(filepath.Join(models, "blobs", "sha256-"+h)); err != nil || sha(b) != h {
+			t.Fatalf("blob %s missing or wrong: %v", h[:12], err)
+		}
+	}
+	if out.RunAs != "hf.co/org/m-GGUF:Q4_K_M" {
+		t.Fatalf("RunAs %q, want Ollama's own name", out.RunAs)
+	}
+	if !f.auth.Load() {
+		t.Fatal("the Hugging Face token did not reach Hugging Face's registry: gated repositories would fail")
+	}
+	list, err := c.List()
+	if err != nil || len(list) != 1 || list[0].Ref != ref {
+		t.Fatalf("ls: %+v %v", list, err)
+	}
+	if _, err := c.Remove(ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(tag); !os.IsNotExist(err) {
+		t.Fatal("rm left the tag")
+	}
+}
+
+func TestHFGGUFToOllamaNamesTheWay(t *testing.T) {
+	f := &fakeHF{files: []fakeFile{{path: "m-Q5_K_M.gguf", data: fakeGGUF(4000), lfs: true}, {path: "README.md", data: []byte("# m")}}}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	t.Setenv("OLLAMA_MODELS", t.TempDir())
+	_, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m-GGUF"), Target: Target{Kind: "ollama"}}, nil)
+	e := AsError(err)
+	if e.Code != ExitUsage || len(e.Fixes) == 0 || e.Fixes[0].Cmd != "lmget hf.co/org/m-GGUF:Q5_K_M" {
+		t.Fatalf("%+v", e)
+	}
+	if f.served.Load() != 0 {
+		t.Fatal("refused after downloading")
+	}
+}
+
+func TestGGUFQuant(t *testing.T) {
+	for name, want := range map[string]string{
+		"Qwen3-0.6B-Q4_K_M.gguf":            "Q4_K_M",
+		"sub/model.q8_0.gguf":               "Q8_0",
+		"Llama-3.2-1B-Instruct-IQ4_XS.gguf": "IQ4_XS",
+		"gemma-3-1b-it-BF16.gguf":           "BF16",
+		"big-Q8_0-00001-of-00003.gguf":      "Q8_0",
+		"model.gguf":                        "Q4_K_M",
+		"mmproj-F16.gguf":                   "F16",
+	} {
+		if got := ggufQuant(name); got != want {
+			t.Errorf("ggufQuant(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
