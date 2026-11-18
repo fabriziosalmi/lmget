@@ -14,7 +14,7 @@ import sys
 root = pathlib.Path(sys.argv[1])
 page = root / "index.html"
 html = page.read_text()
-for name in ("site.css", "app.js"):
+for name in ("site.css", "app.js", "intro.js"):
     digest = hashlib.sha256((root / name).read_bytes()).hexdigest()[:12]
     html, n = re.subn(r'"/%s(\?v=[0-9a-f]{12})?"' % re.escape(name), '"/%s?v=%s"' % (name, digest), html)
     if n != 1:
