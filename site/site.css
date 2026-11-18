@@ -666,7 +666,43 @@ tr[data-on] .org {
   }
 }
 
+/* the page starts in the other theme's colour: a veil over everything but
+   the install command, which fades out as the rest fades in */
+@keyframes intro-veil {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+:root {
+  --intro-from: #fff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --intro-from: #000;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .intro body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: var(--intro-from);
+    pointer-events: none;
+    animation: intro-veil 0.5s cubic-bezier(0.2, 0, 0, 1) 0.6s both;
+  }
+
+  .intro .hero .install {
+    z-index: 2; /* above the veil */
+  }
+
   .intro .bar,
   .intro .hero > :not(.install),
   .intro .flow,
