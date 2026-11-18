@@ -28,7 +28,11 @@ fi
 [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "not a release tag: $tag (expected vX.Y.Z or latest)"
 ver=${tag#v}
 archive="lmget_${ver}_${os}_${arch}.tar.gz"
-dir="$RUNNER_TEMP/lmget-$ver-$os-$arch"
+tmp=$RUNNER_TEMP
+if [ "$os" = windows ] && command -v cygpath >/dev/null 2>&1; then
+	tmp=$(cygpath -u "$tmp") # D:\a\_temp: GNU tar would take "D:" for a remote host
+fi
+dir="$tmp/lmget-$ver-$os-$arch"
 rm -rf "$dir"
 mkdir -p "$dir"
 
