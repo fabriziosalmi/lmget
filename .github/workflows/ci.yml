@@ -146,3 +146,7 @@ jobs:
           python3 -m venv venv # the system Python takes no pip packages (PEP 668)
           venv/bin/pip install --quiet jsonschema==4.23.0
           venv/bin/python scripts/check-cyclonedx.py schema one.cdx.json kinds.cdx.json
+          # the check is not vacuous: a component type and an SPDX id the
+          # schema does not know make a document it refuses
+          sed -e 's/"machine-learning-model"/"ml-model"/' -e 's/"id": "MIT"/"id": "mit"/' one.cdx.json > broken.cdx.json
+          ! venv/bin/python scripts/check-cyclonedx.py schema broken.cdx.json
