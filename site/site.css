@@ -310,17 +310,6 @@ dd {
   color: var(--bad);
 }
 
-.facts-source {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: var(--faint);
-  font: 0.75rem/1.5 var(--mono);
-}
-
-.facts-source a {
-  color: inherit;
-}
-
 /* --- the flow diagram, drawn at 960px wide (360px for phones) --- */
 
 /* hairlines run as wide as the content, like the sections' */
@@ -737,8 +726,8 @@ tr[data-on] .org {
     grid-column: 1 / -1;
   }
 
-  .facts-source {
-    padding-block-start: 1rem;
+  .stat:last-child {
+    border-block-end: 0; /* the diagram's hairline follows */
   }
 
   .flow img {
