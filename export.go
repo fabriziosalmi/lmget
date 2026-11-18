@@ -16,7 +16,7 @@ import (
 //	ollama    Ollama's models directory (ollama run reads it)
 //	omlx      oMLX's models directory, as <dir>/<org>/<name>
 //	lmstudio  LM Studio's models directory, as <dir>/<org>/<name>
-//	jan, localai, exo, comfyui: see targets.go and comfyui.go
+//	jan, localai, exo, colibri, comfyui: see targets.go and comfyui.go
 //	dir:PATH  a plain directory with the repository's file names
 //	none      store only
 //
@@ -47,7 +47,7 @@ func ParseTarget(s string) (Target, error) {
 			return Target{}, err
 		}
 		return Target{Kind: "comfyui", Path: dir, Folder: folder}, nil
-	case s == "omlx" || s == "lmstudio" || s == "jan" || s == "localai" || s == "exo":
+	case s == "omlx" || s == "lmstudio" || s == "jan" || s == "localai" || s == "exo" || s == "colibri":
 		dir, err := AppModelsDir(s)
 		if err != nil {
 			return Target{}, err
@@ -161,7 +161,7 @@ func TargetAccepts(plan *Plan, t Target) error {
 					fix("", "drop --include and --exclude, or export to --to dir:PATH")
 			}
 		}
-	case "jan", "localai", "exo":
+	case "jan", "localai", "exo", "colibri":
 		return appAccepts(plan, t)
 	case "comfyui":
 		return comfyAccepts(plan, t)
@@ -210,6 +210,8 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 		return c.exportLocalAI(plan, t)
 	case "exo":
 		return c.exportExo(plan, t)
+	case "colibri":
+		return c.exportColibri(plan, t)
 	case "comfyui":
 		return c.exportComfyUI(plan, t)
 	}

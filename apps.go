@@ -22,7 +22,8 @@ import (
 //	          directory moved in the app in no documented file: set the variable)
 func AppModelsDir(app string) (string, error) {
 	env := map[string]string{"omlx": "LMGET_OMLX_DIR", "lmstudio": "LMGET_LMSTUDIO_DIR",
-		"jan": "LMGET_JAN_DIR", "localai": "LMGET_LOCALAI_DIR", "exo": "LMGET_EXO_DIR", "comfyui": "LMGET_COMFYUI_DIR"}[app]
+		"jan": "LMGET_JAN_DIR", "localai": "LMGET_LOCALAI_DIR", "exo": "LMGET_EXO_DIR", "comfyui": "LMGET_COMFYUI_DIR",
+		"colibri": "LMGET_COLIBRI_DIR"}[app]
 	if env == "" {
 		return "", newErr(ExitUsage, "usage", "unknown app "+quote(app))
 	}
@@ -57,6 +58,8 @@ func AppModelsDir(app string) (string, error) {
 		return abs(exoModels(home), "exo's models directory")
 	case "comfyui":
 		return comfyModels(home)
+	case "colibri": // the folder colibri's setup downloads into without --dir (default_models_root)
+		return filepath.Join(home, "colibri-models"), nil
 	}
 	settings := filepath.Join(omlxBase(), "settings.json")
 	dir, err := omlxModelDir(settings)

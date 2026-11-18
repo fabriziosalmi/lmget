@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Jan, LocalAI and exo: apps that load models from a folder of their own,
@@ -20,6 +21,9 @@ import (
 //	localai  <models path>/<file>.gguf: the file name is the model name
 //	exo      <models dir>/<org>--<name>/ with the files and .exo-download.json,
 //	         the manifest exo writes when it has verified a download
+//	colibri  <models dir>/<org>--<name>/ with the files and
+//	         .colibri-download.json, the manifest colibri's setup writes when a
+//	         download is complete (c/setup_download.py)
 //
 // The model files are hard links into the store, as for every target; the
 // two small files lmget writes (model.yml, .exo-download.json) are known to be
@@ -29,6 +33,7 @@ func init() {
 	appNames["jan"] = "Jan"
 	appNames["localai"] = "LocalAI"
 	appNames["exo"] = "exo"
+	appNames["colibri"] = "colibri"
 }
 
 // janData is Jan's data folder: $LMGET_JAN_DIR, else Jan's default.
@@ -123,6 +128,14 @@ func appAccepts(plan *Plan, t Target) error {
 		if !hasWeights(plan, ".safetensors") {
 			return newErr(ExitUsage, "usage", "exo loads MLX models (config.json and *.safetensors), and this selection has none").
 				fix("", "pick an mlx-community repository")
+		}
+	case "colibri":
+		if !hasWeights(plan, ".safetensors") {
+			e := newErr(ExitUsage, "usage", "colibri loads a model folder (config.json and *.safetensors), and this selection has none")
+			if w, _ := ggufWeights(plan); len(w) > 0 { // colibri imports a GGUF into a folder of its own
+				return e.fix("lmget "+plan.Ref.Repo+" --to dir:PATH", "then ./coli import PATH/"+path.Base(w[0].Path)+", which writes the model folder beside it")
+			}
+			return e.fix("", "pick a colibri container, e.g. Justvugg/Qwen3-Coder-30B-A3B-colibri-int4")
 		}
 	}
 	return nil
@@ -284,8 +297,59 @@ func (c *Client) exportExo(plan *Plan, t Target) (string, []string, error) {
 	return dir, append(links, mp), nil
 }
 
+// colibriManifest is colibri's .colibri-download.json: the repository, the
+// revision and the files with their sizes; colibri takes the folder as a
+// downloaded model when complete is true and each file is there at its size.
+// LmgetExport marks the ones lmget wrote: colibri reads its keys by name.
+type colibriManifest struct {
+	Repo        string        `json:"repo"`
+	Revision    string        `json:"revision"`
+	Complete    bool          `json:"complete"`
+	Files       []colibriFile `json:"files"`
+	Completed   string        `json:"completed,omitempty"`
+	LmgetExport bool          `json:"lmget_export,omitempty"`
+}
+
+type colibriFile struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+}
+
+func (c *Client) exportColibri(plan *Plan, t Target) (string, []string, error) {
+	dir := filepath.Join(t.Path, strings.ReplaceAll(plan.Ref.Repo, "/", "--"))
+	if err := os.MkdirAll(t.Path, 0o755); err != nil {
+		return "", nil, diskErr(err)
+	}
+	if err := within(t.Path, dir); err != nil {
+		return "", nil, err
+	}
+	mp := filepath.Join(dir, ".colibri-download.json")
+	if old, err := os.ReadFile(mp); err == nil { // before any link: colibri's own download stays as it is
+		var prev colibriManifest
+		if json.Unmarshal(old, &prev) != nil || !prev.LmgetExport {
+			return dir, nil, newErr(ExitFailure, "export", mp+" already exists").
+				why("colibri wrote it, not lmget: lmget does not overwrite a download it did not make").
+				fix("", "remove the folder, or set LMGET_COLIBRI_DIR to another models directory")
+		}
+	}
+	p, links, err := c.exportDir(plan, dir, true)
+	if err != nil {
+		return p, links, err
+	}
+	m := colibriManifest{Repo: plan.Ref.Repo, Revision: plan.Commit, Complete: true, LmgetExport: true,
+		Completed: time.Now().Format("2006-01-02T15:04:05")}
+	for _, f := range plan.Selected() {
+		m.Files = append(m.Files, colibriFile{Path: f.Path, Size: f.Size})
+	}
+	b, _ := json.MarshalIndent(m, "", " ")
+	if err := writeFileAtomic(mp, b); err != nil {
+		return dir, links, diskErr(err)
+	}
+	return dir, append(links, mp), nil
+}
+
 // ourSidecar reports whether path is a file lmget wrote next to a model for
-// an app (Jan's model.yml, exo's manifest) for this plan.
+// an app (Jan's model.yml, exo's and colibri's manifests) for this plan.
 func ourSidecar(p string, plan *Plan) bool {
 	b, err := os.ReadFile(p)
 	if err != nil {
@@ -297,6 +361,9 @@ func ourSidecar(p string, plan *Plan) bool {
 	case ".exo-download.json":
 		var m exoManifest
 		return json.Unmarshal(b, &m) == nil && strings.EqualFold(m.Repo, plan.Ref.Repo)
+	case ".colibri-download.json":
+		var m colibriManifest
+		return json.Unmarshal(b, &m) == nil && m.LmgetExport && strings.EqualFold(m.Repo, plan.Ref.Repo)
 	}
 	return false
 }

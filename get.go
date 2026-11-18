@@ -76,7 +76,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	}
 	// info: whether it fits this machine, before the plan is shown; never for
 	// a plan the checks below refuse, which downloads nothing at all
-	if r.DryRun && c.plannedFilesAllowed(plan, revoked, r.Licenses) {
+	// colibri streams a model's experts from the disk and keeps only the
+	// dense part in memory: the whole weights are not what it needs
+	if r.DryRun && r.Target.Kind != "colibri" && c.plannedFilesAllowed(plan, revoked, r.Licenses) {
 		plan.Memory = c.estimateMemory(ctx, plan, revoked)
 	}
 	e = ev(EvPlan)
