@@ -149,11 +149,12 @@ func TestMDNSAnswer(t *testing.T) {
 	if !ok {
 		t.Fatal("no answer to a query for the service")
 	}
-	got := strings.Join(mdnsServers(reply, 4242), " ")
+	nets := []*net.IPNet{{IP: net.IPv4(192, 168, 1, 0), Mask: net.CIDRMask(24, 32)}, {IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)}}
+	got := strings.Join(mdnsServers(reply, 4242, nets), " ")
 	if got != "http://192.168.1.20:7878 http://10.0.0.5:7878" && got != "http://10.0.0.5:7878 http://192.168.1.20:7878" {
 		t.Fatalf("servers %q", got)
 	}
-	if s := mdnsServers(reply, 4243); s != nil {
+	if s := mdnsServers(reply, 4243, nets); s != nil {
 		t.Fatal("an answer to another query was taken")
 	}
 	if _, ok := mdnsAnswer(query(1, "_http._tcp.local.", dnsmessage.TypePTR), "lmget-box", 7878, ips); ok {

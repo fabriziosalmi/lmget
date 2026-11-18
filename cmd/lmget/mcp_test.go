@@ -325,3 +325,44 @@ func TestMCPCancel(t *testing.T) {
 		t.Fatal("a cancelled download ends as an error")
 	}
 }
+
+// An agent's URL cannot make lmget mcp reach this machine or its networks:
+// the connection is refused before any request.
+func TestMCPURLsReachPublicHostsOnly(t *testing.T) {
+	var hits atomic.Int64
+	local := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1) }))
+	defer local.Close()
+	s, _ := startMCP(t, &mcpHF{files: map[string][]byte{}})
+	s.call(1, "initialize", map[string]any{"protocolVersion": mcpVersions[0]})
+	for i, u := range []string{local.URL + "/model.gguf", "https://169.254.169.254/latest/meta-data/x.gguf"} {
+		for _, tool := range []string{"info", "get"} {
+			text, isErr := toolText(t, s.call(10+i, "tools/call", map[string]any{"name": tool, "arguments": map[string]any{"model": u, "confirm": true}}))
+			if !isErr || !strings.Contains(text, "not a public address") {
+				t.Errorf("%s %s: %v %s", tool, u, isErr, text)
+			}
+		}
+	}
+	if hits.Load() != 0 {
+		t.Fatalf("a private host got %d requests", hits.Load())
+	}
+}
+
+// One message too long for lmget mcp gets an error; the session goes on.
+func TestMCPSurvivesAnOverlongLine(t *testing.T) {
+	s, _ := startMCP(t, &mcpHF{files: map[string][]byte{}})
+	s.send(`{"jsonrpc":"2.0","id":1,"method":"ping","params":{"pad":"` + strings.Repeat("x", 5<<20) + `"}}`)
+	if r := s.call(2, "ping", nil); r["error"] != nil {
+		t.Fatalf("after an overlong line: %v", r)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tooLong := 0
+	for _, l := range s.lines {
+		if strings.Contains(l, "longer than") {
+			tooLong++
+		}
+	}
+	if tooLong != 1 {
+		t.Fatalf("%d errors for the overlong line, want 1", tooLong)
+	}
+}

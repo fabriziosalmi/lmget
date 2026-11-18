@@ -51,6 +51,7 @@ type flags struct {
 	maxTokens   int    // run: the longest answer
 	listen      string // serve: the address to listen on
 	noMDNS      bool   // serve: do not announce by mDNS
+	open        bool   // serve: answer clients off the local network too
 }
 
 func main() { os.Exit(int(run())) }
@@ -232,13 +233,15 @@ func run() lmget.ExitCode {
 			"at the source) over HTTP on the local network, at /blobs/sha256/<sha256>, and announces\n" +
 			"itself by mDNS as an _lmget._tcp service. An lmget with LMGET_LAN=on finds it and asks it\n" +
 			"first, verifying every byte against the sha256 its plan knows. Gated and private models,\n" +
-			"URLs and OCI images are never shared.",
+			"URLs, OCI images and revoked blobs are never shared. It answers clients on this machine's\n" +
+			"local networks only (--open: any client that reaches it), at most 64 at once.",
 		Example: "  lmget serve\n  lmget serve --listen 192.168.1.10:7878 --no-mdns",
 		Args:    noArgs,
 		RunE:    func(cmd *cobra.Command, args []string) error { code = doServe(f); return nil },
 	}
 	serve.Flags().StringVar(&f.listen, "listen", fmt.Sprintf(":%d", lmget.LANPort), "address to listen on")
 	serve.Flags().BoolVar(&f.noMDNS, "no-mdns", false, "do not announce the server by mDNS")
+	serve.Flags().BoolVar(&f.open, "open", false, "answer clients off this machine's local networks too (a VPN, the internet)")
 	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run, mcp, sbom, serve)
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
@@ -523,6 +526,7 @@ func doServe(f flags) lmget.ExitCode {
 		return fail(mode, err)
 	}
 	ls := c.LANServer()
+	ls.Open = f.open
 	models, blobs, err := ls.Shared()
 	if err != nil {
 		return fail(mode, err)
@@ -531,11 +535,16 @@ func doServe(f flags) lmget.ExitCode {
 	if err != nil {
 		return fail(mode, &lmget.Error{Code: lmget.ExitFailure, Kind: "serve", Msg: "cannot listen on " + lmget.Printable(f.listen) + ": " + err.Error()})
 	}
+	ln = lmget.LANListener(ln)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	srv := &http.Server{Handler: ls, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 	go func() { <-ctx.Done(); srv.Close() }()
-	fmt.Fprintf(os.Stderr, "lmget serve: %d public models (%d files) on %s, read only\n", models, blobs, ln.Addr())
+	who := "clients on this machine's local networks"
+	if f.open {
+		who = "any client that reaches it"
+	}
+	fmt.Fprintf(os.Stderr, "lmget serve: %d public models (%d files) on %s, read only, for %s\n", models, blobs, ln.Addr(), who)
 	if !f.noMDNS {
 		go func() {
 			if err := lmget.Announce(ctx, port); err != nil {

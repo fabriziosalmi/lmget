@@ -8,9 +8,11 @@
 package lmget
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,8 +172,8 @@ func New(o Options) (*Client, error) {
 	}
 	if hc == nil {
 		hc = &http.Client{CheckRedirect: noDowngrade, Transport: &http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+			Proxy:                 publicOnlyProxy,
+			DialContext:           publicOnlyDial(&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}),
 			ForceAttemptHTTP2:     true,
 			MaxIdleConnsPerHost:   32,
 			IdleConnTimeout:       90 * time.Second,
@@ -237,6 +239,12 @@ func noDowngrade(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
 		return errors.New("stopped after 10 redirects")
 	}
+	// an origin's redirects stay on its host and port: anyone's server must
+	// not point lmget at this machine's own services
+	if len(via) > 0 && isOriginRequest(req.Context()) && req.URL.Host != via[0].URL.Host {
+		return newErr(ExitNetwork, "network", "refused an origin's redirect to "+req.URL.Host).
+			why("an origin may redirect within its own host only")
+	}
 	// net/http keeps Authorization on a redirect to the same host name on
 	// another port, and to subdomains: the token stays with the exact host.
 	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
@@ -247,4 +255,72 @@ func noDowngrade(req *http.Request, via []*http.Request) error {
 			why("a downgrade would let anyone on the path change the bytes")
 	}
 	return nil
+}
+
+// publicKey marks a context whose requests may reach public addresses only:
+// lmget mcp's URL and OCI refs, whose host an agent chose.
+type publicKey struct{}
+
+// PublicOnly returns a context whose downloads connect to public internet
+// addresses only: never this machine, its networks, link-local (the cloud
+// metadata address) or carrier-grade NAT. The address is checked when the
+// connection is made, so a name that resolves elsewhere later (DNS
+// rebinding) cannot get around it. Clients built with their own
+// Options.HTTP do not check it.
+func PublicOnly(ctx context.Context) context.Context {
+	return context.WithValue(ctx, publicKey{}, true)
+}
+
+func isPublicOnly(ctx context.Context) bool { v, _ := ctx.Value(publicKey{}).(bool); return v }
+
+// envProxy is the environment's proxy (a variable for tests: net/http reads
+// the environment once per process).
+var envProxy = http.ProxyFromEnvironment
+
+var cgnat = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+
+// publicIP reports a global unicast address outside the private, shared
+// and loopback ranges.
+func publicIP(ip net.IP) bool {
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
+	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() && !cgnat.Contains(ip)
+}
+
+func publicOnlyDial(d *net.Dialer) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if !isPublicOnly(ctx) {
+			return d.DialContext(ctx, network, addr)
+		}
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		if len(ips) == 0 {
+			return nil, errors.New("no address for " + host)
+		}
+		for _, ip := range ips {
+			if !publicIP(ip.IP) {
+				return nil, newErr(ExitUsage, "usage", host+" is not a public address ("+ip.IP.String()+")").
+					why("lmget mcp fetches URLs and OCI images from public hosts only: an agent must not reach this machine or its networks")
+			}
+		}
+		return d.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port)) // the address checked
+	}
+}
+
+// publicOnlyProxy is the environment's proxy, except for a public-only
+// request: through a proxy the address it reaches cannot be checked.
+func publicOnlyProxy(req *http.Request) (*url.URL, error) {
+	u, err := envProxy(req)
+	if err == nil && u != nil && isPublicOnly(req.Context()) {
+		return nil, newErr(ExitUsage, "usage", "lmget mcp does not fetch a URL or an OCI image through a proxy").
+			why("through a proxy, lmget cannot check that the host is public")
+	}
+	return u, err
 }

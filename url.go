@@ -49,7 +49,7 @@ func (c *Client) resolveURL(ctx context.Context, ref Ref, sel Selection) (*Plan,
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, newErr(ExitNetwork, "network", "cannot reach "+hostOf(ref.Repo)).wrap(err)
+		return nil, reachErr(hostOf(ref.Repo), err)
 	}
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 1)) // never read a 200 body here
 	resp.Body.Close()

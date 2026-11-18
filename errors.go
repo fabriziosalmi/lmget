@@ -86,3 +86,14 @@ func AsError(err error) *Error {
 	}
 	return &Error{Code: ExitFailure, Kind: "failure", Msg: err.Error(), Err: err, Cause: err.Error()}
 }
+
+// reachErr is the error of a request that got no answer from host. One
+// lmget refused itself (a host that is not public, for lmget mcp) keeps its
+// own message: "cannot reach" would hide why.
+func reachErr(host string, err error) error {
+	var e *Error
+	if errors.As(err, &e) {
+		return e
+	}
+	return newErr(ExitNetwork, "network", "cannot reach "+host).wrap(err)
+}

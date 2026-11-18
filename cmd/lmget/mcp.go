@@ -81,21 +81,47 @@ func (s *mcpServer) serve(ctx context.Context, in io.Reader) error {
 		cancel()
 		s.wg.Wait()
 	}()
-	sc := bufio.NewScanner(in)
-	sc.Buffer(make([]byte, 64*1024), 4<<20)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
+	r := bufio.NewReaderSize(in, 64*1024)
+	for {
+		raw, tooLong, err := readLine(r, mcpMaxLine)
+		if tooLong { // one line an agent got wrong does not end the session
+			s.reply(json.RawMessage("null"), nil, &rpcError{Code: -32700, Message: fmt.Sprintf("a message longer than %d bytes", mcpMaxLine)})
+		} else if line := bytes.TrimSpace(raw); len(line) > 0 {
+			var m rpcIn
+			if line[0] != '{' || json.Unmarshal(line, &m) != nil || m.JSONRPC != "2.0" {
+				s.reply(json.RawMessage("null"), nil, &rpcError{Code: -32700, Message: "not a JSON-RPC 2.0 message"})
+			} else {
+				s.handle(ctx, m)
+			}
 		}
-		var m rpcIn
-		if line[0] != '{' || json.Unmarshal(line, &m) != nil || m.JSONRPC != "2.0" {
-			s.reply(json.RawMessage("null"), nil, &rpcError{Code: -32700, Message: "not a JSON-RPC 2.0 message"})
-			continue
+		if err == io.EOF {
+			return nil
 		}
-		s.handle(ctx, m)
+		if err != nil {
+			return err
+		}
 	}
-	return sc.Err()
+}
+
+// mcpMaxLine bounds one message: lmget's tools take a few short arguments.
+const mcpMaxLine = 4 << 20
+
+// readLine reads up to the next newline. A line longer than max is read to
+// its end and dropped, without holding it in memory: tooLong is then true.
+func readLine(r *bufio.Reader, max int) (line []byte, tooLong bool, err error) {
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if !tooLong {
+			if len(line)+len(chunk) > max {
+				tooLong, line = true, nil
+			} else {
+				line = append(line, chunk...)
+			}
+		}
+		if err != bufio.ErrBufferFull {
+			return line, tooLong, err
+		}
+	}
 }
 
 func (s *mcpServer) handle(ctx context.Context, m rpcIn) {
@@ -363,6 +389,9 @@ func (s *mcpServer) plan(ctx context.Context, c *lmget.Client, a mcpArgs, tool s
 	dry := !(tool == "get" && a.Confirm)
 	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry}
 	preferFasterNodes(c)
+	if ref.Source == "url" || ref.Source == "oci" { // a host the agent chose: public ones only
+		ctx = lmget.PublicOnly(ctx)
+	}
 	out, err := c.Pull(ctx, req, s.progress(progress))
 	code := lmget.ExitOK
 	if err != nil {
