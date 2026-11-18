@@ -21,14 +21,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: lmget from this repository's Scoop bucket
+      - name: lmget from this repository's Scoop manifest
         shell: pwsh
         run: |
           $installer = 'https://raw.githubusercontent.com/ScoopInstaller/Install/1e2f334083d609986d8c8bc9e31ae8e87c39fab4/install.ps1'
           iex "& {$(irm $installer)} -RunAsAdmin"
           $env:PATH = (Join-Path $HOME 'scoop\shims') + ';' + $env:PATH
-          scoop bucket add lmget $env:GITHUB_WORKSPACE
-          scoop install lmget/lmget
+          # scoop bucket add needs a git URL, which is main once merged: here
+          # the manifest file itself, which is what the bucket serves
+          scoop install (Join-Path $env:GITHUB_WORKSPACE 'bucket\lmget.json')
           $want = 'lmget v' + (Get-Content bucket/lmget.json -Raw | ConvertFrom-Json).version
           $got = lmget --version
           if ($got -ne $want) { throw "installed: $got, want $want" }
