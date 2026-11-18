@@ -171,7 +171,7 @@ func ChooseVariant(a Alias, m Machine, apps []string, o ChoiceOptions) (Choice, 
 			c := Choice{Variant: vs[pick], Target: t, Budget: budget}
 			if o.Target == "" {
 				if t == "hf" && a.Kind != "chat" {
-					c.Why = append(c.Why, "a "+a.Kind+" model, for transformers and sentence-transformers: the Hugging Face cache")
+					c.Why = append(c.Why, a.Kind+" models go to the Hugging Face cache, where transformers and sentence-transformers read them")
 				} else if t == "hf" {
 					c.Why = append(c.Why, "no app found that loads this family's formats: the Hugging Face cache")
 				} else {

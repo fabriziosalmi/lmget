@@ -29,18 +29,30 @@ type nickname struct {
 	to      string   // "" when the user's --to (or the default) stands
 }
 
-// resolveNickname turns "qwen" into a concrete model: the user's own
-// nickname as written, or the project's, choosing the variant for this
-// machine. Unless dry, --yes or an interactive yes is needed.
-func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bool) (*nickname, error) {
+// nickDecision is what lmget chose for a nickname, before anyone is shown
+// or asked anything: the user's own nickname, or a variant of the
+// project's for this machine.
+type nickDecision struct {
+	name  string
+	local *lmget.Ref // the user's own nickname: nothing to choose
+	alias lmget.Alias
+	m     lmget.Machine
+	apps  []string
+	ch    lmget.Choice
+	note  string
+	hc    *lmget.HistoryChoice
+}
+
+// decideNickname makes the choice resolveNickname shows. It prints nothing,
+// so lmget mcp, whose stdout is the protocol, uses it too. to is the
+// target the user named, "" when they named none.
+func decideNickname(c *lmget.Client, name, to, format, forSize string) (*nickDecision, error) {
 	local, err := c.LocalAliases()
 	if err != nil {
 		return nil, err
 	}
 	if ref, ok := local[name]; ok {
-		say(mode, "nickname", map[string]any{"name": name, "ref": ref.Display(), "from": c.LocalAliasesPath()},
-			fmt.Sprintf("%s = %s (your nickname, %s)", name, ref.Display(), c.LocalAliasesPath()))
-		return &nickname{name: name, ref: ref}, nil
+		return &nickDecision{name: name, local: &ref}, nil
 	}
 
 	list, note := publicAliases(c)
@@ -62,19 +74,16 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 
 	m := lmget.DetectMachine()
 	apps := lmget.DetectApps(m)
-	opt := lmget.ChoiceOptions{Format: f.format, DiskFree: c.StoreDiskFree()}
-	if f.toChanged {
-		opt.Target = f.to
-	}
-	if f.forSize != "" {
-		if opt.Budget, err = lmget.ParseSize(f.forSize); err != nil {
+	opt := lmget.ChoiceOptions{Format: format, Target: to, DiskFree: c.StoreDiskFree()}
+	if forSize != "" {
+		if opt.Budget, err = lmget.ParseSize(forSize); err != nil {
 			return nil, err
 		}
 	}
 	// what the user chose last time for this nickname, unless they say now
 	var remembered string
 	h, _ := c.History()
-	if f.forSize == "" && f.format == "" {
+	if forSize == "" && format == "" {
 		if last := lmget.LastNicknameChoice(h, name); last != nil {
 			opt.Budget, opt.Format = last.Choice.For, last.Choice.Format
 			var what []string
@@ -93,7 +102,7 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 	// a variant an app could not load for memory lately: a ceiling below it,
 	// which lowers the budget and never raises it
 	var tooBig string
-	if f.forSize == "" {
+	if forSize == "" {
 		opt.Ceiling, tooBig = memoryCeiling(h, name, a, time.Now())
 	}
 	ch, err := lmget.ChooseVariant(a, m, apps, opt)
@@ -114,7 +123,48 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 		ch.Why = append(ch.Why, tooBig)
 	}
 	hc := &lmget.HistoryChoice{Variant: ch.Variant.Ref, Format: userFormat, For: userFor, Answer: "flag"}
-	showChoice(mode, name, a, m, apps, ch, note)
+	return &nickDecision{name: name, alias: a, m: m, apps: apps, ch: ch, note: note, hc: hc}, nil
+}
+
+// resolved turns a decision into the model to get. include and to stay
+// empty when the user gave their own.
+func (d *nickDecision) resolved(userInclude bool, userTo bool) (*nickname, error) {
+	if d.local != nil {
+		return &nickname{name: d.name, ref: *d.local}, nil
+	}
+	ref, err := lmget.ParseRef(d.ch.Variant.Ref)
+	if err != nil {
+		return nil, err
+	}
+	n := &nickname{name: d.name, choice: d.hc, ref: ref}
+	if !userInclude {
+		n.include = d.ch.Variant.Include
+	}
+	if !userTo {
+		n.to = d.ch.Target
+	}
+	return n, nil
+}
+
+// resolveNickname turns "qwen" into a concrete model: the user's own
+// nickname as written, or the project's, choosing the variant for this
+// machine. Unless dry, --yes or an interactive yes is needed.
+func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bool) (*nickname, error) {
+	to := ""
+	if f.toChanged {
+		to = f.to
+	}
+	d, err := decideNickname(c, name, to, f.format, f.forSize)
+	if err != nil {
+		return nil, err
+	}
+	if d.local != nil {
+		say(mode, "nickname", map[string]any{"name": name, "ref": d.local.Display(), "from": c.LocalAliasesPath()},
+			fmt.Sprintf("%s = %s (your nickname, %s)", name, d.local.Display(), c.LocalAliasesPath()))
+		return d.resolved(len(f.include) > 0, f.toChanged)
+	}
+	ch, hc := d.ch, d.hc
+	showChoice(mode, name, d.alias, d.m, d.apps, ch, d.note)
 
 	if !dry && !f.yes {
 		if mode == ui.ModeJSON || !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stderr.Fd())) {
@@ -132,18 +182,7 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 					{Cmd: "lmget " + name + " --format gguf", Note: "another format"}}}
 		}
 	}
-	ref, err := lmget.ParseRef(ch.Variant.Ref)
-	if err != nil {
-		return nil, err
-	}
-	n := &nickname{name: name, choice: hc, ref: ref}
-	if len(f.include) == 0 {
-		n.include = ch.Variant.Include
-	}
-	if !f.toChanged {
-		n.to = ch.Target
-	}
-	return n, nil
+	return d.resolved(len(f.include) > 0, f.toChanged)
 }
 
 // publicAliases returns the project's nickname list: the cached one when it

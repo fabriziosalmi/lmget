@@ -199,7 +199,18 @@ func run() lmget.ExitCode {
 	rf.StringVar(&f.forSize, "for", "", "with a nickname: memory the model may use, e.g. 8GB")
 	rf.StringVar(&f.format, "format", "", "with a nickname: safetensors, mlx, gguf or ollama")
 	rf.IntVar(&f.conns, "conns", 8, "parallel connections per file")
-	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run)
+	mcp := &cobra.Command{
+		Use:   "mcp",
+		Short: "Serve lmget to an AI agent over the Model Context Protocol (stdin and stdout)",
+		Long: "mcp speaks the Model Context Protocol on stdin and stdout, for agents such as Claude Code,\n" +
+			"Cursor or Zed. Its tools: info (the plan, read only), list (the store, read only) and get,\n" +
+			"which downloads only when called with confirm: true and links only into the apps and the\n" +
+			"Hugging Face cache, never into a folder an agent picks.",
+		Example: "  claude mcp add lmget -- lmget mcp",
+		Args:    noArgs,
+		RunE:    func(cmd *cobra.Command, args []string) error { code = doMCP(); return nil },
+	}
+	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run, mcp)
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
 			Fixes: []lmget.Fix{{Cmd: c.CommandPath() + " --help"}}}
