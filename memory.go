@@ -87,8 +87,17 @@ func (c *llmConfig) kvPerToken() (int64, bool, bool) {
 		}
 		layers, upper = full+sliding, sliding > 0
 	}
-	return int64(2 * layers * kv * hd * 2), upper, true
+	// keys and values, 2 bytes each; in floating point, since a published
+	// config can carry dimensions whose product wraps an int64 (to 0, which
+	// would say any model fits). Past 4 GiB a token is no real model.
+	per := 2 * float64(layers) * float64(kv) * float64(hd) * 2
+	if per <= 0 || per > maxKVPerToken {
+		return 0, false, false
+	}
+	return int64(per), upper, true
 }
+
+const maxKVPerToken = 4 << 30
 
 func parseLLMConfig(b []byte) (*llmConfig, bool) {
 	var c llmConfig

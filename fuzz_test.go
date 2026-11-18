@@ -128,3 +128,36 @@ func FuzzIsLocalSlash(f *testing.F) {
 		}
 	})
 }
+
+// A config.json is the publisher's: whatever it says, the estimate never
+// claims a model fits on numbers that overflowed, and never panics.
+func FuzzEstimateMemory(f *testing.F) {
+	f.Add([]byte(cfgQwen3_06B), int64(1<<30))
+	f.Add([]byte(`{"num_hidden_layers":4611686018427387904,"num_attention_heads":2,"num_key_value_heads":4611686018427387904,"head_dim":4}`), int64(1))
+	f.Add([]byte(`{"text_config":{"num_hidden_layers":2,"num_attention_heads":2,"hidden_size":4,"layer_types":["full_attention"]}}`), int64(10))
+	f.Fuzz(func(t *testing.T, cfg []byte, weights int64) {
+		if weights <= 0 || weights > 1<<50 {
+			return
+		}
+		p := &Plan{Files: []File{{Path: "model.safetensors", Size: weights}}}
+		e := estimateMemory(cfg, p, Machine{OS: "darwin", AppleSilicon: true, TotalMem: 16 << 30})
+		if e == nil {
+			return
+		}
+		if e.KVPerToken <= 0 || e.KVPerToken > maxKVPerToken || e.Total < e.Weights || e.Context <= 0 {
+			t.Fatalf("nonsense estimate: %+v", e)
+		}
+	})
+}
+
+// A safetensors header is the publisher's too: read without a panic, and
+// never past the file.
+func FuzzSafetensorsKeys(f *testing.F) {
+	f.Add(tensorFile("model.diffusion_model.w", 4))
+	f.Add([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f})
+	f.Fuzz(func(t *testing.T, b []byte) {
+		p := filepath.Join(t.TempDir(), "x.safetensors")
+		os.WriteFile(p, b, 0o644)
+		safetensorsKeys(p)
+	})
+}

@@ -119,3 +119,19 @@ func TestInfoRefusesAConfigOtherThanThePlanned(t *testing.T) {
 		}
 	}
 }
+
+// Dimensions whose product overflows (a published config is anyone's) give
+// no estimate: wrapped to 0 or negative, the KV cache would say it fits.
+func TestEstimateMemoryRefusesOverflow(t *testing.T) {
+	p := &Plan{Files: []File{{Path: "model.safetensors", Size: 1000}}}
+	m := Machine{OS: "darwin", AppleSilicon: true, TotalMem: 16 << 30}
+	for _, cfg := range []string{
+		`{"num_hidden_layers":2147483648,"num_attention_heads":1,"num_key_value_heads":2147483648,"head_dim":4}`, // 2^66: wraps to 0
+		`{"num_hidden_layers":3037000500,"num_attention_heads":1,"num_key_value_heads":3037000500,"head_dim":3}`, // wraps negative
+		`{"num_hidden_layers":64,"num_attention_heads":64,"num_key_value_heads":64,"head_dim":4294967296}`,
+	} {
+		if e := estimateMemory([]byte(cfg), p, m); e != nil {
+			t.Errorf("%s: %+v", cfg, e)
+		}
+	}
+}
