@@ -41,85 +41,107 @@
 <figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="684"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory." width="960" height="392"></picture></figure>
 
 <main>
-  <section aria-labelledby="install">
-    <h2 id="install">Install</h2>
-    <p class="note">For macOS and Linux, amd64 and arm64; Windows with the PowerShell script above. The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code>~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a> (v0.3.2, 2026-11-18).</p>
-  </section>
-
   <section aria-labelledby="use">
-    <h2 id="use">Use</h2>
-    <div class="block">
-      <pre><code id="use-cmd">lmget qwen
-lmget Qwen/Qwen3-0.6B
-lmget info Qwen/Qwen3-0.6B
-lmget mlx-community/Qwen3.5-0.8B-4bit --to omlx
-lmget ollama:smollm2:135m</code></pre>
-      <span class="copy" hidden>
-        <button type="button" class="copy-button" command="--copy" commandfor="use-cmd">Copy<span class="sr"> example commands</span></button>
-        <span class="tip" role="status"></span>
-      </span>
-    </div>
-    <p class="note"><code>qwen</code> is a nickname: lmget reads this machine's memory and the apps installed, proposes the Qwen3.5 variant that fits, and asks before downloading. The second downloads, verifies and links into the Hugging Face cache. <code>info</code> shows the plan and downloads nothing. <code>--to omlx</code>, <code>--to lmstudio</code>, <code>--to jan</code>, <code>--to localai</code> and <code>--to exo</code> link into those apps; the last lands in Ollama, ready for <code>ollama run</code>.</p>
+    <header>
+      <h2 id="use">Use</h2>
+      <p>A name in, a verified model where your tools look.</p>
+    </header>
+    <dl class="cmds">
+      <div><dt><code>lmget qwen</code></dt><dd>A nickname: lmget reads this machine's memory and the apps installed, proposes the Qwen3.5 variant that fits, and asks before downloading.</dd></div>
+      <div><dt><code>lmget Qwen/Qwen3-0.6B</code></dt><dd>Downloads, verifies and links into the Hugging Face cache.</dd></div>
+      <div><dt><code>lmget info Qwen/Qwen3-0.6B</code></dt><dd>Shows the plan and downloads nothing.</dd></div>
+      <div><dt><code>lmget mlx-community/Qwen3.5-0.8B-4bit <span class="nw">--to omlx</span></code></dt><dd>Links into oMLX. <code class="nw">--to lmstudio</code>, <code class="nw">--to jan</code>, <code class="nw">--to localai</code> and <code class="nw">--to exo</code> link into those apps.</dd></div>
+      <div><dt><code>lmget ollama:smollm2:135m</code></dt><dd>Lands in Ollama, ready for <code class="nw">ollama run</code>.</dd></div>
+    </dl>
   </section>
 
   <section aria-labelledby="run">
-    <h2 id="run">A real run</h2>
-    <pre class="out" tabindex="0" aria-label="Output of a real lmget run"><code><span class="dim">$</span> lmget sentence-transformers/all-MiniLM-L6-v2 --include config.json --include tokenizer.json --include model.safetensors --to none --plain
-lmget: resolve hf:sentence-transformers/all-MiniLM-L6-v2
-lmget: plan sentence-transformers/all-MiniLM-L6-v2 commit=1110a243fdf4706b3f48f1d95db1a4f5529b4d41 license=apache-2.0 files=4 bytes=91335425 to_fetch=91335425
-lmget: skip 26 files (not included)
-lmget: <span class="ok">verified</span> 1_Pooling/config.json sha256=4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23
-lmget: <span class="ok">verified</span> config.json sha256=953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41
-lmget: <span class="ok">verified</span> model.safetensors sha256=53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db
-lmget: <span class="ok">verified</span> tokenizer.json sha256=be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037<!-- gitleaks:allow: a public Hugging Face digest -->
-lmget: done bytes=91335425 fetched=91335425 elapsed=13.8s</code></pre>
-    <p class="note">lmget v0.1.0, recorded on 2026-11-17. Each sha256 is the one Hugging Face publishes for that file at that commit.</p>
+    <header>
+      <h2 id="run">A real run</h2>
+      <p>Every file checked against the hash its source publishes.</p>
+    </header>
+    <div>
+      <figure class="term">
+        <figcaption><span>lmget v0.1.0</span><span>recorded 2026-11-17</span></figcaption>
+        <pre tabindex="0" aria-label="Output of a real lmget run"><code><span class="d">$</span> lmget <span class="nw">sentence-transformers/</span><wbr><span class="nw">all-MiniLM-L6-v2</span> <span class="nw">--include config.json</span> <span class="nw">--include tokenizer.json</span> <span class="nw">--include model.safetensors</span> <span class="nw">--to none</span> <span class="nw">--plain</span>
+<span class="d">plan</span>  <span class="nw">commit 1110a24</span>  apache-2.0  <span class="nw">4 files</span>  <span class="nw">91.3 MB</span>
+<span class="d">skip</span>  <span class="nw">26 files</span> not included
+<span class="ok">&#10003;</span> 1_Pooling/config.json  <span class="d h" title="sha256 4be450dde3b0273bb9787637cfbd28fe04a7ba6ab9d36ac48e92b11e350ffc23">sha256 4be450dd&hellip;0ffc23</span>
+<span class="ok">&#10003;</span> config.json            <span class="d h" title="sha256 953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41">sha256 953f9c0d&hellip;908b41</span>
+<span class="ok">&#10003;</span> model.safetensors      <span class="d h" title="sha256 53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db">sha256 53aa5117&hellip;28d9db</span>
+<span class="ok">&#10003;</span> tokenizer.json         <span class="d h" title="sha256 be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037">sha256 be50c362&hellip;572037</span><!-- gitleaks:allow: public Hugging Face digests -->
+<span class="d">done</span>  <span class="nw">91.3 MB</span> in <span class="nw">13.8 s</span></code></pre>
+      </figure>
+      <p class="note">The output of <code>--plain</code>, set in columns, with each sha256 shortened (point at one to see it whole; narrow screens leave them out). Each is the one Hugging Face publishes for that file at that commit.</p>
+    </div>
   </section>
 
   <section aria-labelledby="what">
-    <h2 id="what">What it does</h2>
-    <ul>
-      <li>Checks every file against the hash its source publishes, or the one you pin, and refuses pickle content hidden under another name.</li>
-      <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look: the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory.</li>
-      <li>Nicknames such as <code>qwen</code>, <code>whisper</code> or <code>embed</code> pick the variant that fits the machine; the list is signed like the index.</li>
-      <li>When Hugging Face fails, a signed index and mirror nodes keep the models it lists available, even to a first run.</li>
-      <li>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</li>
+    <header>
+      <h2 id="what">What it does</h2>
+      <p>From Hugging Face (ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</p>
+    </header>
+    <ul class="features">
+      <li><h3>Every file verified</h3><p>Checked against the hash its source publishes, or the one you pin.</p></li>
+      <li><h3>No hidden pickle</h3><p>Pickle content under another name is refused; pickle weights are skipped when safetensors exist.</p></li>
+      <li><h3>Stored once</h3><p>Parallel, resumable downloads, each file stored once by sha256.</p></li>
+      <li><h3>Where your tools look</h3><p>Linked into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory.</p></li>
+      <li><h3>Nicknames</h3><p><code>qwen</code>, <code>whisper</code> or <code>embed</code> pick the variant that fits the machine; the list is signed like the index.</p></li>
+      <li><h3>When the source fails</h3><p>A signed index and mirror nodes keep the models it lists available, even to a first run.</p></li>
     </ul>
   </section>
 
   <section aria-labelledby="works">
-    <h2 id="works">Works with</h2>
-    <ul>
-      <li>The Hugging Face cache (the default): transformers, sentence-transformers, llama.cpp <code>-hf</code>, Goose's local inference, Lemonade.</li>
-      <li>Ollama: Ollama, RamaLama's <code>ollama://</code> models, and the apps that ask Ollama for a model, such as Open WebUI, Page Assist, Hollama and Oterm.</li>
-      <li>Their own folders: oMLX, LM Studio, Jan, LocalAI, exo.</li>
-      <li>A plain directory: Text Generation WebUI, and apps given a file path, such as KoboldCpp, llamafile and llama-server.</li>
-      <li>Through a server: chat and agent apps that keep no model files of their own (LobeChat, LibreChat, Cherry Studio, Chatbox, SillyTavern, Dify, Langflow) use the models of the local server they ask, which lmget fills.</li>
-    </ul>
-    <p class="note">Read from each project's source or documentation on 2026-11-18. The folders and layouts are in the <a href="https://github.com/fabriziosalmi/lmget#apps">README</a>.</p>
+    <header>
+      <h2 id="works">Works with</h2>
+      <p>Read from each project's source or documentation on <span class="nw">2026-11-18</span>. Folders and layouts are in the <a href="https://github.com/fabriziosalmi/lmget#apps">README</a>.</p>
+    </header>
+    <dl class="works">
+      <div><dt>The Hugging Face cache <code>--to hf</code></dt><dd><span class="nw">transformers</span>, <span class="nw">sentence-transformers</span>, <span class="nw">llama.cpp -hf</span>, <span class="nw">Goose's local inference</span>, <span class="nw">Lemonade</span></dd></div>
+      <div><dt>Ollama <code>--to ollama</code></dt><dd><span class="nw">Ollama</span>, <span class="nw">RamaLama's ollama://</span> models, and the apps that ask Ollama: <span class="nw">Open WebUI</span>, <span class="nw">Page Assist</span>, <span class="nw">Hollama</span>, <span class="nw">Oterm</span></dd></div>
+      <div><dt>Their own folders</dt><dd><span class="nw">oMLX</span>, <span class="nw">LM Studio</span>, <span class="nw">Jan</span>, <span class="nw">LocalAI</span>, <span class="nw">exo</span></dd></div>
+      <div><dt>A plain directory <code>--to dir:PATH</code></dt><dd><span class="nw">Text Generation WebUI</span>, and apps given a file path: <span class="nw">KoboldCpp</span>, <span class="nw">llamafile</span>, <span class="nw">llama-server</span></dd></div>
+      <div><dt>Through a server</dt><dd>Apps that keep no model files of their own use the models of the local server they ask, which lmget fills: <span class="nw">LobeChat</span>, <span class="nw">LibreChat</span>, <span class="nw">Cherry Studio</span>, <span class="nw">Chatbox</span>, <span class="nw">SillyTavern</span>, <span class="nw">Dify</span>, <span class="nw">Langflow</span></dd></div>
+    </dl>
   </section>
 
   <section aria-labelledby="nicknames">
-    <h2 id="nicknames">Nicknames</h2>
+    <header>
+      <h2 id="nicknames">Nicknames</h2>
+      <p>One name, the variant that fits: lmget picks it and asks before downloading.</p>
+    </header>
     <div id="aliases-panel">
-      <p class="note">The <a href="/aliases.json">signed nickname list</a> maps names such as <code>qwen</code> to the variants of a model family; lmget picks the one that fits the machine and asks before downloading.</p>
+      <p class="note">The <a href="/aliases.json">signed nickname list</a> maps names such as <code>qwen</code> to the variants of a model family.</p>
     </div>
   </section>
 
   <section aria-labelledby="mirror">
-    <h2 id="mirror">Mirrored models</h2>
+    <header>
+      <h2 id="mirror">Mirrored models</h2>
+      <p>Served by the project's nodes when the source fails, every file listed with its sha256.</p>
+    </header>
     <div id="index-panel">
-      <p class="note">The <a href="/index.json">signed index</a> lists the models the project mirrors, with every file's sha256 and the nodes that serve them. lmget verifies its minisign signature before using it.</p>
+      <p class="note">The <a href="/index.json">signed index</a> lists the models the project mirrors and the nodes that serve them. lmget verifies its minisign signature before using it.</p>
     </div>
   </section>
 
+  <section aria-labelledby="install">
+    <header>
+      <h2 id="install">Install</h2>
+      <p>macOS, Linux and Windows, amd64 and arm64.</p>
+    </header>
+    <p class="note">The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code class="nw">~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a> (<span class="nw">v0.3.2</span>, <span class="nw">2026-11-18</span>).</p>
+  </section>
+</main>
+
+<footer class="foot">
   <nav aria-label="Project links">
     <a href="https://github.com/fabriziosalmi/lmget">Source</a>
     <a href="https://github.com/fabriziosalmi/lmget/releases">Releases</a>
     <a href="/index.json">Signed index</a>
     <a href="https://github.com/fabriziosalmi/lmget/security/policy">Security</a>
   </nav>
-  <footer>Apache-2.0</footer>
-</main>
+  <span>Apache-2.0</span>
+</footer>
 </body>
 </html>
