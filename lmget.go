@@ -37,6 +37,10 @@ type Options struct {
 	// https://www.modelscope.ai. NoMirror never asks it.
 	ModelScopeEndpoint string
 	NoMirror           bool
+	// Licenses a model may come under, as the source names them; "none"
+	// allows a model that declares none. Default $LMGET_LICENSES (names
+	// separated by commas or spaces); empty allows any. See policy.go.
+	Licenses []string
 	// IndexURL is the signed index (https); default $LMGET_INDEX_URL. Its
 	// signature is IndexURL+".minisig". IndexKeys add minisign public keys
 	// to the built-in ones; default $LMGET_INDEX_KEY.
@@ -96,6 +100,9 @@ func New(o Options) (*Client, error) {
 	}
 	if o.HFEndpoint == "" {
 		o.HFEndpoint = os.Getenv("HF_ENDPOINT")
+	}
+	if o.Licenses == nil {
+		o.Licenses = ParseLicenses(os.Getenv("LMGET_LICENSES"))
 	}
 	if o.HFEndpoint == "" {
 		o.HFEndpoint = "https://huggingface.co"

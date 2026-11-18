@@ -47,8 +47,19 @@ type LockModel struct {
 // Lock is the content of lmget.lock.
 type Lock struct {
 	Version int         `toml:"version"`
+	Policy  *LockPolicy `toml:"policy,omitempty"`
 	Models  []LockModel `toml:"model"`
 	path    string
+}
+
+// LockPolicy is what the project allows, written by hand; lmget keeps it as
+// it is when it rewrites the lock. A lmget without policies stops on the
+// unknown key: it never ignores one.
+type LockPolicy struct {
+	// Licenses a model may come under, as the source names them
+	// (apache-2.0, mit, ...), and "none" for a model that declares none.
+	// Empty or absent: any license.
+	Licenses []string `toml:"licenses,omitempty"`
 }
 
 const lockHeader = `# lmget.lock: the models of this project, pinned by commit and sha256.
@@ -103,6 +114,14 @@ func ReadLock(path string) (*Lock, error) {
 		return nil, lockErr(path, "unknown key "+quote(und[0].String()))
 	}
 	seen := map[string]bool{}
+	if l.Policy != nil {
+		for i, lic := range l.Policy.Licenses {
+			if lic == "" || printable(lic) != lic || strings.ContainsAny(lic, " ,") {
+				return nil, lockErr(path, fmt.Sprintf("[policy] license %d is not a license name: %s", i+1, quote(lic)))
+			}
+			l.Policy.Licenses[i] = strings.ToLower(lic)
+		}
+	}
 	for i, m := range l.Models {
 		where := fmt.Sprintf("model %d (%s)", i+1, printable(m.Ref))
 		ref, err := ParseRef(m.Ref)

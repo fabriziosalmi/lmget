@@ -210,7 +210,17 @@ func run() lmget.ExitCode {
 		Args:    noArgs,
 		RunE:    func(cmd *cobra.Command, args []string) error { code = doMCP(); return nil },
 	}
-	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run, mcp)
+	sbom := &cobra.Command{
+		Use:   "sbom",
+		Short: "Write lmget.lock as a CycloneDX bill of materials (JSON, on stdout)",
+		Long: "sbom writes the models of the lockfile as a CycloneDX 1.6 bill of materials: one\n" +
+			"machine-learning-model component per model (name, commit, license, source) with one file\n" +
+			"component per file and its sha256. The same lockfile always gives the same bytes.",
+		Example: "  lmget sbom > sbom.cdx.json\n  lmget sbom --lockfile path/to/lmget.lock",
+		Args:    noArgs,
+		RunE:    func(cmd *cobra.Command, args []string) error { code = doSBOM(f); return nil },
+	}
+	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run, mcp, sbom)
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
 			Fixes: []lmget.Fix{{Cmd: c.CommandPath() + " --help"}}}
@@ -375,12 +385,15 @@ func pullModel(f flags, arg string, dry bool, command string, stdout io.Writer,
 	defer stop()
 	preferFasterNodes(c)
 	req := lmget.Request{Ref: ref, Selection: sel, Target: target, DryRun: dry, AcceptLicenseChange: f.acceptLic}
-	if locking && statErr == nil { // a model already in the lockfile keeps the license recorded there
+	if statErr == nil { // the project's lockfile: its license policy holds for every get here
 		l, err := lmget.ReadLock(f.lockfile)
 		if err != nil {
 			return fail(mode, err)
 		}
-		if m := l.Find(ref); m != nil {
+		if l.Policy != nil {
+			req.Licenses = l.Policy.Licenses
+		}
+		if m := l.Find(ref); locking && m != nil { // a model already in the lockfile keeps the license recorded there
 			req.License = m.License
 		}
 	}
@@ -456,6 +469,9 @@ func doSync(f flags, args []string) lmget.ExitCode {
 			return fail(mode, err)
 		}
 		req.AcceptLicenseChange = f.acceptLic
+		if l.Policy != nil {
+			req.Licenses = l.Policy.Licenses
+		}
 		before := *m
 		opts := ui.Opts{Resume: resumeCmd(), After: func(o *lmget.Outcome) (string, error) {
 			// another lmget may have changed this entry while we downloaded:
@@ -471,6 +487,26 @@ func doSync(f flags, args []string) lmget.ExitCode {
 		if code != lmget.ExitOK {
 			return code
 		}
+	}
+	return lmget.ExitOK
+}
+
+func doSBOM(f flags) lmget.ExitCode {
+	mode := outputMode(f)
+	l, err := lmget.ReadLock(f.lockfile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: "no " + f.lockfile + " here",
+			Fixes: []lmget.Fix{{Cmd: "lmget get <model> --lock", Note: "creates it"}}})
+	}
+	if err != nil {
+		return fail(mode, err)
+	}
+	b, err := l.CycloneDX(lmget.Version)
+	if err != nil {
+		return fail(mode, err)
+	}
+	if _, err := os.Stdout.Write(b); err != nil {
+		return lmget.ExitFailure
 	}
 	return lmget.ExitOK
 }

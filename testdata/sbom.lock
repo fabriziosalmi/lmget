@@ -1,0 +1,67 @@
+# A lockfile with every kind of model, for the CycloneDX schema check in CI.
+# Hashes and commits are made up: nothing here is downloaded.
+
+version = 1
+
+[[model]]
+ref = "hf:Org/Model-X"
+commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+to = "hf"
+license = "apache-2.0"
+
+[[model.file]]
+path = "model.safetensors"
+size = 1
+sha256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+
+[[model]]
+ref = "hf:org/custom"
+commit = "1111111111111111111111111111111111111111"
+to = "hf"
+license = "llama3.2"
+
+[[model.file]]
+path = "a.gguf"
+size = 1
+sha256 = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+
+[[model]]
+ref = "hf:org/bare"
+commit = "2222222222222222222222222222222222222222"
+to = "none"
+license = "none"
+
+[[model.file]]
+path = "a.bin"
+size = 1
+sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+
+[[model]]
+ref = "ollama:qwen3:0.6b"
+commit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+to = "ollama"
+
+[[model.file]]
+path = "manifest.json"
+size = 1
+sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+[[model]]
+ref = "ollama:hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M"
+commit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+to = "ollama"
+
+[[model.file]]
+path = "manifest.json"
+size = 1
+sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+[[model]]
+ref = "https://example.com/files/w.gguf?X-Amz-Signature=secretvalue"
+commit = "b74079502b63715ad39bb9548582dc1328147413"
+to = "none"
+
+[[model.file]]
+path = "w.gguf"
+size = 1
+sha256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"

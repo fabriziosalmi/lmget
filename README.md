@@ -246,6 +246,27 @@ lmget sync Qwen/Qwen3-0.6B       # only the models named, which must be in the l
 
 The lock also records the license the source declared, and `none` for a Hugging Face model that declares none (a lock written before records nothing there, and that is not compared). If a later `get` or `sync --update` finds another license (or none, or one where there was none), lmget stops before downloading, with exit code 5 and the two licenses side by side. Read the new terms, then run the same command with `--accept-license-change` to go on and record the new license. The index builder refuses a changed license too, with exit code 2 and no override: lock the model again after reading the new license.
 
+### License policy
+
+A project can name the licenses its models may come under, in its lockfile; `LMGET_LICENSES` does the same for a machine, a CI job or an agent (names separated by commas or spaces):
+
+```toml
+version = 1
+
+[policy]
+licenses = ["apache-2.0", "mit", "none"]
+```
+
+The names are the ones the source uses (Hugging Face's license tag: `apache-2.0`, `mit`, `llama3.2`, ...), and `none` stands for a model that declares no license. When both policies are set, a model must be allowed by both. lmget checks the license on the plan, so `get`, `sync` and `info` (and the MCP server, which knows only `LMGET_LICENSES`) refuse a model the policy does not allow before anything is downloaded, with exit code 5 and the policy that refused it. lmget keeps the `[policy]` table as it is when it rewrites the lock; an lmget older than the policy stops on the unknown key rather than ignore it. A policy only restricts: it never lets a model through that lmget would otherwise refuse.
+
+### Bill of materials
+
+```sh
+lmget sbom > sbom.cdx.json     # lmget.lock as a CycloneDX 1.6 document (--lockfile picks another)
+```
+
+Each model becomes a `machine-learning-model` component: name, commit, license (an SPDX identifier when the source's name maps to one, the name as written otherwise), where it comes from, a package URL for Hugging Face models (`pkg:huggingface/<org>/<name>@<commit>`), and one `file` component per file with its sha256. A signed URL appears without its query. The same lockfile always gives the same bytes: no timestamp, no random serial number. CI checks the output against the official CycloneDX 1.6 schema.
+
 A lockfile usually arrives with a cloned repository, so lmget treats it as untrusted input:
 
 - A pinned `sync` (or a plan from the signed index) fills the Hugging Face cache's `refs/main` only when it is empty, so offline loading finds the snapshot, and never moves it: a cloned lock cannot turn another project's `main` back to an old commit. Only a pull that resolves the revision now moves it.
