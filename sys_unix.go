@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // The operating-system calls lmget needs, on Unix: file locks, file
@@ -106,8 +108,8 @@ func linkFallback(src, dst string) error { return os.Symlink(src, dst) }
 func reusePort(_, _ string, c syscall.RawConn) error {
 	var serr error
 	err := c.Control(func(fd uintptr) {
-		if serr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); serr == nil {
-			serr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
+		if serr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); serr == nil {
+			serr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 		}
 	})
 	if err != nil {
