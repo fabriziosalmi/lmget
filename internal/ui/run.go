@@ -118,6 +118,10 @@ func runPlain(ctx context.Context, c *lmget.Client, req lmget.Request, stdout, s
 				lic = "file:" + lf
 			}
 			logf("plan %s %s license=%s files=%d bytes=%d to_fetch=%d", p.Ref.Display(), id, lic, len(p.Selected()), p.Bytes, p.ToFetch)
+			if m := p.Memory; m != nil {
+				logf("memory weights=%d kv_per_token=%d context=%d total=%d budget=%d fits=%t upper_bound=%t",
+					m.Weights, m.KVPerToken, m.Context, m.Total, m.Budget, m.Fits, m.UpperBound)
+			}
 			skipped := map[string]int{}
 			var reasons []string
 			for _, f := range p.Files {

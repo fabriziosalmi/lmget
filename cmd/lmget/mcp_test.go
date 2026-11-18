@@ -25,11 +25,13 @@ const mcpCommit = "0123456789abcdef0123456789abcdef01234567"
 
 // mcpHF is the smallest Hugging Face lmget needs: one repository, two
 // files, served at one commit. hold, when set, keeps every file request
-// waiting until the request is cancelled.
+// waiting until the request is cancelled. modelBytes counts what was served
+// of every file but config.json, which info reads to estimate memory.
 type mcpHF struct {
-	files  map[string][]byte
-	served atomic.Int64
-	hold   bool
+	files      map[string][]byte
+	served     atomic.Int64
+	modelBytes atomic.Int64
+	hold       bool
 }
 
 func (f *mcpHF) handler() http.Handler {
@@ -59,6 +61,9 @@ func (f *mcpHF) handler() http.Handler {
 			return
 		}
 		f.served.Add(int64(len(b)))
+		if r.PathValue("path") != "config.json" {
+			f.modelBytes.Add(int64(len(b)))
+		}
 		http.ServeContent(w, r, r.PathValue("path"), time.Time{}, strings.NewReader(string(b)))
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -257,12 +262,12 @@ func TestMCPGetNeedsConfirm(t *testing.T) {
 	s.call(1, "initialize", map[string]any{"protocolVersion": mcpVersions[0]})
 
 	text, isErr := toolText(t, s.call(2, "tools/call", map[string]any{"name": "info", "arguments": map[string]any{"model": "org/m"}}))
-	if isErr || !strings.Contains(text, "apache-2.0") || !strings.Contains(text, "Nothing downloaded") {
+	if isErr || !strings.Contains(text, "apache-2.0") || !strings.Contains(text, "No weights downloaded") {
 		t.Fatalf("info: %v %s", isErr, text)
 	}
 	text, isErr = toolText(t, s.call(3, "tools/call", map[string]any{"name": "get", "arguments": map[string]any{"model": "org/m"}}))
-	if isErr || !strings.Contains(text, "confirm: true") || hf.served.Load() != 0 {
-		t.Fatalf("get without confirm downloads nothing: %v served=%d %s", isErr, hf.served.Load(), text)
+	if isErr || !strings.Contains(text, "confirm: true") || hf.modelBytes.Load() != 0 {
+		t.Fatalf("get without confirm downloads no model file: %v served=%d %s", isErr, hf.modelBytes.Load(), text)
 	}
 	text, isErr = toolText(t, s.call(4, "tools/call", map[string]any{"name": "get", "arguments": map[string]any{"model": "org/m", "confirm": true}}))
 	if isErr || !strings.Contains(text, "every file verified") {

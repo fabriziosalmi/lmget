@@ -158,3 +158,25 @@ func TestOllamaPlanPointsAtItsLicenseFile(t *testing.T) {
 		t.Fatalf("plan without a license:\n%s", out)
 	}
 }
+
+func TestRenderPlanSaysWhetherTheModelFits(t *testing.T) {
+	p := samplePlan()
+	if strings.Contains(renderPlan(p, 100, false), "memory") {
+		t.Fatal("a memory line with no estimate")
+	}
+	p.Memory = &lmget.MemoryEstimate{Weights: 1_500_000_000, KVPerToken: 114688, Context: 8192, Total: 2_440_000_000,
+		Budget: 5_150_000_000, BudgetFrom: "30% of 17.2 GB unified memory", Fits: true}
+	out := renderPlan(p, 100, false)
+	for _, want := range []string{"memory", "fits", "weights 1.50 GB", "for 8k tokens", "about 2.44 GB", "within the 5.15 GB", "30% of 17.2 GB unified memory"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("no %q in:\n%s", want, out)
+		}
+	}
+	p.Memory.Fits, p.Memory.UpperBound = false, true
+	out = renderPlan(p, 100, false)
+	for _, want := range []string{"over", "at most"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("no %q in:\n%s", want, out)
+		}
+	}
+}

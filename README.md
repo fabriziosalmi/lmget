@@ -89,7 +89,7 @@ Flags and environment:
 
 - `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to omlx`, `--to lmstudio`, `--to jan`, `--to localai` and `--to exo` into those apps' models folders (see [Apps](#apps)); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
 - The Hugging Face cache is `$HF_HUB_CACHE`, else `$HF_HOME/hub`, else `$XDG_CACHE_HOME/huggingface/hub`, else `~/.cache/huggingface/hub`.
-- `--dry-run` stops after the plan, as `lmget info` does.
+- `--dry-run` stops after the plan, as `lmget info` does. For a Hugging Face model with a transformers `config.json`, the plan also says whether the model fits this machine: the selected weights plus the KV cache (keys and values, 16-bit) for 8192 tokens (or the model's maximum, if lower), against the memory lmget lets a model use here, the same budget nicknames use (85% of an NVIDIA GPU's memory, 30% of Apple Silicon's unified memory, 50% of the RAM otherwise). Hybrid models count only their full-attention layers; a sliding window makes the figure an upper bound and says so; an architecture whose cache lmget cannot count (such as MLA) gets no figure. Activations, runtime overhead and speed are not estimated. It reads `config.json` only (a few kB, checked against the hash in the plan, never stored), from the store or the source, and not for a plan that a revoked file or the license policy refuses.
 - `--conns N` sets the parallel connections per file (default 8).
 - `--lockfile PATH` uses another lockfile than `./lmget.lock`.
 - `--plain` writes plain log lines even on a terminal, and so does `TERM=dumb`; `--json` writes events (see below).
@@ -106,7 +106,7 @@ A matching hash proves the bytes are what the source publishes, not that they ar
 ```sh
 lmget qwen                  # proposes a Qwen3.5 variant for this machine and asks
 lmget qwen --yes            # takes the proposal without asking
-lmget info qwen             # shows the proposal and its plan, downloads nothing
+lmget info qwen             # shows the proposal and its plan, downloads no weights
 lmget qwen --for 4GB        # a variant whose weights fit in 4 GB
 lmget qwen --format gguf    # or safetensors, mlx, ollama
 lmget qwen --to ollama      # for that app
@@ -381,7 +381,7 @@ claude mcp add lmget -- lmget mcp
 
 `lmget mcp` speaks the Model Context Protocol on stdin and stdout, for agents such as Claude Code, Cursor or Zed. It offers three tools:
 
-- `info`: the plan of a model, without downloading: commit, license, files with sizes and hashes, what is already stored, the pickle and gated checks, the free disk. For a nickname, the variant chosen for this machine and why. It only reads.
+- `info`: the plan of a model, without downloading: commit, license, files with sizes and hashes, what is already stored, the pickle and gated checks, the free disk, and whether it fits this machine's memory when lmget can tell. For a nickname, the variant chosen for this machine and why. It only reads.
 - `list`: the models in the store and where each one is linked. It only reads.
 - `get`: downloads, verifies and links a model, only when called with `confirm: true`; without it, it returns the plan. It links into the apps and the Hugging Face cache (`to`: `hf`, `ollama`, `omlx`, `lmstudio`, `jan`, `localai`, `exo`) or keeps the files in the store (`none`), never into a directory: the file names come from the repository, so a folder is chosen on the command line, by a person. A direct URL or an OCI image stays in the store unless `to` names an app.
 
