@@ -57,7 +57,7 @@ What happens on every run:
 
 Flags and environment:
 
-- `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to omlx` and `--to lmstudio` into those apps' models directories (see below); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
+- `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to omlx`, `--to lmstudio`, `--to jan`, `--to localai` and `--to exo` into those apps' models folders (see [Apps](#apps)); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
 - The Hugging Face cache is `$HF_HUB_CACHE`, else `$HF_HOME/hub`, else `$XDG_CACHE_HOME/huggingface/hub`, else `~/.cache/huggingface/hub`.
 - `--dry-run` stops after the plan, as `lmget info` does.
 - `--conns N` sets the parallel connections per file (default 8).
@@ -121,19 +121,50 @@ echo "summarize this" | lmget run qwen --yes
 
 Checked live on 2026-11-17 with oMLX 0.8.0rc1 on an M4 Pro with 16 GB: the model was linked, oMLX reloaded and listed it, and its memory guard refused the prompt (it needed about 1.17 GB, the machine had 0.07 GB free); lmget reported it as a memory error. Ollama and LM Studio are covered by tests against simulated servers only.
 
-## oMLX and LM Studio
+## Apps
 
 ```sh
 lmget mlx-community/Qwen3.5-0.8B-4bit --to omlx
 lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_0*' --to lmstudio
+lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to jan
+lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to localai
+lmget mlx-community/Qwen3-0.6B-4bit --to exo
 ```
 
-Both apps keep models as `<models directory>/<org>/<name>`, and lmget links the files there (hard links on the same disk, symlinks into the store otherwise). Only Hugging Face models go there, and a target that cannot hold the selection is refused before anything is downloaded.
+lmget links the files into the app's models folder (hard links on the same disk, symlinks into the store otherwise), in the layout the app reads. Only Hugging Face models go there, and a target that cannot hold the selection is refused before anything is downloaded. Each folder can be set with a variable; a path must be absolute, `~/` is expanded.
 
-- oMLX: the directory is `$LMGET_OMLX_DIR`, else `model.model_dir` in `~/.omlx/settings.json` (only that key is read), else `~/.omlx/models`; both must be absolute, `~/` is expanded. oMLX finds a model by its `config.json` and `*.safetensors`, so a selection without them is refused. Checked with oMLX 0.8.0rc1 on 2026-11-17: it found a model lmget exported and listed it by its directory name (`Qwen3.5-0.8B-4bit`); its log also showed it listing MLX models from the Hugging Face cache as `<org>--<name>`.
-- LM Studio: the directory is `$LMGET_LMSTUDIO_DIR` (absolute, `~/` expanded), else `~/.lmstudio/models`. A directory moved in the app is kept in no documented file, so set the variable then. The layout follows LM Studio's documentation; it has not been checked against the app yet.
+| `--to` | Folder | Layout | Loads |
+|---|---|---|---|
+| `omlx` | `$LMGET_OMLX_DIR`, else `model.model_dir` in `~/.omlx/settings.json` (only that key is read), else `~/.omlx/models` | `<org>/<name>/` | `config.json` and `*.safetensors` |
+| `lmstudio` | `$LMGET_LMSTUDIO_DIR`, else `~/.lmstudio/models` | `<org>/<name>/` | GGUF; MLX on Apple Silicon |
+| `jan` | `$LMGET_JAN_DIR`, else Jan's data folder: `~/Library/Application Support/Jan/data` (macOS), `%APPDATA%\Jan\data` (Windows), `$XDG_DATA_HOME/Jan/data` or `~/.local/share/Jan/data` (Linux) | `llamacpp/models/<org>/<name>/` with a `model.yml` | one GGUF, and at most one `mmproj` file |
+| `localai` | `$LMGET_LOCALAI_DIR`, else `$LOCALAI_MODELS_PATH`, else `$MODELS_PATH`, else `~/.localai/models` (the LocalAI launcher's folder) | flat: `<file>.gguf` | GGUF |
+| `exo` | `$LMGET_EXO_DIR`, else `$EXO_DEFAULT_MODELS_DIR`, else `~/$EXO_HOME/models`, else `~/.exo/models` (macOS, Windows), `$XDG_DATA_HOME/exo/models` or `~/.local/share/exo/models` (Linux) | `<org>--<name>/` with `.exo-download.json` | `config.json` and `*.safetensors` |
 
-A model in an app directory has one revision at a time: updating it replaces the links lmget made and removes the ones the new revision no longer has, so the app never loads two revisions mixed. Files that lmget did not create are left alone, and one in the way stops the export. `lmget rm` removes only lmget's links.
+- oMLX: checked with oMLX 0.8.0rc1 on 2026-11-17: it found a model lmget exported and listed it by its directory name (`Qwen3.5-0.8B-4bit`); its log also showed it listing MLX models from the Hugging Face cache as `<org>--<name>`.
+- LM Studio: a folder moved in the app is kept in no documented file, so set `LMGET_LMSTUDIO_DIR` then.
+- Jan: lmget writes the `model.yml` Jan writes when it imports a GGUF (`model_path` relative to the data folder, `name`, `size_bytes`, `model_sha256`, and the `mmproj_` fields), plus the key `lmget_export: true`. Jan rewrites `model.yml` with keys of its own and keeps that one, so lmget still knows the file as its own. A `model.yml` without that key is Jan's, and lmget does not overwrite it.
+- LocalAI: the file name is the model name. The `local-ai` command reads its models from `./models` in the folder where it starts, unless `--models-path` or one of the two variables says otherwise: point `LMGET_LOCALAI_DIR` at the same folder.
+- exo: `.exo-download.json` is the manifest exo writes after it has verified a download (repository, commit, and each file's path, size and hash); exo takes a folder with a complete manifest as a downloaded model. exo runs the models it has a model card for (`mlx-community/Qwen3-0.6B-4bit` has one), so a repository outside its list is stored but not offered.
+- The layouts of LM Studio, Jan, LocalAI and exo follow their documentation and source code; they have not been checked against the running apps yet. `lmget run` asks oMLX, LM Studio and Ollama; for Jan, LocalAI and exo, start the app and ask it.
+
+A model in an app folder has one revision at a time: updating it replaces the links lmget made and removes the ones the new revision no longer has, so the app never loads two revisions mixed. Files that lmget did not create are left alone, and one in the way stops the export. `lmget rm` removes only lmget's links and the `model.yml` or `.exo-download.json` it wrote.
+
+Text Generation WebUI keeps its models in `user_data/models` inside its install folder, where it finds a GGUF at any depth and a safetensors model as one folder per model; the plain-directory target fills it (here installed in `~/textgen`):
+
+```sh
+lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to dir:$HOME/textgen/user_data/models/Qwen3.5-4B-GGUF
+```
+
+### Works with
+
+What an app reads, and the lmget target that fills it. Read from each project's source or documentation on 2026-11-18.
+
+- **The Hugging Face cache** (`--to hf`, the default): transformers, sentence-transformers, llama.cpp (`-hf` downloads into it and reads it), Goose's local inference, Lemonade.
+- **Ollama** (`--to ollama`): Ollama, RamaLama's `ollama://` models, and the apps that ask Ollama for a model: Open WebUI, Page Assist, Hollama, Oterm, among others.
+- **The apps above**: oMLX, LM Studio, Jan, LocalAI, exo.
+- **A plain directory** (`--to dir:PATH`): Text Generation WebUI (above), and apps given a file path: KoboldCpp (`--model`), llamafile (`-m`), llama-server (`-m`).
+- **Through a server**: chat and agent apps that keep no model files of their own (LobeChat, LibreChat, Cherry Studio, Chatbox, SillyTavern, Dify, Langflow, and others) use whatever model the local server they are pointed at (Ollama, LM Studio, oMLX, LocalAI, Jan, a vLLM or llama-server) has, and lmget fills that server's folder.
 
 ## Ollama
 

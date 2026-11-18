@@ -61,7 +61,7 @@ func targetRoot(t Target) string {
 	switch t.Kind {
 	case "hf":
 		return HFCacheDir()
-	case "dir", "omlx", "lmstudio":
+	case "dir", "omlx", "lmstudio", "jan", "localai", "exo":
 		return t.Path
 	}
 	return ""

@@ -265,6 +265,9 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan,
 				mine = hasContent(l, fi.Size(), plan.Commit)
 			}
 		}
+		if !mine && fi.Mode().IsRegular() && ourSidecar(l, plan) { // Jan's model.yml, exo's manifest
+			mine = true
+		}
 		if !mine {
 			return
 		}

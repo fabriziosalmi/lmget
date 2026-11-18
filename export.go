@@ -34,7 +34,7 @@ func ParseTarget(s string) (Target, error) {
 		return Target{Kind: "none"}, nil
 	case s == "ollama":
 		return Target{Kind: "ollama"}, nil
-	case s == "omlx" || s == "lmstudio":
+	case s == "omlx" || s == "lmstudio" || s == "jan" || s == "localai" || s == "exo":
 		dir, err := AppModelsDir(s)
 		if err != nil {
 			return Target{}, err
@@ -52,6 +52,7 @@ func ParseTarget(s string) (Target, error) {
 		fix("--to ollama", "Ollama's models directory (Ollama models)").
 		fix("--to omlx", "oMLX's models directory").
 		fix("--to lmstudio", "LM Studio's models directory").
+		fix("--to jan", "Jan (a GGUF), --to localai (GGUF files), --to exo (an MLX model)").
 		fix("--to dir:./models/name", "plain directory").
 		fix("--to none", "store only")
 }
@@ -138,6 +139,8 @@ func TargetAccepts(plan *Plan, t Target) error {
 					fix("", "drop --include and --exclude, or export to --to dir:PATH")
 			}
 		}
+	case "jan", "localai", "exo":
+		return appAccepts(plan, t)
 	case "omlx", "lmstudio":
 		if plan.Ref.Source != "hf" {
 			return newErr(ExitUsage, "usage", appNames[t.Kind]+"'s models directory holds Hugging Face repositories here").
@@ -177,6 +180,12 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 		return c.exportOllama(plan)
 	case "omlx", "lmstudio":
 		return c.exportApp(plan, t)
+	case "jan":
+		return c.exportJan(plan, t)
+	case "localai":
+		return c.exportLocalAI(plan, t)
+	case "exo":
+		return c.exportExo(plan, t)
 	}
 	return "", nil, nil
 }

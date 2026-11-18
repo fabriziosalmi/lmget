@@ -21,7 +21,8 @@ import (
 //	lmstudio  $LMGET_LMSTUDIO_DIR, else ~/.lmstudio/models (LM Studio keeps a
 //	          directory moved in the app in no documented file: set the variable)
 func AppModelsDir(app string) (string, error) {
-	env := map[string]string{"omlx": "LMGET_OMLX_DIR", "lmstudio": "LMGET_LMSTUDIO_DIR"}[app]
+	env := map[string]string{"omlx": "LMGET_OMLX_DIR", "lmstudio": "LMGET_LMSTUDIO_DIR",
+		"jan": "LMGET_JAN_DIR", "localai": "LMGET_LOCALAI_DIR", "exo": "LMGET_EXO_DIR"}[app]
 	if env == "" {
 		return "", newErr(ExitUsage, "usage", "unknown app "+quote(app))
 	}
@@ -40,8 +41,20 @@ func AppModelsDir(app string) (string, error) {
 		return "", newErr(ExitUsage, "usage", "no home directory to find the app's models in").
 			fix("", "set "+env)
 	}
-	if app == "lmstudio" {
+	switch app {
+	case "lmstudio":
 		return filepath.Join(home, ".lmstudio", "models"), nil
+	case "jan": // Jan's data folder; models go under llamacpp/models
+		return janData(home), nil
+	case "localai": // the variables local-ai reads, else where LocalAI's launcher keeps them
+		for _, v := range []string{"LOCALAI_MODELS_PATH", "MODELS_PATH"} {
+			if p := os.Getenv(v); p != "" {
+				return abs(expandHome(p), v)
+			}
+		}
+		return filepath.Join(home, ".localai", "models"), nil
+	case "exo":
+		return abs(exoModels(home), "exo's models directory")
 	}
 	settings := filepath.Join(omlxBase(), "settings.json")
 	dir, err := omlxModelDir(settings)
