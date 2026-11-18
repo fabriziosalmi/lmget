@@ -492,7 +492,7 @@ func doRm(f flags, arg string) lmget.ExitCode {
 	if err != nil {
 		return fail(mode, err)
 	}
-	c.AppendHistory(lmget.HistoryEntry{Command: "rm", Ref: ref.String()})
+	c.AppendHistory(lmget.HistoryEntry{Command: "rm", Ref: ref.Redacted().String()})
 	note := ""
 	if l, err := lmget.ReadLock(f.lockfile); err == nil {
 		for _, m := range l.Models {

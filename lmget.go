@@ -171,31 +171,41 @@ func New(o Options) (*Client, error) {
 
 func (c *Client) Store() *Store { return c.store }
 
-// hfToken follows huggingface_hub: $HF_TOKEN, $HF_TOKEN_PATH, $HF_HOME/token,
-// ~/.cache/huggingface/token. It returns the token and where it was found.
-// The value is never logged or printed.
+// hfToken follows huggingface_hub: $HF_TOKEN, else the one token file
+// huggingface_hub reads: $HF_TOKEN_PATH, else $HF_HOME/token, where HF_HOME
+// defaults to $XDG_CACHE_HOME/huggingface, then ~/.cache/huggingface. One
+// file, not a chain: a project or a container that points HF_HOME elsewhere
+// must not fall back to the user's personal token. It returns the token and
+// where it was found; the value is never logged or printed.
 func hfToken() (string, string) {
 	if t := strings.TrimSpace(os.Getenv("HF_TOKEN")); t != "" {
 		return t, "HF_TOKEN"
 	}
-	var paths []string
-	if p := os.Getenv("HF_TOKEN_PATH"); p != "" {
-		paths = append(paths, p)
-	}
-	if p := os.Getenv("HF_HOME"); p != "" {
-		paths = append(paths, filepath.Join(p, "token"))
-	}
-	if h, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(h, ".cache", "huggingface", "token"))
-	}
-	for _, p := range paths {
-		if b, err := os.ReadFile(p); err == nil {
-			if t := strings.TrimSpace(string(b)); t != "" {
-				return t, p
+	p := os.Getenv("HF_TOKEN_PATH")
+	if p == "" {
+		home := os.Getenv("HF_HOME")
+		if home == "" {
+			cache := os.Getenv("XDG_CACHE_HOME")
+			if cache == "" {
+				h, err := os.UserHomeDir()
+				if err != nil {
+					return "", ""
+				}
+				cache = filepath.Join(h, ".cache")
 			}
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", "unreadable:" + p // exists but cannot be read: say so, do not pretend there is none
+			home = filepath.Join(cache, "huggingface")
 		}
+		p = filepath.Join(home, "token")
+	}
+	b, err := os.ReadFile(p)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return "", ""
+	case err != nil:
+		return "", "unreadable:" + p // exists but cannot be read: say so, do not pretend there is none
+	}
+	if t := strings.TrimSpace(string(b)); t != "" {
+		return t, p
 	}
 	return "", ""
 }

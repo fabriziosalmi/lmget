@@ -110,7 +110,16 @@ func (c *Client) Remove(ref Ref) (*RemoveResult, error) {
 	}
 	var hit []Installed
 	for _, in := range all {
-		if in.Ref.Source != ref.Source || !strings.EqualFold(in.Ref.Repo, ref.Repo) {
+		if in.Ref.Source != ref.Source {
+			continue
+		}
+		if ref.Source == "url" { // by its id: the stored URL has its query redacted
+			if in.Commit == urlID(ref.Repo) {
+				hit = append(hit, in)
+			}
+			continue
+		}
+		if !strings.EqualFold(in.Ref.Repo, ref.Repo) {
 			continue
 		}
 		byTag := (ref.Source == "ollama" || ref.Source == "oci") && in.Ref.Revision == ref.Revision

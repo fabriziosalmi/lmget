@@ -19,7 +19,7 @@ func recordPull(c *lmget.Client, command string, req lmget.Request, out *lmget.O
 	if req.DryRun {
 		return // a look, not a use
 	}
-	e := lmget.HistoryEntry{Command: command, Ref: req.Ref.String(), Target: req.Target.Kind, Exit: int(code)}
+	e := lmget.HistoryEntry{Command: command, Ref: req.Ref.Redacted().String(), Target: req.Target.Kind, Exit: int(code)}
 	if nick != nil {
 		e.Nickname, e.Choice = nick.name, nick.choice
 	}

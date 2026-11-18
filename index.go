@@ -169,7 +169,9 @@ func (m IndexModel) LockFiles() []LockFile {
 // Find returns the entry of ref at commit, or nil.
 func (ix *Index) Find(ref Ref, commit string) *IndexModel {
 	for i := range ix.Models {
-		if r, err := ParseRef(ix.Models[i].Ref); err == nil && r.String() == ref.String() && ix.Models[i].Commit == commit {
+		// by commit: a lock pinned on a tag (Org/Name@v1.0) names the same
+		// model and commit as the index's Org/Name
+		if r, err := ParseRef(ix.Models[i].Ref); err == nil && r.Source == ref.Source && r.Repo == ref.Repo && ix.Models[i].Commit == commit {
 			return &ix.Models[i]
 		}
 	}

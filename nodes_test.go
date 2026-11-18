@@ -346,3 +346,26 @@ func TestADeadNodeIsAskedForOneFileOnly(t *testing.T) {
 		t.Fatalf("the dead node was asked for %d different blobs (%v); want 1, then skipped", len(asked), asked)
 	}
 }
+
+// Found by the 2026-11-18 review: a lock pinned on a tag (Org/Name@v1.0)
+// never matched the index's Org/Name, so the nodes could not help it.
+func TestAPinnedTagFindsTheIndexedCommit(t *testing.T) {
+	m := setupM3(t)
+	u := m.client(t, t.TempDir())
+	if _, err := u.UpdateIndex(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	tagged := hfRef("org/m")
+	tagged.Revision = "v1.0"
+	commit := m.lock.Models[0].Commit
+	if _, e := u.indexEntry(tagged, commit); e == nil {
+		t.Fatal("the indexed commit is not found for a ref pinned on a tag")
+	}
+	if _, e := u.indexEntry(tagged, ""); e != nil {
+		t.Fatal("without a commit, a tag was answered with the index's main")
+	}
+	ix, _ := u.Index()
+	if ix.Find(tagged, commit) == nil {
+		t.Fatal("Index.Find misses the commit for a tagged ref")
+	}
+}

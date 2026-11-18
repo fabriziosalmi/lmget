@@ -52,6 +52,10 @@ type Plan struct {
 	// the signed index, and the bytes from its nodes
 	FromIndex bool `json:"from_index,omitempty"`
 	offline   bool // built from a lockfile and verified bindings, without the source
+	// fresh: Ref.Revision was resolved to Commit just now, at the source. Only
+	// then may the Hugging Face cache's refs/<revision> be moved to Commit: a
+	// pinned, offline or index plan must not turn another project's main back
+	fresh bool
 }
 
 // Selection filters the files of a repository.

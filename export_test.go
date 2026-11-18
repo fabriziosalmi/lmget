@@ -191,3 +191,47 @@ func TestNothingIsWrittenIntoAGitDirectory(t *testing.T) {
 		t.Fatal("a file was created inside .git")
 	}
 }
+
+// Found by the 2026-11-18 review: a pinned sync (a cloned lock) moved the
+// shared Hugging Face cache's refs/main back to its old commit. Now a pinned
+// plan fills an empty ref and never moves one; a fresh pull still does.
+func TestPinnedSyncDoesNotMoveTheCachesMain(t *testing.T) {
+	f := &fakeHF{files: modelFiles()}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	cache := t.TempDir()
+	t.Setenv("HF_HUB_CACHE", cache)
+	refMain := filepath.Join(cache, "models--org--m", "refs", "main")
+
+	out := pullTo(t, c, "org/m", Target{Kind: "none"})
+	l := NewLock(filepath.Join(t.TempDir(), DefaultLockName))
+	if err := l.Upsert(out.Plan, Selection{}, Target{Kind: "hf"}); err != nil {
+		t.Fatal(err)
+	}
+	req, err := l.Request(&l.Models[0], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// an empty cache: the pinned sync fills refs/main, so offline loading works
+	if _, err := c.Pull(context.Background(), req, nil); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(refMain); string(b) != commit {
+		t.Fatalf("refs/main = %q after a pinned sync into an empty cache", b)
+	}
+	// another project moved main on: a pinned sync leaves it there
+	newer := strings.Repeat("b", 40)
+	os.WriteFile(refMain, []byte(newer), 0o644)
+	if _, err := c.Pull(context.Background(), req, nil); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(refMain); string(b) != newer {
+		t.Fatalf("a pinned sync moved refs/main to %q", b)
+	}
+	// a pull that resolves main now says where main is
+	pullTo(t, c, "org/m", Target{Kind: "hf"})
+	if b, _ := os.ReadFile(refMain); string(b) != commit {
+		t.Fatalf("a fresh pull left refs/main at %q", b)
+	}
+}

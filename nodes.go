@@ -78,7 +78,11 @@ func (c *Client) indexEntry(ref Ref, commit string) (*Index, *IndexModel) {
 	var hit *IndexModel
 	for i := range ix.Models {
 		r, err := ParseRef(ix.Models[i].Ref)
-		if err == nil && r.String() == ref.String() && (commit == "" || ix.Models[i].Commit == commit) {
+		// with a commit, the model and commit decide (a lock pinned on a tag
+		// is the index's model); without one, the revision must match too,
+		// or a request for a tag would get the index's main
+		same := err == nil && r.Source == ref.Source && r.Repo == ref.Repo
+		if same && (commit != "" && ix.Models[i].Commit == commit || commit == "" && r.String() == ref.String()) {
 			hit = &ix.Models[i] // the index lists commits oldest first: the last one wins
 		}
 	}

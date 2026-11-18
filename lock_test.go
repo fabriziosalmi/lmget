@@ -528,3 +528,30 @@ func TestALicenseChangeStopsThePullUntilAccepted(t *testing.T) {
 		t.Fatalf("an unchanged license was refused: %v", err)
 	}
 }
+
+// Found by the 2026-11-18 review: a model locked with no license could
+// later come under one without a word. The lock now says "none".
+func TestALicenseAppearingIsAChange(t *testing.T) {
+	f := &fakeHF{files: modelFiles()}
+	f.noLicense.Store(true)
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	out := pullTo(t, c, "org/m", Target{Kind: "none"})
+	l := NewLock(filepath.Join(t.TempDir(), DefaultLockName))
+	if err := l.Upsert(out.Plan, Selection{}, Target{Kind: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	if l.Models[0].License != LicenseNone {
+		t.Fatalf("the lock records %q for no license", l.Models[0].License)
+	}
+	// unchanged: still no license, no complaint
+	if _, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}, License: l.Models[0].License}, nil); err != nil {
+		t.Fatalf("no license, still none: %v", err)
+	}
+	f.noLicense.Store(false) // the source now declares apache-2.0
+	_, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}, License: l.Models[0].License}, nil)
+	if AsError(err).Kind != "license" {
+		t.Fatalf("a license appearing went unnoticed: %v", err)
+	}
+}

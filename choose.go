@@ -68,6 +68,7 @@ type ChoiceOptions struct {
 	Target   string // --to, "" when not given
 	Format   string // --format
 	Budget   int64  // --for: memory for the model's weights, bytes
+	Ceiling  int64  // a cap below the budget, from the history: 0 for none
 	DiskFree int64  // on the store's disk, 0 when unknown
 }
 
@@ -149,6 +150,9 @@ func ChooseVariant(a Alias, m Machine, apps []string, o ChoiceOptions) (Choice, 
 						fix("--for 8GB", "say how much memory the model may use")
 				}
 				budget, from = budgetFor(m, f)
+			}
+			if o.Ceiling > 0 && o.Ceiling < budget { // lowers, never raises
+				budget, from = o.Ceiling, from+", below a variant that did not fit in memory"
 			}
 			pick := -1
 			for i, v := range vs {

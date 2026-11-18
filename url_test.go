@@ -6,7 +6,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -279,5 +281,50 @@ func TestFormatCheckRefusesDisguisedFiles(t *testing.T) {
 				t.Errorf("%s: refused file left in the store: %+v", tc.name, st)
 			}
 		}
+	}
+}
+
+// Found by the 2026-11-18 review: a signed URL's credentials reached the
+// events, the store's manifest and (in the CLI) the history. Only the
+// download sees them now, and rm still finds the model by the full URL.
+func TestSignedURLCredentialsAreNotWrittenDown(t *testing.T) {
+	f := &fakeURL{}
+	f.set(randBytes(64 << 10))
+	c, srv := newURLTest(t, f)
+	const secret = "SECRETSIG123"
+	u := srv.URL + "/m.dat?X-Amz-Signature=" + secret + "&X-Amz-Credential=AKIATEST"
+	ref, err := ParseRef(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen []string
+	_, err = c.Pull(context.Background(), Request{Ref: ref, Target: Target{Kind: "dir", Path: t.TempDir()}}, func(e Event) {
+		b, _ := json.Marshal(e)
+		seen = append(seen, string(b))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range seen {
+		if strings.Contains(s, secret) || strings.Contains(s, "AKIATEST") {
+			t.Fatalf("an event carries the credential: %s", s)
+		}
+	}
+	if !strings.Contains(strings.Join(seen, ""), "X-Amz-Signature=REDACTED") {
+		t.Fatal("the redacted URL does not say what it was")
+	}
+	filepath.WalkDir(c.store.Root(), func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".json") {
+			if b, _ := os.ReadFile(p); strings.Contains(string(b), secret) {
+				t.Errorf("%s keeps the credential", p)
+			}
+		}
+		return nil
+	})
+	if strings.Contains(ref.Display(), secret) || strings.Contains(ref.Redacted().String(), secret) {
+		t.Fatal("Display or Redacted shows the credential")
+	}
+	if _, err := c.Remove(ref); err != nil {
+		t.Fatalf("rm by the full URL: %v", err)
 	}
 }

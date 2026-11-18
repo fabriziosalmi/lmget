@@ -244,8 +244,12 @@ func (l *Lock) Upsert(p *Plan, sel Selection, t Target) error {
 	if err != nil {
 		return err
 	}
+	lic := p.License
+	if lic == "" && p.Ref.Source == "hf" {
+		lic = LicenseNone // recorded, so a license that appears later is a change too
+	}
 	m := LockModel{
-		Ref: p.Ref.String(), Commit: p.Commit, To: to, License: p.License,
+		Ref: p.Ref.String(), Commit: p.Commit, To: to, License: lic,
 		Include: sel.Include, Exclude: sel.Exclude, AllowPickle: sel.AllowPickle,
 	}
 	for _, f := range p.Selected() {
@@ -423,7 +427,7 @@ func (c *Client) resolvePinned(ctx context.Context, r Request) (*Plan, error) {
 	// model (sec-audit finding offline-plan-trusts-lock-repo-commit-file-mapping).
 	if all {
 		if m, err := c.store.loadManifest(r.Ref, pin.Commit); err == nil && boundAll(c.store, m, pin.Files) {
-			p := &Plan{Ref: r.Ref, Commit: pin.Commit, License: pin.License, offline: true}
+			p := &Plan{Ref: r.Ref, Commit: pin.Commit, License: lockedLicense(pin.License), offline: true}
 			for _, f := range pin.Files {
 				p.Files = append(p.Files, File{Path: f.Path, Size: f.Size, SHA256: f.SHA256, GitSHA1: f.GitSHA1, Cached: true})
 			}
@@ -534,3 +538,16 @@ func hasManifestFile(m LockModel) bool {
 
 // LockPathFor returns the lockfile path in dir.
 func LockPathFor(dir string) string { return filepath.Join(dir, DefaultLockName) }
+
+// LicenseNone is what a lock records for a model whose source declares no
+// license: an empty field means "not recorded" (a lock written before it),
+// which is not compared.
+const LicenseNone = "none"
+
+// lockedLicense is a lock's license as the source would declare it.
+func lockedLicense(s string) string {
+	if s == LicenseNone {
+		return ""
+	}
+	return s
+}

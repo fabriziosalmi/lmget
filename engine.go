@@ -144,6 +144,12 @@ func (e *Engine) startHint() string {
 }
 
 func (c *Client) engineDo(ctx context.Context, e *Engine, method, p string, body any) (*http.Response, error) {
+	return c.engineDoKey(ctx, e, method, p, body, true)
+}
+
+// engineDoKey sends the user's key for the app only when withKey: before an
+// app is recognised, whatever answers on its port gets no key.
+func (c *Client) engineDoKey(ctx context.Context, e *Engine, method, p string, body any, withKey bool) (*http.Response, error) {
 	var rd io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
@@ -156,7 +162,7 @@ func (c *Client) engineDo(ctx context.Context, e *Engine, method, p string, body
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if e.key != "" {
+	if e.key != "" && withKey {
 		req.Header.Set("Authorization", "Bearer "+e.key)
 	}
 	// a client of its own: no proxy (a local app) and no Hugging Face token
@@ -212,9 +218,17 @@ func (c *Client) Identify(ctx context.Context, e *Engine) error {
 			return wrong("it does not answer /api/version as Ollama does")
 		}
 	case "lmstudio":
-		resp, err := c.engineDo(ctx, e, http.MethodGet, "/api/v0/models", nil)
+		// no key first; LM Studio has no answer that names it, so the key the
+		// user gave for this address goes only when the server asks for one
+		resp, err := c.engineDoKey(ctx, e, http.MethodGet, "/api/v0/models", nil, false)
 		if err != nil {
 			return err
+		}
+		if resp.StatusCode == 401 && e.key != "" {
+			resp.Body.Close()
+			if resp, err = c.engineDo(ctx, e, http.MethodGet, "/api/v0/models", nil); err != nil {
+				return err
+			}
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode == 401 {
@@ -227,6 +241,17 @@ func (c *Client) Identify(ctx context.Context, e *Engine) error {
 			return wrong("it does not answer /api/v0/models as LM Studio does")
 		}
 	case "omlx":
+		// recognised without the key: oMLX answers /health to anyone, with
+		// fields of its own; any other server on the port gets nothing
+		resp, err := c.engineDoKey(ctx, e, http.MethodGet, "/health", nil, false)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		var h map[string]json.RawMessage
+		if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&h) != nil || h["status"] == nil || h["engine_pool"] == nil {
+			return wrong("it does not answer /health as oMLX does")
+		}
 		ids, owners, err := c.modelIDs(ctx, e)
 		if err != nil {
 			return err

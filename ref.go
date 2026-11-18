@@ -49,8 +49,19 @@ func (r Ref) String() string {
 }
 
 // Display is the short form shown to people: no source prefix for hf.
+// Redacted is r with a URL's query values removed (see redactURL): what is
+// written to the history, the store's manifests and events.
+func (r Ref) Redacted() Ref {
+	if r.Source == "url" {
+		r.Repo = redactURL(r.Repo)
+	}
+	return r
+}
+
 func (r Ref) Display() string {
 	switch r.Source {
+	case "url":
+		return redactURL(r.String())
 	case "hf":
 		d := strings.TrimPrefix(r.String(), "hf:")
 		if r.File != "" {
