@@ -403,6 +403,11 @@ func (c *Client) UpdateKeys(ctx context.Context) error {
 	}
 	p, ps, ph, pr := c.keyPaths()
 	sum := sha256.Sum256(data)
+	unlock, err := c.store.flock(signedLock, true, true) // check and write as one step
+	if err != nil {
+		return diskErr(err)
+	}
+	defer unlock()
 	if b, err := os.ReadFile(ph); err == nil {
 		var seq int64
 		var had string

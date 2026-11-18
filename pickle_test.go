@@ -5,7 +5,9 @@ package lmget
 // loaded. The callable is operator.abs.
 
 import (
+	"bytes"
 	"crypto/rand"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,5 +57,24 @@ func TestOpcodeWalkHasNoFalsePositives(t *testing.T) {
 		if err := checkFormat(p, name, false); err != nil {
 			t.Errorf("%s: refused: %v", name, err)
 		}
+	}
+}
+
+// Found by the 2026-11-18 review: a protocol 0 pickle padded with more
+// harmless opcodes than the scanner walks hid its call behind the limit.
+func TestAPicklePaddedPastTheLimitIsStillAPickle(t *testing.T) {
+	var b bytes.Buffer
+	for range 1<<20 + 10 {
+		b.WriteString("N0") // push None, pop it: harmless, well-formed
+	}
+	b.WriteString("cos\nsystem\n(S'echo pwned'\ntR.")
+	data := b.Bytes()
+	if !walkPickle(io.NewSectionReader(bytes.NewReader(data), 0, int64(len(data))), int64(len(data))) {
+		t.Fatal("a pickle padded past the opcode limit passed as data")
+	}
+	// data that is not a pickle still is not
+	plain := bytes.Repeat([]byte("hello world\n"), 1000)
+	if walkPickle(io.NewSectionReader(bytes.NewReader(plain), 0, int64(len(plain))), int64(len(plain))) {
+		t.Fatal("plain text read as a pickle")
 	}
 }

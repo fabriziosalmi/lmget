@@ -228,6 +228,10 @@ func (c *Client) exportHF(plan *Plan) (string, []string, error) {
 				links = append(links, dst)
 				continue
 			}
+			if dfi, err := os.Lstat(dst); err == nil && copiesAreLinks && dfi.Mode().IsRegular() && hasContent(dst, f.Size, f.SHA256) {
+				links = append(links, dst) // lmget's copy from an earlier run, still right: not copied again
+				continue
+			}
 			os.Remove(dst)
 			if err := os.Symlink(rel, dst); err != nil {
 				// Windows without Developer Mode cannot make symlinks; there

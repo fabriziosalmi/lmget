@@ -96,6 +96,11 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 			why("a new revision may come under terms that do not allow what the old one did").
 			fix("", "read the new license, then run the same command with --accept-license-change to record it")
 	}
+	if len(plan.Files) == 0 { // not a selection matter: there is nothing there
+		return nil, newErr(ExitNotFound, "not_found", r.Ref.Display()+" has no files at "+short(plan.Commit)).
+			why("the repository exists but is empty at that revision").
+			fix("", "check the name, or pick another revision with @<branch|tag|commit>")
+	}
 	if len(plan.Selected()) == 0 {
 		return nil, newErr(ExitUsage, "usage", "no files selected").
 			fix("lmget info "+r.Ref.Display(), "list the files, then adjust --include / --exclude")
@@ -103,6 +108,17 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	// before a single byte: a target that cannot hold the model wastes none
 	if err := TargetAccepts(plan, r.Target); err != nil {
 		return nil, err
+	}
+	// two files one name on this filesystem: the second would overwrite or
+	// shadow the first where the model is exported
+	if root := targetRoot(r.Target); root != "" {
+		if pairs := nameCollisions(plan); len(pairs) > 0 && caseFolds(root) {
+			return nil, newErr(ExitUsage, "usage", "two files of "+r.Ref.Display()+" would be one file here: "+
+				quote(pairs[0][0])+" and "+quote(pairs[0][1])).
+				why("the filesystem at %s does not tell names apart by case (or Unicode form)", root).
+				fix("--exclude '"+GlobEscape(pairs[0][1])+"'", "skip one of them").
+				fix("--to none", "or keep the model in the store only")
+		}
 	}
 	// keep a margin so a full disk never ends half way through
 	if margin := int64(512 << 20); plan.DiskFree >= 0 && plan.ToFetch+margin > plan.DiskFree {

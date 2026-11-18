@@ -259,7 +259,7 @@ func (c *Client) unlinkExport(ex ExportRecord, owned map[inode]bool, plan *Plan,
 				mine = strings.HasPrefix(t, storeBlobs) || (ex.Kind == "hf" && strings.HasPrefix(t, repoBlobs))
 			}
 		} else if in, ok := inodeOf(l, fi); ok && fi.Mode().IsRegular() {
-			mine = owned[in]
+			mine = owned[in] || c.store.storedCopy(l, fi) // a recorded link, or lmget's copy (Windows)
 			if !mine && ex.Kind == "ollama" && plan.Ref.Source == "ollama" {
 				// the tag file is a copy of the manifest, whose sha256 is the commit
 				mine = hasContent(l, fi.Size(), plan.Commit)
