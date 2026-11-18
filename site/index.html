@@ -17,7 +17,7 @@
 <main>
   <h1><picture><source srcset="/lmget-dark.svg" media="(prefers-color-scheme: dark)"><img src="/lmget-light.svg" alt="lmget" width="212" height="64"></picture></h1>
   <p class="lead">Get open models from their sources, verified.</p>
-  <figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="684"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio or a directory." width="960" height="392"></picture></figure>
+  <figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="684"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory." width="960" height="392"></picture></figure>
 
   <section aria-labelledby="install">
     <h2 id="install">Install</h2>
@@ -45,7 +45,7 @@ lmget ollama:smollm2:135m</code></pre>
         <span class="tip" role="status"></span>
       </span>
     </div>
-    <p class="note"><code>qwen</code> is a nickname: lmget reads this machine's memory and the apps installed, proposes the Qwen3.5 variant that fits, and asks before downloading. The second downloads, verifies and links into the Hugging Face cache. <code>info</code> shows the plan and downloads nothing. <code>--to omlx</code> and <code>--to lmstudio</code> link into those apps; the last lands in Ollama, ready for <code>ollama run</code>.</p>
+    <p class="note"><code>qwen</code> is a nickname: lmget reads this machine's memory and the apps installed, proposes the Qwen3.5 variant that fits, and asks before downloading. The second downloads, verifies and links into the Hugging Face cache. <code>info</code> shows the plan and downloads nothing. <code>--to omlx</code>, <code>--to lmstudio</code>, <code>--to jan</code>, <code>--to localai</code> and <code>--to exo</code> link into those apps; the last lands in Ollama, ready for <code>ollama run</code>.</p>
   </section>
 
   <section aria-labelledby="run">
@@ -66,11 +66,23 @@ lmget: done bytes=91335425 fetched=91335425 elapsed=13.8s</code></pre>
     <h2 id="what">What it does</h2>
     <ul>
       <li>Checks every file against the hash its source publishes, or the one you pin, and refuses pickle content hidden under another name.</li>
-      <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look: the Hugging Face cache, Ollama, oMLX, LM Studio or a directory.</li>
+      <li>Resumes parallel downloads, stores each file once by sha256, and links the model where your tools already look: the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory.</li>
       <li>Nicknames such as <code>qwen</code>, <code>whisper</code> or <code>embed</code> pick the variant that fits the machine; the list is signed like the index.</li>
       <li>When Hugging Face fails, a signed index and mirror nodes keep the models it lists available, even to a first run.</li>
       <li>Sources: Hugging Face (with ModelScope as a second origin), the Ollama registry, OCI registries and https URLs.</li>
     </ul>
+  </section>
+
+  <section aria-labelledby="works">
+    <h2 id="works">Works with</h2>
+    <ul>
+      <li>The Hugging Face cache (the default): transformers, sentence-transformers, llama.cpp <code>-hf</code>, Goose's local inference, Lemonade.</li>
+      <li>Ollama: Ollama, RamaLama's <code>ollama://</code> models, and the apps that ask Ollama for a model, such as Open WebUI, Page Assist, Hollama and Oterm.</li>
+      <li>Their own folders: oMLX, LM Studio, Jan, LocalAI, exo.</li>
+      <li>A plain directory: Text Generation WebUI, and apps given a file path, such as KoboldCpp, llamafile and llama-server.</li>
+      <li>Through a server: chat and agent apps that keep no model files of their own (LobeChat, LibreChat, Cherry Studio, Chatbox, SillyTavern, Dify, Langflow) use the models of the local server they ask, which lmget fills.</li>
+    </ul>
+    <p class="note">Read from each project's source or documentation on 2026-11-18. The folders and layouts are in the <a href="https://github.com/fabriziosalmi/lmget#apps">README</a>.</p>
   </section>
 
   <section aria-labelledby="nicknames">
