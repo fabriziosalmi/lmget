@@ -16,14 +16,16 @@ import (
 //	ollama    Ollama's models directory (ollama run reads it)
 //	omlx      oMLX's models directory, as <dir>/<org>/<name>
 //	lmstudio  LM Studio's models directory, as <dir>/<org>/<name>
+//	jan, localai, exo, comfyui: see targets.go and comfyui.go
 //	dir:PATH  a plain directory with the repository's file names
 //	none      store only
 //
 // For omlx and lmstudio, Path is the app's models directory, resolved on this
 // machine; a lock records only the kind.
 type Target struct {
-	Kind string `json:"kind"`
-	Path string `json:"path,omitempty"`
+	Kind   string `json:"kind"`
+	Path   string `json:"path,omitempty"`
+	Folder string `json:"folder,omitempty"` // comfyui:FOLDER, the ComfyUI folder for every weight file
 }
 
 func ParseTarget(s string) (Target, error) {
@@ -34,6 +36,17 @@ func ParseTarget(s string) (Target, error) {
 		return Target{Kind: "none"}, nil
 	case s == "ollama":
 		return Target{Kind: "ollama"}, nil
+	case s == "comfyui" || strings.HasPrefix(s, "comfyui:"):
+		folder := strings.TrimPrefix(strings.TrimPrefix(s, "comfyui"), ":")
+		if s != "comfyui" && !comfyFolders[folder] {
+			return Target{}, newErr(ExitUsage, "usage", "ComfyUI has no model folder "+quote(folder)).
+				fix("--to comfyui:FOLDER", "one of "+strings.Join(ComfyFolders(), ", "))
+		}
+		dir, err := AppModelsDir("comfyui")
+		if err != nil {
+			return Target{}, err
+		}
+		return Target{Kind: "comfyui", Path: dir, Folder: folder}, nil
 	case s == "omlx" || s == "lmstudio" || s == "jan" || s == "localai" || s == "exo":
 		dir, err := AppModelsDir(s)
 		if err != nil {
@@ -150,6 +163,8 @@ func TargetAccepts(plan *Plan, t Target) error {
 		}
 	case "jan", "localai", "exo":
 		return appAccepts(plan, t)
+	case "comfyui":
+		return comfyAccepts(plan, t)
 	case "omlx", "lmstudio":
 		if plan.Ref.Source != "hf" {
 			return newErr(ExitUsage, "usage", appNames[t.Kind]+"'s models directory holds Hugging Face repositories here").
@@ -195,6 +210,8 @@ func (c *Client) export(plan *Plan, t Target) (string, []string, error) {
 		return c.exportLocalAI(plan, t)
 	case "exo":
 		return c.exportExo(plan, t)
+	case "comfyui":
+		return c.exportComfyUI(plan, t)
 	}
 	return "", nil, nil
 }

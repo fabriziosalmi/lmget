@@ -212,11 +212,16 @@ func apart(a, b int64) (string, string) {
 
 // TargetName is how lmget names a target to people.
 func TargetName(t string) string {
+	if n, ok := appNames[t]; ok { // the apps with a models folder of their own
+		return n
+	}
 	switch t {
-	case "omlx", "lmstudio":
-		return appNames[t]
 	case "ollama":
 		return "Ollama"
+	case "dir":
+		return "a directory"
+	case "none":
+		return "the store only"
 	}
 	return "the Hugging Face cache"
 }
