@@ -1,0 +1,45 @@
+name: pypi
+
+# When a person publishes a release, its wheels go to PyPI, by trusted
+# publishing (no token in the repository). Off until the repository variable
+# PYPI_PUBLISH is "true", which is set once PyPI knows this workflow as the
+# publisher of the lmget project (environment "pypi").
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The published release whose wheels go to PyPI (vX.Y.Z)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: vars.PYPI_PUBLISH == 'true'
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write # trusted publishing
+    steps:
+      - name: the release's wheels, with their build provenance checked
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a release tag: $TAG"; exit 1; }
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.whl' --dir dist
+          n=0
+          for f in dist/*.whl; do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$TAG" >/dev/null
+            n=$((n+1))
+          done
+          [ "$n" -eq 6 ] || { echo "$n wheels, want 6"; exit 1; }
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist
