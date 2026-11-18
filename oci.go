@@ -143,7 +143,7 @@ func (c *Client) ociFetchToken(ctx context.Context, base, name string) (string, 
 	req.Header.Set("User-Agent", c.opt.UserAgent) // registry requests never carry the HF token
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", 0, newErr(ExitNetwork, "network", "cannot reach "+hostOf(base)).wrap(err)
+		return "", 0, reachErr(hostOf(base), err)
 	}
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	resp.Body.Close()
@@ -177,7 +177,7 @@ func (c *Client) ociFetchToken(ctx context.Context, base, name string) (string, 
 	treq.Header.Set("User-Agent", c.opt.UserAgent)
 	tresp, err := c.http.Do(treq)
 	if err != nil {
-		return "", 0, newErr(ExitNetwork, "network", "cannot reach "+realm.Host).wrap(err)
+		return "", 0, reachErr(realm.Host, err)
 	}
 	defer tresp.Body.Close()
 	if tresp.StatusCode != http.StatusOK {

@@ -2,11 +2,13 @@ package lmget
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 // Origins are blob servers the user names (LMGET_ORIGINS, --origin): a LAN
@@ -53,45 +55,88 @@ func (c *Client) fromOrigins(ctx context.Context, f File, part, state string, cn
 	}
 	// the user's origins first, then the lmget servers found on the LAN
 	origins := append(append([]string(nil), c.opt.Origins...), c.lanOrigins(ctx)...)
-	for _, o := range origins {
-		of := f
-		of.url = o + "/blobs/sha256/" + f.SHA256
-		of.ifRange, of.ociRepo = "", ""
-		of.attempts = 2
-		// the whole base URL: two origins on one host keep apart their
-		// partial downloads and their down marks
-		of.From = UserOrigin + strings.TrimPrefix(strings.TrimPrefix(o, "https://"), "http://")
-		if c.nodeIsDown(of.From) || ctx.Err() != nil {
-			continue
+	for i, o := range origins {
+		if of, sum, ok := c.fromOrigin(ctx, f, o, i >= len(c.opt.Origins), part, state, cnt); ok {
+			return of, sum, true
 		}
-		ranges, err := c.probeOrigin(ctx, of.url)
-		if err != nil {
-			if AsError(err).Code == ExitNetwork && ctx.Err() == nil {
-				c.markNodeDown(of.From)
-			}
-			continue // a 404 is this file only
-		}
-		of.noRanges = !ranges
-		cnt.done.Store(0)
-		if err := c.fetch(ctx, of, part, state, cnt); err != nil {
-			if AsError(err).Code == ExitNetwork && ctx.Err() == nil {
-				c.markNodeDown(of.From) // unreachable or failing: not for every file again
-			}
-			continue // a 404 is this file only
-		}
-		sum, err := c.verify(part, &of)
-		if err != nil {
-			os.Remove(part) // other bytes: the next origin, or the source, starts clean
-			os.Remove(state)
-			if AsError(err).Code == ExitVerify {
-				c.markNodeDown(of.From)
-			}
-			continue
-		}
-		return of, sum, true
 	}
 	return f, "", false
 }
+
+// A server found on the LAN is anyone's answer to a multicast query: it
+// gets lanProbeTimeout to answer the first byte, and a file
+// lanFileTime plus a second per MiB, then the next origin or the source
+// takes over. One that trickles a byte at a time cannot hold a pull.
+var (
+	lanProbeTimeout = 3 * time.Second
+	lanFileTime     = 30 * time.Second
+)
+
+func lanFileDeadline(size int64) time.Duration {
+	return lanFileTime + time.Duration(size>>20)*time.Second
+}
+
+func (c *Client) fromOrigin(ctx context.Context, f File, o string, lan bool, part, state string, cnt *counters) (File, string, bool) {
+	of := f
+	of.url = o + "/blobs/sha256/" + f.SHA256
+	of.ifRange, of.ociRepo = "", ""
+	of.attempts = 2
+	// the whole base URL: two origins on one host keep apart their
+	// partial downloads and their down marks
+	of.From = UserOrigin + strings.TrimPrefix(strings.TrimPrefix(o, "https://"), "http://")
+	if c.nodeIsDown(of.From) || ctx.Err() != nil {
+		return f, "", false
+	}
+	octx, cancel := context.WithCancel(withOriginRequest(ctx)) // its redirects stay on its host
+	defer cancel()
+	pctx, fctx := octx, octx
+	if lan {
+		var c1, c2 context.CancelFunc
+		pctx, c1 = context.WithTimeout(octx, lanProbeTimeout)
+		defer c1()
+		fctx, c2 = context.WithTimeout(octx, lanFileDeadline(f.Size))
+		defer c2()
+	}
+	// failing on its own (not because the pull was stopped): skipped for the
+	// rest of the run, not asked for every file again
+	down := func(err error, cctx context.Context) {
+		if ctx.Err() == nil && (AsError(err).Code == ExitNetwork || errors.Is(cctx.Err(), context.DeadlineExceeded)) {
+			c.markNodeDown(of.From)
+		}
+	}
+	ranges, err := c.probeOrigin(pctx, of.url)
+	if err != nil {
+		down(err, pctx)
+		return f, "", false // a 404 is this file only
+	}
+	of.noRanges = !ranges
+	cnt.done.Store(0)
+	if err := c.fetch(fctx, of, part, state, cnt); err != nil {
+		down(err, fctx)
+		return f, "", false
+	}
+	sum, err := c.verify(part, &of)
+	if err != nil {
+		os.Remove(part) // other bytes: the next origin, or the source, starts clean
+		os.Remove(state)
+		if AsError(err).Code == ExitVerify {
+			c.markNodeDown(of.From)
+		}
+		return f, "", false
+	}
+	return of, sum, true
+}
+
+// originKey marks a request to a user's or a LAN origin: a redirect to
+// another host is not followed (an origin is anyone's server, and its
+// redirects could reach this machine's own services).
+type originKey struct{}
+
+func withOriginRequest(ctx context.Context) context.Context {
+	return context.WithValue(ctx, originKey{}, true)
+}
+
+func isOriginRequest(ctx context.Context) bool { v, _ := ctx.Value(originKey{}).(bool); return v }
 
 // probeOrigin asks for the first byte of a blob: 206 means the origin serves
 // ranges (parallel chunks, resumable), 200 that it only streams whole files,

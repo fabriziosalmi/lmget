@@ -37,12 +37,16 @@ import (
 
 	"golang.org/x/net/dns/dnsmessage"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/netutil"
 )
 
 const (
 	lanService     = "_lmget._tcp.local."
 	mdnsPort       = 5353
 	lanDiscoverFor = 600 * time.Millisecond
+	// maxLANOrigins: what anyone on the network can add to a pull's origins
+	// is a few servers, not hundreds (one answer can name 25,000)
+	maxLANOrigins = 4
 	// LANPort is the port lmget serve listens on by default.
 	LANPort = 7878
 )
@@ -54,6 +58,9 @@ var mdnsGroup = net.IPv4(224, 0, 0, 251)
 // LANServer serves the public blobs of the store at /blobs/sha256/<sha256>,
 // the paths every lmget asks an origin for.
 type LANServer struct {
+	// Open serves clients off this machine's networks too: by default only
+	// the LAN (and this machine) are answered, whatever address it listens on
+	Open    bool
 	c       *Client
 	mu      sync.Mutex
 	blobs   map[string]int64 // sha256 -> size, public models only
@@ -86,6 +93,13 @@ func (s *LANServer) refresh(force bool) error {
 	if err != nil {
 		return err
 	}
+	// what the signed index revoked is never served, to clients whose index
+	// is older; when the record cannot be read, nothing is
+	revoked, err := s.c.revokedBlobs()
+	if err != nil {
+		s.blobs, s.models, s.scanned = nil, 0, time.Now()
+		return err
+	}
 	blobs, models := map[string]int64{}, 0
 	for _, m := range ms {
 		if m.Plan == nil || m.Plan.Access != "public" {
@@ -96,7 +110,7 @@ func (s *LANServer) refresh(force bool) error {
 		}
 		models++
 		for _, f := range m.Plan.Files {
-			if hex64.MatchString(f.SHA256) {
+			if _, bad := revoked[f.SHA256]; hex64.MatchString(f.SHA256) && !bad {
 				blobs[f.SHA256] = f.Size
 			}
 		}
@@ -105,8 +119,45 @@ func (s *LANServer) refresh(force bool) error {
 	return nil
 }
 
+// lanMaxConns and lanWriteIdle bound what clients can hold: connections at
+// once, and how long a response may wait for a client that stopped reading.
+var (
+	lanMaxConns  = 64
+	lanWriteIdle = 30 * time.Second
+)
+
+// LANListener caps a server's connections at lanMaxConns.
+func LANListener(ln net.Listener) net.Listener { return netutil.LimitListener(ln, lanMaxConns) }
+
+// lanClient reports whether a client may be served: on this machine's
+// networks, or this machine itself.
+func lanClient(remote string) bool {
+	host, _, err := net.SplitHostPort(remote)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && (ip.IsLoopback() || onLAN(ip, lanNets()))
+}
+
+// idleWriter pushes the write deadline forward before every write: a slow
+// client keeps its download, one that stops reading loses it.
+type idleWriter struct {
+	http.ResponseWriter
+	rc *http.ResponseController
+}
+
+func (w idleWriter) Write(b []byte) (int, error) {
+	_ = w.rc.SetWriteDeadline(time.Now().Add(lanWriteIdle))
+	return w.ResponseWriter.Write(b)
+}
+
 func (s *LANServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if !s.Open && !lanClient(r.RemoteAddr) {
+		http.Error(w, "this server answers its local network only", http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "read only", http.StatusMethodNotAllowed)
 		return
@@ -131,7 +182,7 @@ func (s *LANServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	w.Header().Set("Content-Type", "application/octet-stream")
-	http.ServeContent(w, r, sum, time.Time{}, f)
+	http.ServeContent(idleWriter{w, http.NewResponseController(w)}, r, sum, time.Time{}, f)
 }
 
 // --- announcing ------------------------------------------------------------------
@@ -177,6 +228,48 @@ func ipv4Of(ifi *net.Interface) []net.IP {
 		}
 	}
 	return out
+}
+
+// lanNets are the IPv4 networks of the interfaces mDNS goes out on: a LAN
+// server's address, and a querier's, is inside one of them.
+func lanNets() []*net.IPNet {
+	var out []*net.IPNet
+	for _, ifi := range lanInterfaces() {
+		addrs, _ := ifi.Addrs()
+		for _, a := range addrs {
+			if n, ok := a.(*net.IPNet); ok && n.IP.To4() != nil && !n.IP.IsLinkLocalUnicast() {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
+}
+
+// onLAN reports whether ip is a unicast address inside one of nets, other
+// than the network's own and broadcast addresses: not loopback, link-local
+// (the cloud metadata address), or anything off this machine's networks.
+func onLAN(ip net.IP, nets []*net.IPNet) bool {
+	v4 := ip.To4()
+	if v4 == nil || v4.IsLoopback() || v4.IsLinkLocalUnicast() || v4.IsUnspecified() || v4.IsMulticast() {
+		return false
+	}
+	for _, n := range nets {
+		base, mask := n.IP.To4(), n.Mask
+		if base == nil || !n.Contains(v4) {
+			continue
+		}
+		if len(mask) == 16 {
+			mask = mask[12:]
+		}
+		netw, bcast := make(net.IP, 4), make(net.IP, 4)
+		for i := range 4 {
+			netw[i], bcast[i] = base[i]&mask[i], base[i]|^mask[i]
+		}
+		if ones, _ := mask.Size(); ones >= 31 || (!v4.Equal(netw) && !v4.Equal(bcast)) {
+			return true
+		}
+	}
+	return false
 }
 
 // Announce makes this machine's server at port known as an _lmget._tcp
@@ -241,6 +334,7 @@ func respond(ctx context.Context, port int) error {
 	go func() { <-ctx.Done(); pc.Close() }()
 	instance := lanInstance()
 	buf := make([]byte, 9000)
+	lim := newAnswerLimit()
 	for {
 		n, cm, src, err := p.ReadFrom(buf)
 		if err != nil {
@@ -248,6 +342,13 @@ func respond(ctx context.Context, port int) error {
 				return nil
 			}
 			return fmt.Errorf("mDNS: %w", err)
+		}
+		// a querier on this machine's networks only (RFC 6762 section 11),
+		// at most once a second each, and the group at most once a second:
+		// no answers for anyone off the LAN, no flood on request
+		u, isUDP := src.(*net.UDPAddr)
+		if !isUDP || !lim.answer(u, lanNets(), time.Now()) {
+			continue
 		}
 		var ifi *net.Interface
 		if cm != nil {
@@ -267,7 +368,7 @@ func respond(ctx context.Context, port int) error {
 			continue
 		}
 		to := src
-		if u, isUDP := src.(*net.UDPAddr); isUDP && u.Port == mdnsPort {
+		if u.Port == mdnsPort {
 			to = &net.UDPAddr{IP: mdnsGroup, Port: mdnsPort} // a full mDNS querier: answer to the group
 			if ifi != nil {
 				_ = p.SetMulticastInterface(ifi)
@@ -275,6 +376,36 @@ func respond(ctx context.Context, port int) error {
 		}
 		_, _ = p.WriteTo(reply, nil, to)
 	}
+}
+
+// answerLimit allows one answer a second to each source, and one a second
+// to the multicast group.
+type answerLimit struct {
+	last  map[string]time.Time
+	group time.Time
+}
+
+func newAnswerLimit() *answerLimit { return &answerLimit{last: map[string]time.Time{}} }
+
+// answer decides whether the responder answers a query from src: a querier
+// on this machine's networks (RFC 6762 section 11), within the rate limits.
+// A query from port 5353 is answered to the group.
+func (l *answerLimit) answer(src *net.UDPAddr, nets []*net.IPNet, now time.Time) bool {
+	return onLAN(src.IP, nets) && l.allow(src.IP.String(), src.Port == mdnsPort, now)
+}
+
+func (l *answerLimit) allow(src string, toGroup bool, now time.Time) bool {
+	if now.Sub(l.last[src]) < time.Second || (toGroup && now.Sub(l.group) < time.Second) {
+		return false
+	}
+	if len(l.last) > 4096 { // forget, rather than grow with every spoofed source
+		clear(l.last)
+	}
+	l.last[src] = now
+	if toGroup {
+		l.group = now
+	}
+	return true
 }
 
 // mdnsAnswer builds the answer to a query for the lmget service: PTR to
@@ -381,27 +512,39 @@ func DiscoverLAN(ctx context.Context, wait time.Duration) ([]string, error) {
 	}
 	_ = pc.SetReadDeadline(deadline)
 	found := map[string]bool{}
+	nets := lanNets()
 	buf := make([]byte, 9000)
 	for {
 		n, _, err := pc.ReadFrom(buf)
 		if err != nil {
 			break // the deadline: every answer that came is in
 		}
-		for _, o := range mdnsServers(buf[:n], id) {
+		for _, o := range mdnsServers(buf[:n], id, nets) {
 			found[o] = true
 		}
 	}
+	return lanServerList(found), nil
+}
+
+// lanServerList is what discovery found, sorted, at most maxLANOrigins.
+func lanServerList(found map[string]bool) []string {
 	out := make([]string, 0, len(found))
 	for o := range found {
 		out = append(out, o)
 	}
 	sort.Strings(out)
-	return out, nil
+	if len(out) > maxLANOrigins {
+		out = out[:maxLANOrigins]
+	}
+	return out
 }
 
 // mdnsServers reads an answer to query id: the lmget instances it names,
-// their port and their IPv4 addresses, as origin URLs.
-func mdnsServers(msg []byte, id uint16) []string {
+// their port and their IPv4 addresses, as origin URLs. Only addresses on
+// this machine's networks (nets): an answer comes from anyone on the LAN,
+// and must not send lmget to this machine's own services, the cloud
+// metadata address or the internet.
+func mdnsServers(msg []byte, id uint16, nets []*net.IPNet) []string {
 	var p dnsmessage.Parser
 	h, err := p.Start(msg)
 	if err != nil || !h.Response || h.ID != id {
@@ -452,7 +595,7 @@ func mdnsServers(msg []byte, id uint16) []string {
 			continue
 		}
 		for _, ip := range addrs[host] {
-			if v4 := ip.To4(); v4 != nil && !v4.IsUnspecified() && !v4.IsMulticast() {
+			if v4 := ip.To4(); v4 != nil && onLAN(v4, nets) {
 				out = append(out, "http://"+net.JoinHostPort(v4.String(), strconv.Itoa(int(port))))
 			}
 		}
