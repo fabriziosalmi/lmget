@@ -201,16 +201,7 @@ function showFacts(ix, al) {
     "until the signature expires",
     left < 7 ? "warn" : "",
   ));
-  const src = el("p", undefined, "facts-source");
-  src.append("Read now from the signed ");
-  const a1 = el("a", "index"); a1.href = "/index.json";
-  src.append(a1, ` (sequence ${ix.sequence})`);
-  if (al) {
-    const a2 = el("a", "nickname list"); a2.href = "/aliases.json";
-    src.append(" and ", a2, ` (sequence ${al.sequence})`);
-  }
-  src.append(".");
-  box.replaceChildren(...facts, src);
+  box.replaceChildren(...facts);
   box.hidden = false;
 }
 
