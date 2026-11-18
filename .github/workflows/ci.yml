@@ -28,6 +28,10 @@ jobs:
           test -z "$(git ls-files -z '*.go' | xargs -0 gofmt -l)"
       - name: tests with the race detector
         run: go test -race -count=1 ./...
+      - name: lmget's own mDNS responder answers and is found (Linux, where it is used)
+        run: |
+          go test -count=1 -run 'TestRespondAndDiscover$' -v . | tee mdns.log
+          grep -q -- '--- PASS: TestRespondAndDiscover' mdns.log # a skip is not a pass
       - name: release build is reproducible
         run: |
           ./scripts/release-build.sh v0.0.0 dist-a
