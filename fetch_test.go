@@ -9,7 +9,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // Hardening: an absurd size from a server is refused instead of overflowing.
@@ -151,5 +153,38 @@ func TestAURLServersPartialIsNotResumedByHuggingFace(t *testing.T) {
 			t.Errorf("origin %q left behind: the Hugging Face pull failed: %v", left, err)
 		}
 		srv.Close()
+	}
+}
+
+// A download makes its chunks durable in groups, not one sync per chunk: on
+// macOS a sync flushes the drive's cache. The state still never lists a
+// chunk before its sync (checkpoint), and the last group is synced in every
+// case (TestPullResumesWithoutRefetching interrupts before any timed one).
+func TestChunksAreSyncedInGroups(t *testing.T) {
+	big := fakeSafetensors(16 << 20) // 65 chunks of 256 KiB
+	var syncs atomic.Int64
+	old := syncFile
+	syncFile = func(f *os.File) error { syncs.Add(1); return f.Sync() }
+	defer func() { syncFile, checkpointEvery, checkpointBytes = old, time.Second, 256<<20 }()
+	for _, tc := range []struct {
+		every    time.Duration
+		bytes    int64
+		min, max int64
+	}{
+		{time.Hour, 1 << 40, 1, 1},      // one sync, at the end
+		{time.Hour, 16 << 20 / 4, 4, 6}, // every quarter of the file
+	} {
+		checkpointEvery, checkpointBytes = tc.every, tc.bytes
+		f := &fakeHF{files: []fakeFile{{path: "model.safetensors", data: big, lfs: true}}}
+		srv := httptest.NewServer(f.handler())
+		c := newTestClient(t, srv, t.TempDir())
+		syncs.Store(0)
+		if _, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil); err != nil {
+			t.Fatal(err)
+		}
+		srv.Close()
+		if n := syncs.Load(); n < tc.min || n > tc.max {
+			t.Errorf("checkpoint every %v or %d bytes: %d syncs for 65 chunks, want %d to %d", tc.every, tc.bytes, n, tc.min, tc.max)
+		}
 	}
 }
