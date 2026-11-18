@@ -224,8 +224,12 @@ section {
   color: var(--fg);
 }
 
-.note code {
-  white-space: nowrap; /* a flag such as --to lmstudio never breaks at its dashes */
+/* a flag such as --to lmstudio never breaks at its dashes, where there is
+   room; on a phone a long command may wrap rather than push the page wide */
+@media (min-width: 30rem) {
+  .note code {
+    white-space: nowrap;
+  }
 }
 
 pre.out {
@@ -441,4 +445,25 @@ td.mono {
 th:last-child,
 td:last-child {
   padding-inline-end: 0;
+}
+
+/* the flow diagram: as wide as the page allows, never wider than drawn */
+/* wider than the text column, centred on it: drawn at 960px, its small
+   labels stay legible; on narrow screens it takes the width there is */
+.flow {
+  inline-size: min(960px, calc(100vw - 2.5rem));
+  margin: 0 0 2.5rem calc(50% - min(480px, calc(50vw - 1.25rem)));
+}
+
+.flow img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+
+@media (max-width: 720px) {
+  .flow {
+    inline-size: min(360px, 100%);
+    margin-inline: auto;
+  }
 }
