@@ -32,6 +32,12 @@ scoop bucket add lmget https://github.com/fabriziosalmi/lmget
 scoop install lmget
 ```
 
+With pip or uv, from the releases after v0.3.2: each release carries Python wheels for macOS, Linux (glibc and musl) and Windows, amd64 and arm64, that hold the release binary unchanged and no Python code, with their build provenance attested. Once lmget is on PyPI (published when a release is, by `pypi.yml`):
+
+```sh
+uv tool install lmget     # or: pipx install lmget, pip install lmget
+```
+
 In a container, from the releases after v0.3.2: `ghcr.io/fabriziosalmi/lmget`, for linux/amd64 and linux/arm64, the release binary on a distroless base (CA certificates, a nonroot user, no shell), with its build provenance attested. The store is `/home/nonroot/.lmget`; mount a volume there to keep it.
 
 ```sh

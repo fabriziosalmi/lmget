@@ -182,3 +182,40 @@ jobs:
           subject-name: ${{ steps.name.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  wheels:
+    # the Python wheels, built from the same checked archives (scripts/wheels.py
+    # copies the binary unchanged), attested, and attached to the draft. PyPI
+    # gets them only when a person publishes the release (pypi.yml).
+    needs: [build, release]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write      # attach the wheels to the draft release
+      id-token: write      # sign the provenance
+      attestations: write  # store the attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/wheels.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: archives
+      - name: the archives are the ones the build job hashed
+        env:
+          BUILT: ${{ needs.build.outputs.checksums }}
+        run: |
+          printf '%s\n' "$BUILT" > built.txt
+          cmp built.txt archives/checksums.txt
+          (cd archives && sha256sum -c checksums.txt)
+      - name: the wheels
+        run: python3 scripts/wheels.py "$GITHUB_REF_NAME" archives wheels
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: wheels/*.whl
+      - name: attached to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" wheels/*.whl --repo "$GITHUB_REPOSITORY"
