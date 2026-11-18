@@ -38,10 +38,14 @@ func (f File) Selected() bool { return f.Skipped == "" }
 
 // Plan is everything lmget knows before downloading a byte.
 type Plan struct {
-	Ref      Ref      `json:"ref"`
-	Commit   string   `json:"commit"`
-	License  string   `json:"license,omitempty"`
-	Gated    string   `json:"gated,omitempty"`
+	Ref     Ref    `json:"ref"`
+	Commit  string `json:"commit"`
+	License string `json:"license,omitempty"`
+	Gated   string `json:"gated,omitempty"`
+	// Access is "public" when the source says anyone may download the model
+	// without a token or an accepted license (lmget serve shares only those),
+	// and empty when it does not say so.
+	Access   string   `json:"access,omitempty"`
 	HashFrom string   `json:"hash_from,omitempty"` // direct URLs: user, server or first
 	Files    []File   `json:"files"`
 	Bytes    int64    `json:"bytes"`            // selected files

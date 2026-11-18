@@ -37,6 +37,8 @@ type fakeHF struct {
 	onByte    atomic.Pointer[func(total int64)]
 	tree      func() []map[string]any // override
 	noLicense atomic.Bool             // the card declares no license
+	private   atomic.Bool             // a private repository
+	gatedAs   string                  // "auto" or "manual": a gated repository
 	id        string                  // the repository's own spelling, if not the one asked for
 }
 
@@ -72,7 +74,11 @@ func (f *fakeHF) handler() http.Handler {
 		if f.id != "" {
 			id = f.id
 		}
-		json.NewEncoder(w).Encode(map[string]any{"id": id, "sha": commit, "gated": false, "cardData": card})
+		var gated any = false
+		if f.gatedAs != "" {
+			gated = f.gatedAs
+		}
+		json.NewEncoder(w).Encode(map[string]any{"id": id, "sha": commit, "gated": gated, "private": f.private.Load(), "cardData": card})
 	})
 	mux.HandleFunc("GET /api/models/{org}/{name}/tree/"+commit, func(w http.ResponseWriter, r *http.Request) {
 		var entries []map[string]any

@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -46,6 +49,8 @@ type flags struct {
 	endpoint    string // run: an OpenAI-compatible server
 	modelID     string // run: the name the app knows the model by
 	maxTokens   int    // run: the longest answer
+	listen      string // serve: the address to listen on
+	noMDNS      bool   // serve: do not announce by mDNS
 }
 
 func main() { os.Exit(int(run())) }
@@ -220,7 +225,21 @@ func run() lmget.ExitCode {
 		Args:    noArgs,
 		RunE:    func(cmd *cobra.Command, args []string) error { code = doSBOM(f); return nil },
 	}
-	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run, mcp, sbom)
+	serve := &cobra.Command{
+		Use:   "serve",
+		Short: "Share this store's public models with the local network, read only, announced by mDNS",
+		Long: "serve shares the blobs of this store's public models (no token or accepted license needed\n" +
+			"at the source) over HTTP on the local network, at /blobs/sha256/<sha256>, and announces\n" +
+			"itself by mDNS as an _lmget._tcp service. An lmget with LMGET_LAN=on finds it and asks it\n" +
+			"first, verifying every byte against the sha256 its plan knows. Gated and private models,\n" +
+			"URLs and OCI images are never shared.",
+		Example: "  lmget serve\n  lmget serve --listen 192.168.1.10:7878 --no-mdns",
+		Args:    noArgs,
+		RunE:    func(cmd *cobra.Command, args []string) error { code = doServe(f); return nil },
+	}
+	serve.Flags().StringVar(&f.listen, "listen", fmt.Sprintf(":%d", lmget.LANPort), "address to listen on")
+	serve.Flags().BoolVar(&f.noMDNS, "no-mdns", false, "do not announce the server by mDNS")
+	root.AddCommand(get, info, sync, ls, rm, doctor, index, history, run, mcp, sbom, serve)
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: err.Error(),
 			Fixes: []lmget.Fix{{Cmd: c.CommandPath() + " --help"}}}
@@ -487,6 +506,47 @@ func doSync(f flags, args []string) lmget.ExitCode {
 		if code != lmget.ExitOK {
 			return code
 		}
+	}
+	return lmget.ExitOK
+}
+
+func doServe(f flags) lmget.ExitCode {
+	mode := outputMode(f)
+	_, portStr, err := net.SplitHostPort(f.listen)
+	port, perr := strconv.Atoi(portStr)
+	if err != nil || perr != nil || port <= 0 || port > 65535 {
+		return fail(mode, &lmget.Error{Code: lmget.ExitUsage, Kind: "usage", Msg: "not a listen address: " + lmget.Printable(f.listen),
+			Fixes: []lmget.Fix{{Cmd: fmt.Sprintf("lmget serve --listen :%d", lmget.LANPort), Note: ""}}})
+	}
+	c, err := lmget.New(lmget.Options{})
+	if err != nil {
+		return fail(mode, err)
+	}
+	ls := c.LANServer()
+	models, blobs, err := ls.Shared()
+	if err != nil {
+		return fail(mode, err)
+	}
+	ln, err := net.Listen("tcp", f.listen)
+	if err != nil {
+		return fail(mode, &lmget.Error{Code: lmget.ExitFailure, Kind: "serve", Msg: "cannot listen on " + lmget.Printable(f.listen) + ": " + err.Error()})
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	srv := &http.Server{Handler: ls, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
+	go func() { <-ctx.Done(); srv.Close() }()
+	fmt.Fprintf(os.Stderr, "lmget serve: %d public models (%d files) on %s, read only\n", models, blobs, ln.Addr())
+	if !f.noMDNS {
+		go func() {
+			if err := lmget.Announce(ctx, port); err != nil {
+				fmt.Fprintf(os.Stderr, "lmget serve: not announced (%v); clients can still use LMGET_ORIGINS=http://<this host>:%d\n", err, port)
+			}
+		}()
+		fmt.Fprintf(os.Stderr, "lmget serve: announced by mDNS as _lmget._tcp; clients find it with LMGET_LAN=on\n")
+	}
+	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		fmt.Fprintln(os.Stderr, "lmget serve:", err)
+		return lmget.ExitFailure
 	}
 	return lmget.ExitOK
 }

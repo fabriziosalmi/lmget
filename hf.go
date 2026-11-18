@@ -20,6 +20,7 @@ type hfModelInfo struct {
 	ID       string `json:"id"`
 	Sha      string `json:"sha"`
 	Gated    any    `json:"gated"`
+	Private  *bool  `json:"private"`
 	Disabled bool   `json:"disabled"`
 	CardData struct {
 		License any `json:"license"`
@@ -78,6 +79,11 @@ func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, er
 	p := &Plan{Ref: ref, Commit: info.Sha, License: licenseString(info.CardData.License)}
 	if g, ok := info.Gated.(string); ok && g != "" {
 		p.Gated = printable(g)
+	}
+	// public only when Hugging Face says so: not private, and gated false
+	// (it is false, or the kind of gate, auto or manual)
+	if g, ok := info.Gated.(bool); ok && !g && info.Private != nil && !*info.Private {
+		p.Access = "public"
 	}
 	next := fmt.Sprintf("%s/api/models/%s/tree/%s?recursive=true", c.opt.HFEndpoint, ref.Repo, info.Sha)
 	seen := map[string]bool{}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"golang.org/x/sys/windows"
 )
@@ -150,4 +151,17 @@ func linkFallback(src, dst string) error {
 		os.Remove(dst)
 	}
 	return err
+}
+
+// reusePort lets lmget serve's mDNS socket share port 5353 with other
+// mDNS responders.
+func reusePort(_, _ string, c syscall.RawConn) error {
+	var serr error
+	err := c.Control(func(fd uintptr) {
+		serr = windows.SetsockoptInt(windows.Handle(fd), windows.SOL_SOCKET, windows.SO_REUSEADDR, 1)
+	})
+	if err != nil {
+		return err
+	}
+	return serr
 }

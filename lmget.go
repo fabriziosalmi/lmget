@@ -37,6 +37,10 @@ type Options struct {
 	// https://www.modelscope.ai. NoMirror never asks it.
 	ModelScopeEndpoint string
 	NoMirror           bool
+	// LAN looks for lmget servers on the local network by mDNS, once per
+	// client, and asks them first, as origins (lan.go). Default: on when
+	// $LMGET_LAN is on, 1 or true.
+	LAN bool
 	// Licenses a model may come under, as the source names them; "none"
 	// allows a model that declares none. Default $LMGET_LICENSES (names
 	// separated by commas or spaces); empty allows any. See policy.go.
@@ -69,6 +73,8 @@ type Options struct {
 }
 
 type Client struct {
+	lanOnce     sync.Once
+	lanFound    []string // lmget servers found on the local network (lan.go)
 	opt         Options
 	store       *Store
 	http        *http.Client
@@ -100,6 +106,10 @@ func New(o Options) (*Client, error) {
 	}
 	if o.HFEndpoint == "" {
 		o.HFEndpoint = os.Getenv("HF_ENDPOINT")
+	}
+	switch strings.ToLower(os.Getenv("LMGET_LAN")) {
+	case "on", "1", "true":
+		o.LAN = true
 	}
 	if o.Licenses == nil {
 		o.Licenses = ParseLicenses(os.Getenv("LMGET_LICENSES"))
