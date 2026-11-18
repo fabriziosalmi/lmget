@@ -127,6 +127,16 @@ func (c *Client) hfFile(ref Ref, commit string, e hfTreeEntry) (File, error) {
 	}
 	f := File{Path: e.Path, Size: e.Size}
 	if e.Lfs != nil {
+		if e.Lfs.Oid != "" && strings.Trim(e.Lfs.Oid, "*") == "" {
+			// what Hugging Face lists for a gated repository to a request
+			// without a token, or from an account not granted access
+			e := newErr(ExitAuth, "auth", "Hugging Face hides the hashes of "+ref.Display()+"'s files").
+				why("the repository is gated: lmget verifies every file by its hash, so it downloads nothing it cannot verify")
+			if c.opt.HFToken == "" {
+				e = e.fix("export HF_TOKEN=...", "a read token from https://huggingface.co/settings/tokens")
+			}
+			return File{}, e.fix("", "accept the conditions at https://huggingface.co/"+ref.Repo)
+		}
 		if !hex64.MatchString(e.Lfs.Oid) {
 			return File{}, newErr(ExitFailure, "source", "invalid sha256 for "+e.Path)
 		}

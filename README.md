@@ -87,7 +87,7 @@ What happens on every run:
 
 Flags and environment:
 
-- `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to omlx`, `--to lmstudio`, `--to jan`, `--to localai` and `--to exo` into those apps' models folders (see [Apps](#apps)); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
+- `--to hf` links into the Hugging Face cache (the default for Hugging Face models); `--to ollama` into Ollama's models directory (the default for Ollama models, and for Ollama models only); `--to omlx`, `--to lmstudio`, `--to jan`, `--to localai`, `--to exo` and `--to comfyui` into those apps' models folders (see [Apps](#apps)); `--to dir:PATH` into a plain directory; `--to none` keeps the files in the store only.
 - The Hugging Face cache is `$HF_HUB_CACHE`, else `$HF_HOME/hub`, else `$XDG_CACHE_HOME/huggingface/hub`, else `~/.cache/huggingface/hub`.
 - `--dry-run` stops after the plan, as `lmget info` does. For a Hugging Face model with a transformers `config.json`, the plan also says whether the model fits this machine: the selected weights plus the KV cache (keys and values, 16-bit) for 8192 tokens (or the model's maximum, if lower), against the memory lmget lets a model use here, the same budget nicknames use (85% of an NVIDIA GPU's memory, 30% of Apple Silicon's unified memory, 50% of the RAM otherwise). Hybrid models count only their full-attention layers; a sliding window makes the figure an upper bound and says so; an architecture whose cache lmget cannot count (such as MLA) gets no figure. Activations, runtime overhead and speed are not estimated. It reads `config.json` only (a few kB, checked against the hash in the plan, never stored), from the store or the source, and not for a plan that a revoked file or the license policy refuses.
 - `--conns N` sets the parallel connections per file (default 8).
@@ -159,6 +159,8 @@ lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_0*' --to lmstudio
 lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to jan
 lmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to localai
 lmget mlx-community/Qwen3-0.6B-4bit --to exo
+lmget Comfy-Org/Z-Image-Turbo --include z_image_turbo_bf16.safetensors --include qwen_3_4b.safetensors --include ae.safetensors --to comfyui
+lmget Comfy-Org/Flux-1-Schnell --include flux1-schnell.safetensors --to comfyui:diffusion_models
 ```
 
 lmget links the files into the app's models folder (hard links on the same disk, symlinks into the store otherwise), in the layout the app reads. Only Hugging Face models go there, and a target that cannot hold the selection is refused before anything is downloaded. Each folder can be set with a variable; a path must be absolute, `~/` is expanded.
@@ -170,13 +172,15 @@ lmget links the files into the app's models folder (hard links on the same disk,
 | `jan` | `$LMGET_JAN_DIR`, else Jan's data folder: `~/Library/Application Support/Jan/data` (macOS), `%APPDATA%\Jan\data` (Windows), `$XDG_DATA_HOME/Jan/data` or `~/.local/share/Jan/data` (Linux) | `llamacpp/models/<org>/<name>/` with a `model.yml` | one GGUF, and at most one `mmproj` file |
 | `localai` | `$LMGET_LOCALAI_DIR`, else `$LOCALAI_MODELS_PATH`, else `$MODELS_PATH`, else `~/.localai/models` (the LocalAI launcher's folder) | flat: `<file>.gguf` | GGUF |
 | `exo` | `$LMGET_EXO_DIR`, else `$EXO_DEFAULT_MODELS_DIR`, else `~/$EXO_HOME/models`, else `~/.exo/models` (macOS, Windows), `$XDG_DATA_HOME/exo/models` or `~/.local/share/exo/models` (Linux) | `<org>--<name>/` with `.exo-download.json` | `config.json` and `*.safetensors` |
+| `comfyui` | `$LMGET_COMFYUI_DIR`, else `<basePath>/models` from ComfyUI Desktop's `config.json` (`~/Library/Application Support/ComfyUI`, `%APPDATA%\ComfyUI`; only that key is read), else comfy-cli's default workspace `~/Documents/comfy/ComfyUI/models` (macOS, Windows) or `~/comfy/ComfyUI/models` (Linux), whichever exists | flat, a folder per kind: `<folder>/<file>` | `*.safetensors` and ComfyUI's other weight files |
 
 - oMLX: checked with oMLX 0.8.0rc1 on 2026-11-17: it found a model lmget exported and listed it by its directory name (`Qwen3.5-0.8B-4bit`); its log also showed it listing MLX models from the Hugging Face cache as `<org>--<name>`.
 - LM Studio: a folder moved in the app is kept in no documented file, so set `LMGET_LMSTUDIO_DIR` then.
 - Jan: lmget writes the `model.yml` Jan writes when it imports a GGUF (`model_path` relative to the data folder, `name`, `size_bytes`, `model_sha256`, and the `mmproj_` fields), plus the key `lmget_export: true`. Jan rewrites `model.yml` with keys of its own and keeps that one, so lmget still knows the file as its own. A `model.yml` without that key is Jan's, and lmget does not overwrite it.
 - LocalAI: the file name is the model name. The `local-ai` command reads its models from `./models` in the folder where it starts, unless `--models-path` or one of the two variables says otherwise: point `LMGET_LOCALAI_DIR` at the same folder.
 - exo: `.exo-download.json` is the manifest exo writes after it has verified a download (repository, commit, and each file's path, size and hash); exo takes a folder with a complete manifest as a downloaded model. exo runs the models it has a model card for (`mlx-community/Qwen3-0.6B-4bit` has one), so a repository outside its list is stored but not offered.
-- The layouts of LM Studio, Jan, LocalAI and exo follow their documentation and source code; they have not been checked against the running apps yet. `lmget run` asks oMLX, LM Studio and Ollama; for Jan, LocalAI and exo, start the app and ask it.
+- ComfyUI: workflows name a model by its file name in a folder (`diffusion_models`, `text_encoders`, `vae`, `loras`, `checkpoints`, ...), so each selected weight file is linked flat into its folder, and the rest of the repository stays in the store. The folder comes from `--to comfyui:FOLDER` when given; else from the file's path, where a directory is named as a ComfyUI folder, as in the Comfy-Org repositories (`split_files/vae/ae.safetensors` goes to `vae/`); else from its tensors: a safetensors file with `model.diffusion_model.*` tensors is a full checkpoint (`checkpoints/`), as ComfyUI's checkpoint loader reads one. That is read from the stored file after its hash is verified. Any other file is not guessed: lmget asks for the folder, and the command it suggests downloads nothing again. Two files that would have one name in one folder are refused before the download, and so is a file inside a repository in the diffusers layout (`model_index.json`, a folder per component): ComfyUI loads single files, and that layout's `vae/` is not ComfyUI's. lmget does not find a ComfyUI installed somewhere else, nor the newer Desktop's installations: set `LMGET_COMFYUI_DIR` to its `models` folder.
+- The layouts of LM Studio, Jan, LocalAI, exo and ComfyUI follow their documentation and source code; they have not been checked against the running apps yet. `lmget run` asks oMLX, LM Studio and Ollama; for Jan, LocalAI, exo and ComfyUI, start the app and ask it.
 
 A model in an app folder has one revision at a time: updating it replaces the links lmget made and removes the ones the new revision no longer has, so the app never loads two revisions mixed. Files that lmget did not create are left alone, and one in the way stops the export. `lmget rm` removes only lmget's links and the `model.yml` or `.exo-download.json` it wrote.
 
@@ -192,7 +196,7 @@ What an app reads, and the lmget target that fills it. Read from each project's 
 
 - **The Hugging Face cache** (`--to hf`, the default): transformers, sentence-transformers, llama.cpp (`-hf` downloads into it and reads it), Goose's local inference, Lemonade.
 - **Ollama** (`--to ollama`): Ollama, RamaLama's `ollama://` models, and the apps that ask Ollama for a model: Open WebUI, Page Assist, Hollama, Oterm, among others.
-- **The apps above**: oMLX, LM Studio, Jan, LocalAI, exo.
+- **The apps above**: oMLX, LM Studio, Jan, LocalAI, exo, ComfyUI.
 - **A plain directory** (`--to dir:PATH`): Text Generation WebUI (above), and apps given a file path: KoboldCpp (`--model`), llamafile (`-m`), llama-server (`-m`).
 - **Through a server**: chat and agent apps that keep no model files of their own (LobeChat, LibreChat, Cherry Studio, Chatbox, SillyTavern, Dify, Langflow, and others) use whatever model the local server they are pointed at (Ollama, LM Studio, oMLX, LocalAI, Jan, a vLLM or llama-server) has, and lmget fills that server's folder.
 
@@ -383,7 +387,7 @@ claude mcp add lmget -- lmget mcp
 
 - `info`: the plan of a model, without downloading: commit, license, files with sizes and hashes, what is already stored, the pickle and gated checks, the free disk, and whether it fits this machine's memory when lmget can tell. For a nickname, the variant chosen for this machine and why. It only reads.
 - `list`: the models in the store and where each one is linked. It only reads.
-- `get`: downloads, verifies and links a model, only when called with `confirm: true`; without it, it returns the plan. It links into the apps and the Hugging Face cache (`to`: `hf`, `ollama`, `omlx`, `lmstudio`, `jan`, `localai`, `exo`) or keeps the files in the store (`none`), never into a directory: the file names come from the repository, so a folder is chosen on the command line, by a person. A direct URL or an OCI image stays in the store unless `to` names an app.
+- `get`: downloads, verifies and links a model, only when called with `confirm: true`; without it, it returns the plan. It links into the apps and the Hugging Face cache (`to`: `hf`, `ollama`, `omlx`, `lmstudio`, `jan`, `localai`, `exo`, `comfyui`) or keeps the files in the store (`none`), never into a directory: the file names come from the repository, so a folder is chosen on the command line, by a person. A direct URL or an OCI image stays in the store unless `to` names an app.
 
 Arguments lmget does not know are refused. Downloads report progress when the client asks for it, and stop when the client cancels them. Pulls are recorded in the history as `mcp`; the prompt the agent was given is not.
 
