@@ -1,20 +1,26 @@
+/* lmget.org: the system sans for prose, the monospace for what you type and
+   for identifiers. Light and dark follow the system. */
+
 :root {
   color-scheme: light dark;
   /* dark: OLED black */
   --bg: #000;
-  --fg: #e8e8e8;
-  --dim: #9a9a9a; /* 7.6:1 on black */
-  --accent: #3ddc97;
+  --fg: #ededed;
+  --dim: #a1a1a1; /* 8.3:1 on black */
+  --faint: #7a7a7a; /* 4.9:1 on black, 4.6:1 on the panels */
   --rule: #1f1f1f;
-  --bad: #ff8a80;
-  --faint: #6f6f6f;
   --panel: #0a0a0a;
+  --accent: #3ddc97;
+  --bad: #ff8a80;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --wrap: 70rem;
   background: var(--bg);
   color: var(--fg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-family: var(--sans);
   font-size: 100%;
   line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
 }
 
 @media (prefers-color-scheme: light) {
@@ -22,91 +28,38 @@
     --bg: #fff;
     --fg: #111;
     --dim: #595959; /* 7:1 on white */
-    --accent: #0a7a4b; /* 5.4:1 on white: text-safe */
-    --rule: #e5e5e5;
-    --bad: #b3261e;
-    --faint: #8a8a8a;
+    --faint: #707070; /* 4.9:1 on white, 4.7:1 on the panels */
+    --rule: #e8e8e8;
     --panel: #fafafa;
+    --accent: #0a7a4b; /* 5.4:1 on white: text-safe */
+    --bad: #b3261e;
   }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-main {
-  max-inline-size: 64ch;
-  margin-inline: auto;
-  padding: 0 1.25rem clamp(1.5rem, 1rem + 4vw, 4rem);
-}
-
-h1 {
-  margin: 0 0 0.5rem;
-  line-height: 1;
-}
-
-h1 img {
-  inline-size: min(13.25rem, 100%);
-  block-size: auto;
-}
-
-h2 {
-  margin: 2.5rem 0 0.75rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--dim);
-  text-transform: lowercase;
-}
-
-.lead {
-  margin: 0 0 2rem;
-  font-size: clamp(1.05rem, 0.95rem + 0.6vw, 1.35rem);
-  text-wrap: balance;
-}
-
-p,
-li {
-  text-wrap: pretty;
-}
-
-ul {
-  margin: 0 0 2rem;
-  padding: 0;
-  list-style: none;
-}
-
-li {
-  padding-inline-start: 1.5ch;
-  text-indent: -1.5ch;
-  margin-block-end: 0.5rem;
-}
-
-li::before {
-  content: "- ";
-  color: var(--accent);
-}
-
-pre {
-  margin: 0 0 1.5rem;
-  padding: 1rem 1.25rem;
-  overflow-x: auto;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  line-height: 1.7;
+code,
+pre,
+kbd {
+  font-family: var(--mono);
 }
 
 code {
-  font-family: inherit;
-}
-
-.dim {
-  color: var(--dim);
+  font-size: 0.9em;
 }
 
 a {
   color: var(--fg);
   text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 
@@ -115,99 +68,22 @@ a:focus-visible {
   color: var(--accent);
 }
 
-a:focus-visible {
+a:focus-visible,
+pre:focus-visible,
+button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-main > nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.5rem;
-  margin-block-start: 2.5rem;
-  padding-block-start: 1.5rem;
-  border-block-start: 1px solid var(--rule);
+p,
+li,
+dd {
+  text-wrap: pretty;
 }
 
-footer {
-  margin-block-start: 1.5rem;
-  color: var(--dim);
-  font-size: 0.875rem;
-}
-
-section {
-  margin-block-start: 2.5rem;
-}
-
-.block {
-  position: relative;
-}
-
-.block pre {
-  padding-inline-end: 5rem; /* room for the copy button */
-  white-space: pre-wrap; /* wrapped on screen only: the copied text keeps its lines */
-  overflow-wrap: break-word;
-}
-
-.copy {
-  position: absolute;
-  inset-block-start: 0.6rem;
-  inset-inline-end: 0.6rem;
-}
-
-.copy-button {
-  min-inline-size: 24px;
-  min-block-size: 24px;
-  padding: 0.25rem 0.6rem;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--dim);
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.copy-button:hover,
-.copy-button:focus-visible {
-  color: var(--fg);
-  border-color: var(--dim);
-}
-
-.copy-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.copy-button[data-copied] {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.copy-button[data-failed] {
-  color: var(--bad);
-  border-color: var(--bad);
-}
-
-.tip {
-  position: absolute;
-  inset-block-start: calc(100% + 0.35rem);
-  inset-inline-end: 0;
-  font-size: 0.8125rem;
-  color: var(--accent);
+.nw,
+.nowrap {
   white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.tip:not(:empty) {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tip {
-    transition: none;
-  }
 }
 
 .sr {
@@ -219,252 +95,17 @@ section {
   white-space: nowrap;
 }
 
-.note {
-  color: var(--dim);
-  font-size: 0.875rem;
-}
-
-.note a,
-.note code {
-  color: var(--fg);
-}
-
-/* a flag such as --to lmstudio never breaks at its dashes, where there is
-   room; on a phone a long command may wrap rather than push the page wide */
-@media (min-width: 30rem) {
-  .note code {
-    white-space: nowrap;
-  }
-}
-
-pre.out {
-  font-size: 0.8125rem;
-}
-
-pre:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.ok {
-  color: var(--accent);
-}
-
-.table {
-  overflow-x: auto;
-}
-
-table {
-  inline-size: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-th,
-td {
-  padding: 0.4rem 0.75rem 0.4rem 0;
-  text-align: start;
-  border-block-end: 1px solid var(--rule);
-  white-space: nowrap;
-}
-
-td:first-child {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.nowrap {
-  white-space: nowrap;
-}
-
-th {
-  color: var(--dim);
-  font-weight: 600;
-}
-
-.num {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-}
-
-/* --- entrance: install first, then use; a thread of light runs along each
-   terminal's border and both fade together once both are in. Opacity and
-   transform only, so nothing on the page moves. --- */
-
-@property --trace {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
-@keyframes block-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.4rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes trace-run {
-  to {
-    --trace: 360deg;
-  }
-}
-
-@keyframes trace-life {
-  0% {
-    opacity: 0;
-  }
-  15%,
-  70% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  section .block {
-    animation: block-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-
-  section .block::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: 6px;
-    background: conic-gradient(from var(--trace), transparent 0deg, var(--accent) 50deg, transparent 110deg, transparent 360deg);
-    /* only the 1px ring: the padding box minus the content box */
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0;
-    animation:
-      trace-run 1.4s linear infinite,
-      trace-life 2.4s ease-in-out forwards;
-  }
-
-  /* the second block starts 0.5 s later and its light lasts 0.5 s less:
-     both fade out at the same moment */
-  #use ~ .block {
-    animation-delay: 0.5s;
-  }
-
-  #use ~ .block::before {
-    animation-duration: 1.4s, 1.9s;
-    animation-delay: 0.5s, 0.5s;
-  }
-}
-
-/* --- the signed index, as data --- */
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
-  gap: 0.75rem 1rem;
-  margin: 0 0 1.25rem;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.stat-value {
-  font-size: 1.35rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-
-.stat-label {
-  color: var(--dim);
-  font-size: 0.8125rem;
-}
-
-.stat.warn .stat-value {
-  color: var(--bad);
-}
-
-/* one segment per model, as wide as its share of the bytes */
-.strip {
-  display: flex;
-  gap: 2px;
-  block-size: 6px;
-  margin: 0 0 1rem;
-}
-
-.strip span {
-  flex-basis: 0;
-  min-inline-size: 2px;
-  background: var(--fg);
-  opacity: 0.22;
-  border-radius: 1px;
-  transition: opacity 0.15s;
-}
-
-.strip span[data-on] {
-  background: var(--accent);
-  opacity: 1;
-}
-
-tr[data-on] td {
-  color: var(--accent);
-}
-
-td.mono {
-  font-weight: 600;
-}
-
-.dimmed {
-  color: var(--dim);
-}
-
-/* text columns wrap; numbers stay on one line */
-.wrap-text td:not(.num) {
-  white-space: normal;
-}
-
-/* on a phone the formats column gives its room to the sizes */
-@media (max-width: 30rem) {
-  .wrap-text th:nth-child(3),
-  .wrap-text td:nth-child(3) {
-    display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .strip span {
-    transition: none;
-  }
-}
-
-th:last-child,
-td:last-child {
-  padding-inline-end: 0;
-}
-
-/* --- the top bar and the hero: the system sans for prose, the monospace
-   for what you type and for data --- */
+/* --- top bar --- */
 
 .bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  max-inline-size: 70rem;
+  max-inline-size: var(--wrap);
   margin-inline: auto;
   padding: 0 1.25rem;
   block-size: 3.75rem;
-  font-family: var(--sans);
   font-size: 0.875rem;
 }
 
@@ -498,16 +139,17 @@ td:last-child {
   color: var(--fg);
 }
 
+/* --- hero --- */
+
 .hero {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  max-inline-size: 70rem;
+  max-inline-size: var(--wrap);
   margin-inline: auto;
   padding: clamp(4rem, 2rem + 6vw, 6.5rem) 1.25rem 0;
   text-align: center;
-  font-family: var(--sans);
 }
 
 .hero h1 {
@@ -526,7 +168,67 @@ td:last-child {
   color: var(--dim);
   font-size: clamp(1.0625rem, 0.95rem + 0.5vw, 1.25rem);
   line-height: 1.5;
-  text-wrap: pretty;
+}
+
+/* --- copyable commands --- */
+
+.block {
+  position: relative;
+}
+
+.block pre {
+  margin: 0;
+  white-space: pre-wrap; /* wrapped on screen only: the copied text keeps its lines */
+  overflow-wrap: break-word;
+}
+
+.copy {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0.6rem;
+  transform: translateY(-50%);
+}
+
+.copy-button {
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 500 0.8125rem/1 var(--sans);
+  cursor: pointer;
+}
+
+.copy-button:hover,
+.copy-button:focus-visible {
+  border-color: var(--dim);
+}
+
+.copy-button[data-copied] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.copy-button[data-failed] {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.tip {
+  position: absolute;
+  inset-block-start: calc(100% + 0.35rem);
+  inset-inline-end: 0;
+  font-size: 0.8125rem;
+  color: var(--accent);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tip:not(:empty) {
+  opacity: 1;
 }
 
 .hero .install {
@@ -536,11 +238,12 @@ td:last-child {
 }
 
 .hero .install pre {
-  margin: 0;
   padding: 0.95rem 5.5rem 0.95rem 1.1rem;
+  border: 1px solid var(--rule);
   border-radius: 10px;
   background: var(--panel);
   font-size: 0.9375rem;
+  line-height: 1.6;
 }
 
 .hero .install pre::before {
@@ -548,21 +251,8 @@ td:last-child {
   color: var(--faint);
 }
 
-.hero .install .copy {
-  inset-block-start: 50%;
-  transform: translateY(-50%);
-}
-
-.hero .install .copy-button {
-  padding: 0.45rem 0.85rem;
-  border-radius: 7px;
-  color: var(--fg);
-  font-family: var(--sans);
-  font-weight: 500;
-}
-
-.hero .install .tip {
-  font-family: var(--sans);
+.hero .install code {
+  font-size: inherit;
 }
 
 .alt {
@@ -576,16 +266,8 @@ td:last-child {
   font-size: 0.8125rem;
 }
 
-.nw {
-  white-space: nowrap;
-}
+/* --- facts read from the signed files --- */
 
-.hero pre,
-.hero code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-}
-
-/* the facts: read from the signed files, one cell each */
 .facts {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -599,42 +281,58 @@ td:last-child {
   display: none;
 }
 
-.facts .stat {
+.stat {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   padding: 1.75rem 1.5rem 2rem 0;
 }
 
-.facts .stat + .stat {
+.stat + .stat {
   padding-inline-start: 1.5rem;
   border-inline-start: 1px solid var(--rule);
 }
 
-.facts .stat-value {
+.stat-value {
   font-size: 2rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
-.facts .stat-label {
+.stat-label {
+  color: var(--dim);
   font-size: 0.875rem;
+}
+
+.stat.warn .stat-value {
+  color: var(--bad);
 }
 
 .facts-source {
   grid-column: 1 / -1;
   margin: 0;
   color: var(--faint);
-  font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 0.75rem/1.5 var(--mono);
 }
 
 .facts-source a {
   color: inherit;
 }
 
-/* the flow diagram: drawn at 960px wide (360px for phones), under a hairline */
+/* --- the flow diagram, drawn at 960px wide (360px for phones) --- */
+
+/* hairlines run as wide as the content, like the sections' */
+.flow,
+.foot {
+  inline-size: min(100% - 2.5rem, var(--wrap) - 2.5rem);
+  margin-inline: auto;
+}
+
 .flow {
-  margin: 2.5rem 0 0;
-  padding: clamp(3rem, 2rem + 3vw, 4.5rem) 1.25rem;
+  margin-block: 2.5rem 0;
+  padding-block: clamp(3rem, 2rem + 3vw, 4.5rem);
   border-block-start: 1px solid var(--rule);
 }
 
@@ -644,6 +342,339 @@ td:last-child {
   max-inline-size: 960px;
   block-size: auto;
   margin-inline: auto;
+}
+
+/* --- sections: the title and a line on the left, the content on the right --- */
+
+main {
+  max-inline-size: var(--wrap);
+  margin-inline: auto;
+  padding: 0 1.25rem;
+}
+
+main > section {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  gap: 1.5rem 4rem;
+  padding-block: clamp(3rem, 2rem + 3vw, 4.5rem);
+  border-block-start: 1px solid var(--rule);
+}
+
+main > section > header h2 {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+main > section > header p {
+  margin: 0.5rem 0 0;
+  color: var(--dim);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.note {
+  margin: 1rem 0 0;
+  color: var(--dim);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+main > section > .note {
+  margin-block-start: 0;
+}
+
+.note a,
+.note code {
+  color: var(--fg);
+}
+
+/* commands and what they do; apps and how lmget reaches them */
+.cmds,
+.works {
+  margin: 0;
+}
+
+.cmds > div,
+.works > div {
+  display: grid;
+  grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+  gap: 0.35rem 2rem;
+  padding-block: 1rem;
+  border-block-end: 1px solid var(--rule);
+}
+
+.cmds > div:first-child,
+.works > div:first-child {
+  padding-block-start: 0;
+}
+
+.cmds > div:last-child,
+.works > div:last-child {
+  border-block-end: 0;
+}
+
+.cmds dt code {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.cmds dd,
+.works dd {
+  margin: 0;
+  color: var(--dim);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.cmds dd code {
+  color: var(--fg);
+}
+
+.works > div {
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+}
+
+.works dt {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.works dt code {
+  display: block;
+  margin-block-start: 0.15rem;
+  color: var(--faint);
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.works dd {
+  color: var(--fg);
+}
+
+/* what it does */
+.features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 2.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.features h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.features p {
+  margin: 0;
+  color: var(--dim);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.features code {
+  color: var(--fg);
+}
+
+/* the recorded run */
+.term {
+  margin: 0;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.term figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  border-block-end: 1px solid var(--rule);
+  color: var(--faint);
+  font: 500 0.75rem/1.2 var(--mono);
+}
+
+.term pre {
+  margin: 0;
+  padding: 1rem 1rem 1.15rem;
+  font-size: 0.8125rem;
+  line-height: 1.85;
+  white-space: pre-wrap; /* wraps only between the groups held together */
+}
+
+.term code {
+  font-size: inherit;
+}
+
+.term .d {
+  color: var(--faint);
+}
+
+.term .h {
+  cursor: help;
+}
+
+.ok {
+  color: var(--accent);
+}
+
+/* --- tables: identifiers in monospace, numbers aligned, nothing broken
+   inside a word --- */
+
+.table {
+  overflow-x: auto;
+}
+
+table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+th,
+td {
+  padding: 0.6rem 1rem 0.6rem 0;
+  text-align: start;
+  vertical-align: baseline;
+  border-block-end: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+th:last-child,
+td:last-child {
+  padding-inline-end: 0;
+}
+
+th {
+  color: var(--dim);
+  font-weight: 500;
+  font-size: 0.8125rem;
+}
+
+th.num,
+.num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+td.key,
+td.model,
+td.lic,
+td.fmt {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+td.key {
+  font-weight: 600;
+}
+
+td.fmt,
+td.lic {
+  color: var(--dim);
+}
+
+td.fmt {
+  white-space: normal;
+}
+
+.org {
+  color: var(--faint);
+}
+
+.kind {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--dim);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+tr[data-on] td {
+  color: var(--accent);
+}
+
+tr[data-on] .org {
+  color: inherit;
+}
+
+/* one segment per model, as wide as its share of the bytes */
+.strip {
+  display: flex;
+  gap: 2px;
+  block-size: 6px;
+  margin: 0 0 1rem;
+}
+
+.strip span {
+  flex-basis: 0;
+  min-inline-size: 2px;
+  background: var(--fg);
+  opacity: 0.22;
+  border-radius: 1px;
+  transition: opacity 0.15s;
+}
+
+.strip span[data-on] {
+  background: var(--accent);
+  opacity: 1;
+}
+
+/* --- footer --- */
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding-block: 1.5rem 3rem;
+  border-block-start: 1px solid var(--rule);
+  color: var(--dim);
+  font-size: 0.875rem;
+}
+
+.foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.foot a {
+  color: var(--dim);
+  text-decoration: none;
+}
+
+.foot a:hover,
+.foot a:focus-visible {
+  color: var(--fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tip,
+  .strip span {
+    transition: none;
+  }
+}
+
+/* --- narrower screens --- */
+
+@media (max-width: 960px) {
+  main > section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cmds > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 720px) {
@@ -665,22 +696,22 @@ td:last-child {
     margin-block-start: 2.5rem;
   }
 
-  .facts .stat {
+  .stat {
     padding: 1.25rem 0.75rem 1.25rem 0;
     border-block-end: 1px solid var(--rule);
   }
 
-  .facts .stat + .stat {
+  .stat + .stat {
     padding-inline-start: 0;
     border-inline-start: 0;
   }
 
-  .facts .stat:nth-child(even) {
+  .stat:nth-child(even) {
     padding-inline-start: 1rem;
     border-inline-start: 1px solid var(--rule);
   }
 
-  .facts .stat:nth-child(5) {
+  .stat:nth-child(5) {
     grid-column: 1 / -1;
   }
 
@@ -690,5 +721,101 @@ td:last-child {
 
   .flow img {
     max-inline-size: 360px;
+  }
+
+  .works > div,
+  .features {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .features {
+    gap: 1.5rem;
+  }
+
+  /* the run: hashes give their room to the file names */
+  .term .h {
+    display: none;
+  }
+
+  .term pre {
+    font-size: 0.75rem;
+  }
+
+  /* tables become two-line rows: name and size, then the details */
+  .table {
+    overflow: visible;
+  }
+
+  table,
+  tbody {
+    display: block;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.2rem 1rem;
+    padding-block: 0.75rem;
+    border-block-end: 1px solid var(--rule);
+  }
+
+  tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  /* nicknames: name | sizes / family / formats */
+  .nick td.key {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .nick td.size {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .nick td.family {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    white-space: normal;
+  }
+
+  .nick td.fmt {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  /* models: organisation over name | size / license | files */
+  .models td.model {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .models td.model .org {
+    display: block;
+    font-size: 0.75rem;
+  }
+
+  .models td.size {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+  }
+
+  .models td.lic {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .models td.files {
+    grid-column: 2;
+    grid-row: 2;
+    color: var(--dim);
   }
 }

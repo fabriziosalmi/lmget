@@ -117,7 +117,7 @@ function showIndex(ix) {
   strip.setAttribute("aria-hidden", "true");
   const table = el("table");
   const head = el("tr");
-  for (const h of ["Model", "License", "Files", "Size"]) head.append(el("th", h));
+  for (const [h, c] of [["Model", ""], ["License", ""], ["Files", "num"], ["Size", "num"]]) head.append(el("th", h, c));
   table.append(el("thead"), el("tbody"));
   table.tHead.append(head);
   models.forEach((m, i) => {
@@ -126,7 +126,11 @@ function showIndex(ix) {
     seg.title = `${m.name}: ${bytes(m.bytes)}`;
     strip.append(seg);
     const row = el("tr");
-    row.append(el("td", m.name), el("td", m.license), el("td", String(m.files), "num"), el("td", bytes(m.bytes), "num"));
+    const name = el("td", undefined, "model");
+    const slash = m.name.indexOf("/");
+    if (slash > 0) name.append(el("span", m.name.slice(0, slash + 1), "org"));
+    name.append(el("span", m.name.slice(slash + 1), "name"));
+    row.append(name, el("td", m.license, "lic"), el("td", m.files === 1 ? "1 file" : m.files + " files", "num files"), el("td", bytes(m.bytes), "num size"));
     const on = (v) => () => { seg.toggleAttribute("data-on", v); row.toggleAttribute("data-on", v); };
     for (const x of [seg, row]) {
       x.addEventListener("pointerenter", on(true));
@@ -141,7 +145,7 @@ function showIndex(ix) {
     el("span", date(ix.expires), "nowrap"),
     ". lmget verifies its signature before using it; this page only shows it.",
   );
-  const scroll = el("div", undefined, "table");
+  const scroll = el("div", undefined, "table models");
   scroll.append(table);
   panel.replaceChildren(strip, scroll, note);
 }
@@ -151,7 +155,7 @@ function showAliases(al) {
   if (!panel || !al) return;
   const table = el("table");
   const head = el("tr");
-  for (const h of ["Nickname", "Family", "Formats", "Sizes"]) head.append(el("th", h));
+  for (const [h, c] of [["Nickname", ""], ["Family", ""], ["Formats", ""], ["Sizes", "num"]]) head.append(el("th", h, c));
   table.append(el("thead"), el("tbody"));
   table.tHead.append(head);
   for (const name of Object.keys(al.aliases).sort()) {
@@ -162,18 +166,19 @@ function showAliases(al) {
     const lo = bytes(Math.min(...sizes)), hi = bytes(Math.max(...sizes));
     const range = !sizes.length ? "" : lo === hi ? hi : `${lo} to ${hi}`;
     const row = el("tr");
-    const family = el("td", String(a.family || ""));
-    if (a.kind && a.kind !== "chat") family.append(el("span", ` (${a.kind})`, "dimmed"));
-    row.append(el("td", name, "mono"), family, el("td", formats), el("td", range, "num"));
+    const family = el("td", undefined, "family");
+    family.append(el("span", String(a.family || ""), "fam"));
+    if (a.kind && a.kind !== "chat") family.append(" ", el("span", a.kind, "kind"));
+    row.append(el("td", name, "key"), family, el("td", formats, "fmt"), el("td", range, "num size"));
     table.tBodies[0].append(row);
   }
   const note = el("p", undefined, "note");
   note.append(
     `${Object.keys(al.aliases).length} nicknames, signed like the index, valid until `,
     el("span", date(al.expires), "nowrap"),
-    ". lmget picks the variant that fits the machine and asks before downloading.",
+    ".",
   );
-  const scroll = el("div", undefined, "table wrap-text");
+  const scroll = el("div", undefined, "table nick");
   scroll.append(table);
   panel.replaceChildren(scroll, note);
 }
