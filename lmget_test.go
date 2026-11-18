@@ -156,6 +156,7 @@ func newTestClient(t *testing.T, srv *httptest.Server, home string) *Client {
 	t.Setenv("HF_TOKEN", "")
 	t.Setenv("HF_TOKEN_PATH", filepath.Join(t.TempDir(), "none"))
 	t.Setenv("HF_HOME", t.TempDir())
+	t.Setenv("LMGET_LICENSES", "") // no machine policy in tests unless one sets it
 	c, err := New(Options{Home: home, HFEndpoint: srv.URL, Conns: 4, ChunkSize: 256 << 10})
 	if err != nil {
 		t.Fatal(err)

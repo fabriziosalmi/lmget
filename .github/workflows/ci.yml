@@ -118,3 +118,35 @@ jobs:
           test "$(docker run --rm lmget:ci --version)" = "lmget v0.0.0-ci"
           test "$(docker image inspect lmget:ci --format '{{.Config.User}}')" = "65532"
           docker run --rm lmget:ci info prajjwal1/bert-tiny --plain 2>&1 | grep -q 'license=mit'
+
+  sbom:
+    # lmget sbom writes documents the official CycloneDX 1.6 schema accepts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: the bills of materials
+        run: |
+          go build -o lmget ./cmd/lmget
+          ./lmget sbom --lockfile setup/testdata/lmget.lock > one.cdx.json
+          ./lmget sbom --lockfile testdata/sbom.lock > kinds.cdx.json
+          ! grep -q secretvalue kinds.cdx.json # a signed URL's query never reaches it
+      - name: valid against the CycloneDX 1.6 schema, at a fixed commit
+        run: |
+          c=6470e34ef83f915868ece48934cff52e10c9eb49
+          mkdir schema
+          for f in bom-1.6.schema.json spdx.schema.json jsf-0.82.schema.json; do
+            curl -fsSL -o "schema/$f" "https://raw.githubusercontent.com/CycloneDX/specification/$c/schema/$f"
+          done
+          python3 -m venv venv # the system Python takes no pip packages (PEP 668)
+          venv/bin/pip install --quiet jsonschema==4.23.0
+          venv/bin/python scripts/check-cyclonedx.py schema one.cdx.json kinds.cdx.json
+          # the check is not vacuous: a component type and an SPDX id the
+          # schema does not know make a document it refuses
+          sed -e 's/"machine-learning-model"/"ml-model"/' -e 's/"id": "MIT"/"id": "mit"/' one.cdx.json > broken.cdx.json
+          ! venv/bin/python scripts/check-cyclonedx.py schema broken.cdx.json

@@ -25,6 +25,10 @@ type Request struct {
 	// before downloading, unless AcceptLicenseChange is set.
 	License             string
 	AcceptLicenseChange bool
+	// Licenses are the licenses the project's policy allows (lmget.lock
+	// [policy]); Options.Licenses applies too. A model must be allowed by
+	// both, before anything is downloaded.
+	Licenses []string
 }
 
 // Outcome is the result of a successful pull.
@@ -82,6 +86,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		if err := revokedErr(revoked, f.Path, f.SHA256); err != nil {
 			return nil, err
 		}
+	}
+	if err := c.licensePolicy(plan, r.Licenses); err != nil {
+		return nil, err
 	}
 	if r.DryRun {
 		out.Elapsed = time.Since(t0)

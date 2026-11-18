@@ -108,6 +108,7 @@ func startMCP(t *testing.T, hf *mcpHF) (*mcpSession, string) {
 	t.Setenv("HF_TOKEN", "")
 	t.Setenv("HF_TOKEN_PATH", filepath.Join(tmp, "no-token"))
 	t.Setenv("LMGET_HISTORY", "off")
+	t.Setenv("LMGET_LICENSES", "")
 	srv := httptest.NewServer(hf.handler())
 	t.Cleanup(srv.Close)
 	inR, inW := io.Pipe()
