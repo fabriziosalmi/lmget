@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 392" width="960" height="392" role="img" aria-labelledby="t d">
   <title id="t">How lmget gets a model</title>
-  <desc id="d">Sources on the left: Hugging Face, ModelScope as a second origin, the Ollama registry, OCI registries and https URLs, with the project's mirror nodes when the source fails. In the middle, lmget pins the commit, checks every file against its published sha256, walks the file headers and refuses hidden pickle code, and stores each file once by hash. On the right, where it links the model: the Hugging Face cache, Ollama, oMLX, LM Studio or a directory, and lmget run asks the app and returns the answer.</desc>
+  <desc id="d">Sources on the left: Hugging Face, ModelScope as a second origin, the Ollama registry, OCI registries and https URLs, with the project's mirror nodes when the source fails. In the middle, lmget pins the commit, checks every file against its published sha256, walks the file headers and refuses hidden pickle code, and stores each file once by hash. On the right, where it links the model: the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory, and lmget run asks the app and returns the answer.</desc>
   <style>
     :root { --fg: #111; --dim: #595959; --rule: #d9d9d9; --acc: #0a7a4b; --panel: #ffffff; }
     @media (prefers-color-scheme: dark) {
@@ -46,7 +46,7 @@
     <rect class="box" x="40" y="244" width="220" height="38" rx="6"/>
     <text class="l" x="56" y="268">https URLs</text>
     <rect class="box dash" x="40" y="302" width="220" height="38" rx="6"/>
-    <text class="l" x="56" y="326">mirror nodes <tspan class="s">if the source fails</tspan></text>
+    <text class="l" x="56" y="326">mirror nodes <tspan class="s">fallback</tspan></text>
   </g>
 
   <!-- wires in -->
@@ -100,9 +100,9 @@
     <rect class="box" x="700" y="100" width="220" height="38" rx="6"/>
     <text class="l" x="716" y="124">Ollama</text>
     <rect class="box" x="700" y="148" width="220" height="38" rx="6"/>
-    <text class="l" x="716" y="172">oMLX</text>
+    <text class="l" x="716" y="172">oMLX, LM Studio</text>
     <rect class="box" x="700" y="196" width="220" height="38" rx="6"/>
-    <text class="l" x="716" y="220">LM Studio</text>
+    <text class="l" x="716" y="220">Jan, LocalAI, exo</text>
     <rect class="box" x="700" y="244" width="220" height="38" rx="6"/>
     <text class="l" x="716" y="268">a directory</text>
     <rect class="box dash" x="700" y="302" width="220" height="38" rx="6"/>
