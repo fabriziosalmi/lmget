@@ -665,6 +665,28 @@ tr[data-on] .org {
   }
 }
 
+/* --- the first visit: the install command alone, then the rest fades in.
+   intro.js sets .intro once per browser; opacity only, nothing moves --- */
+
+@keyframes intro-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .intro .bar,
+  .intro .hero > :not(.install),
+  .intro .flow,
+  .intro main,
+  .intro .foot {
+    animation: intro-in 0.5s cubic-bezier(0.2, 0, 0, 1) 0.6s both;
+  }
+}
+
 /* --- narrower screens --- */
 
 @media (max-width: 960px) {
