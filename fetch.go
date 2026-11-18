@@ -40,6 +40,15 @@ func (c *Client) fetch(ctx context.Context, f File, part, statePath string, cnt 
 	return c.fetchHashed(ctx, f, part, statePath, cnt, nil)
 }
 
+// checkpointEvery and checkpointBytes bound how much of a download an
+// interruption can cost: chunks are made durable and recorded at least
+// that often. syncFile is the sync; tests count it.
+var (
+	checkpointEvery       = time.Second
+	checkpointBytes int64 = 256 << 20
+	syncFile              = func(f *os.File) error { return f.Sync() }
+)
+
 // fetchHashed is fetch that also hashes the file in chunk order while later
 // chunks still arrive, when dg is not nil: issue #1. dg is complete only when
 // every byte of the file went through the hash; the caller still compares it
@@ -98,7 +107,7 @@ func (c *Client) fetchHashed(ctx context.Context, f File, part, statePath string
 		if _, err := c.fetchRange(ctx, f, out, 0, f.Size, cnt, false); err != nil {
 			return err
 		}
-		if err := out.Sync(); err != nil {
+		if err := syncFile(out); err != nil {
 			return diskErr(err)
 		}
 		return nil
@@ -115,6 +124,30 @@ func (c *Client) fetchHashed(ctx context.Context, f File, part, statePath string
 		go func() { hashDone <- dg.stream(out, f, st.Chunk, already, hashed) }()
 	}
 	var mu sync.Mutex
+	var pending []int // chunks written but not yet durable: the state does not list them
+	var pendingBytes int64
+	last := time.Now()
+	// checkpoint (mu held) makes the written chunks durable, then records
+	// them: the state never lists a chunk the disk might not hold. Once a
+	// second or every checkpointBytes, not per chunk: on macOS a sync flushes
+	// the drive's cache, and one per 16 MiB chunk cost 40% of the speed.
+	checkpoint := func() error {
+		if len(pending) == 0 {
+			return nil
+		}
+		if err := syncFile(out); err != nil {
+			return diskErr(err)
+		}
+		for _, i := range pending {
+			st.Done[i] = true
+		}
+		b, _ := json.Marshal(st)
+		if err := writeFileAtomic(statePath, b); err != nil {
+			return diskErr(err)
+		}
+		pending, pendingBytes, last = pending[:0], 0, time.Now()
+		return nil
+	}
 	todo := make(chan int)
 	var wg sync.WaitGroup
 	conns := c.opt.Conns
@@ -132,17 +165,15 @@ func (c *Client) fetchHashed(ctx context.Context, f File, part, statePath string
 					cancel(err)
 					return
 				}
-				if err := out.Sync(); err != nil { // data durable before the state says so
-					cancel(diskErr(err))
-					return
-				}
 				mu.Lock()
-				st.Done[i] = true
-				b, _ := json.Marshal(st)
-				err := writeFileAtomic(statePath, b)
+				pending, pendingBytes = append(pending, i), pendingBytes+size
+				var err error
+				if pendingBytes >= checkpointBytes || time.Since(last) >= checkpointEvery {
+					err = checkpoint()
+				}
 				mu.Unlock()
 				if err != nil {
-					cancel(diskErr(err))
+					cancel(err)
 					return
 				}
 				if hashed != nil {
@@ -164,6 +195,13 @@ feed:
 	}
 	close(todo)
 	wg.Wait()
+	// the last chunks, in every case: a finished file is durable before the
+	// store takes it, and an interrupted one keeps all its progress
+	mu.Lock()
+	if err := checkpoint(); err != nil {
+		cancel(err)
+	}
+	mu.Unlock()
 	if hashed != nil {
 		close(hashed)
 		<-hashDone // the hash holds the file open for reading: wait for it in every case
