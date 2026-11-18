@@ -300,6 +300,20 @@ dir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)
 
 `sync --json` emits the same events once per model. `ls`, `rm`, `doctor`, `index` and `history` with `--json` write a single object with `v`, `type` and `time`, plus: for `ls` (type `list`), `models` and `store`; for `rm` (type `removed`), `result`; for `doctor` (type `doctor`), `checks`; for `index` (type `index`), `index`, `signed_by` and `keys`, where `index` is the verified index, `signed_by` the key number that signed it, and `keys` holds `list` (the key list in force, absent when none is), `keys` (the key numbers trusted for the index) and `revoked` (how many key numbers the store refuses).
 
+## Agents (MCP)
+
+```sh
+claude mcp add lmget -- lmget mcp
+```
+
+`lmget mcp` speaks the Model Context Protocol on stdin and stdout, for agents such as Claude Code, Cursor or Zed. It offers three tools:
+
+- `info`: the plan of a model, without downloading: commit, license, files with sizes and hashes, what is already stored, the pickle and gated checks, the free disk. For a nickname, the variant chosen for this machine and why. It only reads.
+- `list`: the models in the store and where each one is linked. It only reads.
+- `get`: downloads, verifies and links a model, only when called with `confirm: true`; without it, it returns the plan. It links into the apps and the Hugging Face cache (`to`: `hf`, `ollama`, `omlx`, `lmstudio`, `jan`, `localai`, `exo`) or keeps the files in the store (`none`), never into a directory: the file names come from the repository, so a folder is chosen on the command line, by a person. A direct URL or an OCI image stays in the store unless `to` names an app.
+
+Arguments lmget does not know are refused. Downloads report progress when the client asks for it, and stop when the client cancels them. Pulls are recorded in the history as `mcp`; the prompt the agent was given is not.
+
 ## Exit codes
 
 | code | meaning |
