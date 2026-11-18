@@ -14,22 +14,37 @@
 <script type="module" src="/app.js"></script>
 </head>
 <body>
-<main>
-  <h1><picture><source srcset="/lmget-dark.svg" media="(prefers-color-scheme: dark)"><img src="/lmget-light.svg" alt="lmget" width="212" height="64"></picture></h1>
-  <p class="lead">Get open models from their sources, verified.</p>
-  <figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="684"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory." width="960" height="392"></picture></figure>
+<header class="bar">
+  <a class="brand" href="/"><picture><source srcset="/lmget-dark.svg" media="(prefers-color-scheme: dark)"><img src="/lmget-light.svg" alt="lmget" width="73" height="22"></picture></a>
+  <nav aria-label="Site">
+    <a href="https://github.com/fabriziosalmi/lmget#readme">Docs</a>
+    <a class="opt" href="https://github.com/fabriziosalmi/lmget/releases">Releases</a>
+    <a class="opt" href="/index.json">Signed index</a>
+    <a href="https://github.com/fabriziosalmi/lmget">GitHub</a>
+  </nav>
+</header>
 
+<div class="hero">
+  <a class="pill" href="https://github.com/fabriziosalmi/lmget/releases/tag/v0.3.2"><b>v0.3.2</b> Jan, LocalAI and exo as targets</a>
+  <h1>Get open models from their sources, verified.</h1>
+  <p class="sub">A command-line tool that downloads open model weights and checks every file against the hash its source publishes, or the one you pin.</p>
+  <div class="block install">
+    <pre><code id="install-cmd">curl -fsSL https://lmget.org/install.sh <span class="nw">| sh</span></code></pre>
+    <span class="copy" hidden>
+      <button type="button" class="copy-button" command="--copy" commandfor="install-cmd">Copy<span class="sr"> install command</span></button>
+      <span class="tip" role="status"></span>
+    </span>
+  </div>
+  <p class="alt">Windows, in PowerShell: <code>irm https://lmget.org/install.ps1 <span class="nw">| iex</span></code></p>
+  <div class="facts" id="facts" hidden></div>
+</div>
+
+<figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="684"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory." width="960" height="392"></picture></figure>
+
+<main>
   <section aria-labelledby="install">
     <h2 id="install">Install</h2>
-    <div class="block">
-      <pre><code id="install-cmd">curl -fsSL https://lmget.org/install.sh | sh</code></pre>
-      <span class="copy" hidden>
-        <button type="button" class="copy-button" command="--copy" commandfor="install-cmd">Copy<span class="sr"> install command</span></button>
-        <span class="tip" role="status"></span>
-      </span>
-    </div>
-    <p class="note">On Windows, in PowerShell: <code>irm https://lmget.org/install.ps1 | iex</code>.</p>
-    <p class="note">For macOS and Linux, amd64 and arm64. The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code>~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>.</p>
+    <p class="note">For macOS and Linux, amd64 and arm64; Windows with the PowerShell script above. The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code>~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a>.</p>
   </section>
 
   <section aria-labelledby="use">

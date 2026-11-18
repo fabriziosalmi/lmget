@@ -94,11 +94,17 @@ function stat(value, label, cls) {
   return d;
 }
 
-async function showIndex() {
+function validIndex(ix) {
+  return ix && Array.isArray(ix.models) ? ix : null;
+}
+
+function validAliases(al) {
+  return al && typeof al.aliases === "object" && al.aliases !== null ? al : null;
+}
+
+function showIndex(ix) {
   const panel = document.getElementById("index-panel");
-  if (!panel) return;
-  const ix = await getJSON("/index.json");
-  if (!ix || !Array.isArray(ix.models)) return;
+  if (!panel || !ix) return;
 
   const models = ix.models.map((m) => ({
     name: String(m.ref || "").replace(/^hf:/, ""),
@@ -106,19 +112,6 @@ async function showIndex() {
     files: (m.files || []).length,
     bytes: (m.files || []).reduce((s, f) => s + (f.size || 0), 0),
   })).sort((a, b) => b.bytes - a.bytes);
-  const total = models.reduce((s, m) => s + m.bytes, 0);
-  const files = models.reduce((s, m) => s + m.files, 0);
-  const left = Math.floor((new Date(ix.expires) - Date.now()) / DAY);
-
-  const stats = el("div", undefined, "stats");
-  stats.append(
-    stat(String(models.length), "models"),
-    stat(String(files), "files"),
-    stat(bytes(total), "verified bytes"),
-    stat(String((ix.nodes || []).length), "nodes"),
-    stat(Number.isFinite(left) ? (left >= 0 ? left + " d" : "expired") : "?", "until expiry", left < 7 ? "warn" : ""),
-  );
-
   // one segment per model, as wide as its share of the bytes
   const strip = el("div", undefined, "strip");
   strip.setAttribute("aria-hidden", "true");
@@ -150,14 +143,12 @@ async function showIndex() {
   );
   const scroll = el("div", undefined, "table");
   scroll.append(table);
-  panel.replaceChildren(stats, strip, scroll, note);
+  panel.replaceChildren(strip, scroll, note);
 }
 
-async function showAliases() {
+function showAliases(al) {
   const panel = document.getElementById("aliases-panel");
-  if (!panel) return;
-  const al = await getJSON("/aliases.json");
-  if (!al || typeof al.aliases !== "object" || al.aliases === null) return;
+  if (!panel || !al) return;
   const table = el("table");
   const head = el("tr");
   for (const h of ["Nickname", "Family", "Formats", "Sizes"]) head.append(el("th", h));
@@ -187,5 +178,38 @@ async function showAliases() {
   panel.replaceChildren(scroll, note);
 }
 
-showIndex();
-showAliases();
+// --- the facts under the install command, read from the signed files ---
+
+function showFacts(ix, al) {
+  const box = document.getElementById("facts");
+  if (!box || !ix) return; // without the index the hero stays as it is
+  const total = ix.models.reduce((s, m) => s + (m.files || []).reduce((t, f) => t + (f.size || 0), 0), 0);
+  const left = Math.floor((new Date(ix.expires) - Date.now()) / DAY);
+  const facts = [
+    stat(String(ix.models.length), "models mirrored"),
+    stat(bytes(total), "verified by sha256"),
+    stat(String((ix.nodes || []).length), "mirror nodes"),
+  ];
+  if (al) facts.push(stat(String(Object.keys(al.aliases).length), "signed nicknames"));
+  facts.push(stat(
+    Number.isFinite(left) ? (left >= 0 ? (left === 1 ? "1 day" : left + " days") : "expired") : "?",
+    "until the signature expires",
+    left < 7 ? "warn" : "",
+  ));
+  const src = el("p", undefined, "facts-source");
+  src.append("Read now from the signed ");
+  const a1 = el("a", "index"); a1.href = "/index.json";
+  src.append(a1, ` (sequence ${ix.sequence})`);
+  if (al) {
+    const a2 = el("a", "nickname list"); a2.href = "/aliases.json";
+    src.append(" and ", a2, ` (sequence ${al.sequence})`);
+  }
+  src.append(".");
+  box.replaceChildren(...facts, src);
+  box.hidden = false;
+}
+
+const [ix, al] = await Promise.all([getJSON("/index.json"), getJSON("/aliases.json")]);
+showFacts(validIndex(ix), validAliases(al));
+showIndex(validIndex(ix));
+showAliases(validAliases(al));
