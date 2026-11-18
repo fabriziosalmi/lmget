@@ -36,10 +36,12 @@ gh release download "$tag" --repo "$repo" --pattern "$archive" --pattern checksu
 	die "cannot download $archive from $tag"
 want=$(awk -v f="$archive" '$2 == f { print $1 }' "$dir/checksums.txt")
 [ -n "$want" ] || die "$archive is not listed in checksums.txt"
+# from stdin: with a path that holds a backslash (any Windows runner),
+# sha256sum escapes its output line and the hash starts with "\"
 if command -v sha256sum >/dev/null 2>&1; then
-	got=$(sha256sum "$dir/$archive" | awk '{ print $1 }')
+	got=$(sha256sum <"$dir/$archive" | awk '{ print $1 }')
 else
-	got=$(shasum -a 256 "$dir/$archive" | awk '{ print $1 }')
+	got=$(shasum -a 256 <"$dir/$archive" | awk '{ print $1 }')
 fi
 [ "$got" = "$want" ] || die "sha256 mismatch for $archive: expected $want, got $got"
 echo "lmget setup: $archive matches checksums.txt"
