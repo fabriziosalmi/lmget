@@ -70,6 +70,15 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	if err != nil {
 		return nil, err
 	}
+	revoked, err := c.revokedBlobs()
+	if err != nil {
+		return nil, err
+	}
+	// info: whether it fits this machine, before the plan is shown; never for
+	// a plan the checks below refuse, which downloads nothing at all
+	if r.DryRun && c.plannedFilesAllowed(plan, revoked, r.Licenses) {
+		plan.Memory = c.estimateMemory(ctx, plan, revoked)
+	}
 	e = ev(EvPlan)
 	snapshot := *plan // the pull goes on updating plan; listeners get their own copy
 	snapshot.Files = append([]File(nil), plan.Files...)
@@ -78,10 +87,6 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	emit(e)
 	out := &Outcome{Plan: plan}
 	// before the dry run returns: lmget info says it too
-	revoked, err := c.revokedBlobs()
-	if err != nil {
-		return nil, err
-	}
 	for _, f := range plan.Selected() {
 		if err := revokedErr(revoked, f.Path, f.SHA256); err != nil {
 			return nil, err

@@ -99,7 +99,7 @@ func run() lmget.ExitCode {
 	}
 	info := &cobra.Command{
 		Use:   "info <model>",
-		Short: "Show the plan: files, sizes, hashes, license, checks. Downloads nothing",
+		Short: "Show the plan: files, sizes, hashes, license, checks, memory fit. Downloads no weights",
 		Args:  oneModel("lmget info", "Qwen/Qwen3-0.6B", false),
 		RunE:  func(cmd *cobra.Command, args []string) error { return pull(args[0], true) },
 	}

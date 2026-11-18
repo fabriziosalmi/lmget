@@ -188,6 +188,13 @@ func renderPlan(p *lmget.Plan, width int, full bool) string {
 		}
 	}
 	fmt.Fprintf(&b, "\n  %s%s\n", sLabel.Render("checks"), strings.Join(checks, sDim.Render(" · ")))
+	if line := MemoryLine(p.Memory); line != "" {
+		verdict := sAccent.Render("fits")
+		if !p.Memory.Fits {
+			verdict = sWarn.Render("over")
+		}
+		fmt.Fprintf(&b, "  %s%s %s\n", sLabel.Render("memory"), verdict, line)
+	}
 
 	skipped := map[string][]string{}
 	for _, f := range p.Files {
@@ -304,4 +311,30 @@ func nfiles(n int, kind string) string {
 		return fmt.Sprintf("1 %sfile", kind)
 	}
 	return fmt.Sprintf("%d %sfiles", n, kind)
+}
+
+// MemoryLine says what the memory estimate measured, in words: weights,
+// KV cache for a context, the total, and the budget it was held against.
+func MemoryLine(m *lmget.MemoryEstimate) string {
+	if m == nil {
+		return ""
+	}
+	kv := m.KVPerToken * int64(m.Context)
+	about := "about"
+	if m.UpperBound {
+		about = "at most"
+	}
+	rel := "within"
+	if !m.Fits {
+		rel = "over"
+	}
+	return fmt.Sprintf("weights %s + KV cache %s for %s tokens: %s %s, %s the %s lmget allows here (%s); activations and runtime not counted",
+		hb(m.Weights), hb(kv), tokens(m.Context), about, hb(m.Total), rel, hb(m.Budget), m.BudgetFrom)
+}
+
+func tokens(n int) string {
+	if n >= 1024 && n%1024 == 0 {
+		return fmt.Sprintf("%dk", n/1024)
+	}
+	return fmt.Sprintf("%d", n)
 }

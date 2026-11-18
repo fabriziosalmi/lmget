@@ -45,13 +45,16 @@ type Plan struct {
 	// Access is "public" when the source says anyone may download the model
 	// without a token or an accepted license (lmget serve shares only those),
 	// and empty when it does not say so.
-	Access   string   `json:"access,omitempty"`
-	HashFrom string   `json:"hash_from,omitempty"` // direct URLs: user, server or first
-	Files    []File   `json:"files"`
-	Bytes    int64    `json:"bytes"`            // selected files
-	ToFetch  int64    `json:"to_fetch"`         // selected and not cached
-	Pickle   []string `json:"pickle,omitempty"` // selected files in a pickle format
-	DiskFree int64    `json:"disk_free"`
+	Access string `json:"access,omitempty"`
+	// Memory: whether the model fits this machine, for a plan that is only
+	// looked at (info); nil when lmget cannot tell (see memory.go)
+	Memory   *MemoryEstimate `json:"memory,omitempty"`
+	HashFrom string          `json:"hash_from,omitempty"` // direct URLs: user, server or first
+	Files    []File          `json:"files"`
+	Bytes    int64           `json:"bytes"`            // selected files
+	ToFetch  int64           `json:"to_fetch"`         // selected and not cached
+	Pickle   []string        `json:"pickle,omitempty"` // selected files in a pickle format
+	DiskFree int64           `json:"disk_free"`
 	// FromIndex: the source was unreachable, the files and hashes come from
 	// the signed index, and the bytes from its nodes
 	FromIndex bool `json:"from_index,omitempty"`

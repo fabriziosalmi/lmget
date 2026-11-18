@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/fabriziosalmi/lmget"
+	"github.com/fabriziosalmi/lmget/internal/ui"
 )
 
 // mcpVersions are the protocol versions lmget speaks, newest first.
@@ -206,7 +207,7 @@ func mcpTools() []map[string]any {
 		{
 			"name":        "info",
 			"title":       "Plan a model download",
-			"description": "Show what lmget would download for a model, without downloading: commit, license, files with sizes and sha256, what is already stored, pickle and gated checks, free disk. For a nickname, the variant chosen for this machine and why.",
+			"description": "Show what lmget would download for a model, without downloading any weights: commit, license, files with sizes and sha256, what is already stored, pickle and gated checks, free disk, and for a Hugging Face model with a transformers config.json (read, a few kB, not stored) whether it fits this machine's memory. For a nickname, the variant chosen for this machine and why.",
 			"inputSchema": schema(common, "model"),
 			"annotations": map[string]any{"title": "Plan a model download", "readOnlyHint": true, "openWorldHint": true},
 		},
@@ -453,6 +454,13 @@ func planResult(out *lmget.Outcome, target lmget.Target, dec *nickDecision, tool
 	if p.FromIndex {
 		b.WriteString("The source is unreachable: files and hashes come from the signed index, the bytes from its nodes.\n")
 	}
+	if line := ui.MemoryLine(p.Memory); line != "" {
+		verdict := "Fits this machine"
+		if !p.Memory.Fits {
+			verdict = "Over what this machine allows"
+		}
+		fmt.Fprintf(&b, "%s: %s.\n", verdict, line)
+	}
 	const most = 40
 	for i, f := range sel {
 		if i == most {
@@ -472,9 +480,9 @@ func planResult(out *lmget.Outcome, target lmget.Target, dec *nickDecision, tool
 	where := lmget.TargetName(target.Kind)
 	switch {
 	case dry && tool == "get":
-		fmt.Fprintf(&b, "Nothing downloaded. Tell the user the size and where it goes (%s), then call get again with confirm: true.", where)
+		fmt.Fprintf(&b, "No weights downloaded, nothing stored. Tell the user the size and where it goes (%s), then call get again with confirm: true.", where)
 	case dry:
-		fmt.Fprintf(&b, "Nothing downloaded. get with confirm: true downloads it into %s.", where)
+		fmt.Fprintf(&b, "No weights downloaded, nothing stored. get with confirm: true downloads it into %s.", where)
 	default:
 		fmt.Fprintf(&b, "Downloaded %s in %.1f s, every file verified, linked into %s", lmget.HumanBytes(out.Fetched), out.Elapsed.Seconds(), where)
 		if out.Path != "" {
