@@ -1,0 +1,53 @@
+name: Set up lmget
+description: Install lmget from a GitHub release, checked against its checksums and its build provenance, and keep its store between runs, keyed by lmget.lock.
+author: Fabrizio Salmi
+branding:
+  icon: download
+  color: green
+
+inputs:
+  version:
+    description: The release to install, such as v0.3.2, or latest.
+    default: latest
+  cache:
+    description: Keep lmget's store between runs, keyed by the lockfile ("true" or "false").
+    default: "true"
+  lockfile:
+    description: The lockfile the cache is keyed by, and that sync reproduces.
+    default: lmget.lock
+  sync:
+    description: Run lmget sync once lmget is installed ("true" or "false").
+    default: "false"
+  token:
+    description: Token for the GitHub API (finding the release, checking its attestation).
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: The release installed.
+    value: ${{ steps.install.outputs.version }}
+  cache-hit:
+    description: Whether the store came from the cache for this exact lockfile.
+    value: ${{ steps.cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        LMGET_SETUP_VERSION: ${{ inputs.version }}
+      run: '"$GITHUB_ACTION_PATH/install.sh"'
+    - id: cache
+      if: inputs.cache == 'true' && hashFiles(inputs.lockfile) != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.install.outputs.store }}
+        key: lmget-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.lockfile) }}
+        restore-keys: lmget-${{ runner.os }}-${{ runner.arch }}-
+    - if: inputs.sync == 'true'
+      shell: bash
+      env:
+        LMGET_SETUP_LOCKFILE: ${{ inputs.lockfile }}
+      run: lmget sync --lockfile "$LMGET_SETUP_LOCKFILE" --plain

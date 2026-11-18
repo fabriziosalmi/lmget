@@ -1,0 +1,35 @@
+name: packaging
+
+# The Scoop manifest in bucket/ installs the release it names, on Windows,
+# with Scoop itself (installed from its installer at a fixed commit).
+
+on:
+  pull_request:
+    paths: ['bucket/**', 'scripts/scoop-manifest.py', '.github/workflows/packaging.yml']
+  push:
+    branches: [main]
+    paths: ['bucket/**', 'scripts/scoop-manifest.py', '.github/workflows/packaging.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scoop:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: lmget from this repository's Scoop bucket
+        shell: pwsh
+        run: |
+          $installer = 'https://raw.githubusercontent.com/ScoopInstaller/Install/1e2f334083d609986d8c8bc9e31ae8e87c39fab4/install.ps1'
+          iex "& {$(irm $installer)} -RunAsAdmin"
+          $env:PATH = (Join-Path $HOME 'scoop\shims') + ';' + $env:PATH
+          scoop bucket add lmget $env:GITHUB_WORKSPACE
+          scoop install lmget/lmget
+          $want = 'lmget v' + (Get-Content bucket/lmget.json -Raw | ConvertFrom-Json).version
+          $got = lmget --version
+          if ($got -ne $want) { throw "installed: $got, want $want" }
+          Write-Host "scoop installed $got"

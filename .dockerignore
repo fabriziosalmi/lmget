@@ -1,0 +1,3 @@
+*
+!dist/linux_amd64/lmget
+!dist/linux_arm64/lmget

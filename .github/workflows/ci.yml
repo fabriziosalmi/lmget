@@ -90,3 +90,31 @@ jobs:
           if (-not $refused) { throw 'a bad checksum was accepted' }
           if (Test-Path (Join-Path $env:LMGET_INSTALL_DIR 'lmget.exe')) { throw 'installed despite a bad checksum' }
           Stop-Process -Id $srv.Id
+
+  image:
+    # the container image release.yml publishes, built here from this commit
+    # and run; nothing is pushed
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: the binaries the image takes
+        run: |
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X github.com/fabriziosalmi/lmget.Version=v0.0.0-ci" \
+              -o "dist/linux_$arch/lmget" ./cmd/lmget
+          done
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: both platforms build
+        run: docker buildx build --platform linux/amd64,linux/arm64 .
+      - name: the amd64 image runs, as nonroot, with certificates
+        run: |
+          docker buildx build --platform linux/amd64 --load -t lmget:ci .
+          test "$(docker run --rm lmget:ci --version)" = "lmget v0.0.0-ci"
+          test "$(docker image inspect lmget:ci --format '{{.Config.User}}')" = "65532"
+          docker run --rm lmget:ci info prajjwal1/bert-tiny --plain 2>&1 | grep -q 'license=mit'
