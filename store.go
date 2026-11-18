@@ -71,7 +71,7 @@ func (s *Store) Has(sha256 string, size int64) bool {
 	sp := s.stampPath(sha256)
 	switch old, err := os.ReadFile(sp); {
 	case err != nil: // no stamp yet (a store from before stamps): start one
-		writeFileAtomic(sp, []byte(stamp))
+		writeCacheFile(sp, []byte(stamp))
 	case string(old) != stamp:
 		if !hasContent(p, size, sha256) {
 			q := filepath.Join(s.root, "quarantine")
@@ -80,7 +80,7 @@ func (s *Store) Has(sha256 string, size int64) bool {
 			os.Rename(p, filepath.Join(q, sha256))
 			return false
 		}
-		writeFileAtomic(sp, []byte(stamp)) // touched, not changed
+		writeCacheFile(sp, []byte(stamp)) // touched, not changed
 	}
 	return true
 }
@@ -136,12 +136,12 @@ func (s *Store) commit(part, sha256, gitOID string) error {
 		return err
 	}
 	if fi, err := os.Stat(dst); err == nil { // the stamp Has compares against
-		if err := writeFileAtomic(s.stampPath(sha256), []byte(blobStamp(fi))); err != nil {
+		if err := writeCacheFile(s.stampPath(sha256), []byte(blobStamp(fi))); err != nil {
 			return err
 		}
 	}
 	if gitOID != "" && hex40.MatchString(gitOID) {
-		return writeFileAtomic(filepath.Join(s.root, "index", "git-sha1", gitOID), []byte(sha256))
+		return writeCacheFile(filepath.Join(s.root, "index", "git-sha1", gitOID), []byte(sha256))
 	}
 	return nil
 }
@@ -372,11 +372,23 @@ var errBusy = newErr(ExitFailure, "busy", "another lmget is using the store").
 // writeFileAtomic writes through a fresh temporary file (O_EXCL, random
 // name, never a symlink someone placed in advance) and renames it over path.
 // The rename replaces a symlink at path itself, never its target.
-func writeFileAtomic(path string, b []byte) error { return writeFileAtomicMode(path, b, 0) }
+func writeFileAtomic(path string, b []byte) error { return writeAtomic(path, b, 0, true) }
 
 // writeFileAtomicMode is writeFileAtomic with the file mode set on the
 // temporary file before the rename (0 keeps CreateTemp's 0600).
 func writeFileAtomicMode(path string, b []byte, mode os.FileMode) error {
+	return writeAtomic(path, b, mode, true)
+}
+
+// writeCacheFile is writeFileAtomic without the sync, for what lmget can
+// rebuild and checks when it reads it: a blob's stamp, a git id's sha256.
+// After a power loss such a file is whole or unusable (the rename is
+// atomic), and unusable costs a hash or a download, never trust. A sync is
+// a flush of the drive's cache on macOS: two per small file were most of a
+// pull of many small files.
+func writeCacheFile(path string, b []byte) error { return writeAtomic(path, b, 0, false) }
+
+func writeAtomic(path string, b []byte, mode os.FileMode, sync bool) error {
 	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp*")
 	if err != nil {
 		return err
@@ -390,8 +402,8 @@ func writeFileAtomicMode(path string, b []byte, mode os.FileMode) error {
 		os.Remove(tmp)
 		return err
 	}
-	if _, err = f.Write(b); err == nil {
-		err = f.Sync()
+	if _, err = f.Write(b); err == nil && sync {
+		err = syncFile(f)
 	}
 	if cerr := f.Close(); err == nil {
 		err = cerr
