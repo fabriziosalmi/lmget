@@ -654,27 +654,27 @@ tr[data-on] .org {
   }
 }
 
-/* --- the first visit: the install command alone, then the rest fades in.
-   intro.js sets .intro once per browser; opacity only, nothing moves --- */
+/* --- the first visit: the install command alone in the other theme's
+   colour, then an iris opens from it onto the page while the command
+   settles. intro.js sets .intro once per browser and puts the iris at the
+   command's centre (--iris-x, --iris-y) before it opens --- */
 
-@keyframes intro-in {
-  from {
-    opacity: 0;
-  }
+@property --iris {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes intro-iris {
   to {
-    opacity: 1;
+    --iris: 150vmax;
+    visibility: hidden;
   }
 }
 
-/* the page starts in the other theme's colour: a veil over everything but
-   the install command, which fades out as the rest fades in */
-@keyframes intro-veil {
+@keyframes intro-settle {
   from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-    visibility: hidden;
+    transform: scale(1.04);
   }
 }
 
@@ -692,25 +692,21 @@ tr[data-on] .org {
 
 @media (prefers-reduced-motion: no-preference) {
   .intro body::before {
+    --iris: 0px;
     content: "";
     position: fixed;
     inset: 0;
     z-index: 1;
     background: var(--intro-from);
     pointer-events: none;
-    animation: intro-veil 0.5s var(--intro-ease) 0.6s both;
+    -webkit-mask: radial-gradient(circle at var(--iris-x, 50%) var(--iris-y, 45%), transparent var(--iris), #000 calc(var(--iris) + 1px));
+    mask: radial-gradient(circle at var(--iris-x, 50%) var(--iris-y, 45%), transparent var(--iris), #000 calc(var(--iris) + 1px));
+    animation: intro-iris 0.7s var(--intro-ease) 0.6s both;
   }
 
   .intro .hero .install {
     z-index: 2; /* above the veil */
-  }
-
-  .intro .bar,
-  .intro .hero > :not(.install),
-  .intro .flow,
-  .intro main,
-  .intro .foot {
-    animation: intro-in 0.5s var(--intro-ease) 0.6s both;
+    animation: intro-settle 0.7s var(--intro-ease) 0.6s both;
   }
 }
 
