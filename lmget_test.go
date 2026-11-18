@@ -31,11 +31,13 @@ type fakeFile struct {
 }
 
 type fakeHF struct {
-	files  []fakeFile
-	byRepo map[string][]fakeFile // optional: files for a given "org/name"
-	served atomic.Int64          // bytes served by resolve
-	onByte atomic.Pointer[func(total int64)]
-	tree   func() []map[string]any // override
+	files     []fakeFile
+	byRepo    map[string][]fakeFile // optional: files for a given "org/name"
+	served    atomic.Int64          // bytes served by resolve
+	onByte    atomic.Pointer[func(total int64)]
+	tree      func() []map[string]any // override
+	noLicense atomic.Bool             // the card declares no license
+	id        string                  // the repository's own spelling, if not the one asked for
 }
 
 func gitID(b []byte) string {
@@ -62,7 +64,15 @@ func (f *fakeHF) handler() http.Handler {
 			http.NotFound(w, r) // like HF: branches, tags and commits resolve, anything else 404
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]any{"id": r.PathValue("org") + "/" + r.PathValue("name"), "sha": commit, "gated": false, "cardData": map[string]any{"license": "apache-2.0"}})
+		card := map[string]any{"license": "apache-2.0"}
+		if f.noLicense.Load() {
+			card = map[string]any{}
+		}
+		id := r.PathValue("org") + "/" + r.PathValue("name")
+		if f.id != "" {
+			id = f.id
+		}
+		json.NewEncoder(w).Encode(map[string]any{"id": id, "sha": commit, "gated": false, "cardData": card})
 	})
 	mux.HandleFunc("GET /api/models/{org}/{name}/tree/"+commit, func(w http.ResponseWriter, r *http.Request) {
 		var entries []map[string]any

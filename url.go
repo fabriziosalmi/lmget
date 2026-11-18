@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -147,4 +148,27 @@ func fileNameOf(final *url.URL, orig string) string {
 		name = name[len(name)-200:]
 	}
 	return name
+}
+
+// redactURL keeps a URL's shape and drops what a signed URL carries in its
+// query: every value becomes REDACTED, the keys stay, so the URL still says
+// what it was without the credential. It is for anything written down or
+// shown; the download itself uses the URL as given.
+func redactURL(s string) string {
+	u, err := url.Parse(s)
+	if err != nil || u.RawQuery == "" {
+		return s
+	}
+	q := u.Query()
+	keys := make([]string, 0, len(q))
+	for k := range q {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, url.QueryEscape(k)+"=REDACTED")
+	}
+	u.RawQuery = strings.Join(parts, "&")
+	return u.String()
 }

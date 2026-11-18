@@ -44,7 +44,8 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	}
 	t0 := time.Now()
 	e := ev(EvResolve)
-	e.Ref = &r.Ref
+	shown := r.Ref.Redacted() // events are logged and piped: no signed-URL credentials
+	e.Ref = &shown
 	emit(e)
 	var plan *Plan
 	var err error
@@ -52,6 +53,9 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		plan, err = c.resolvePinned(ctx, r)
 	} else {
 		plan, err = c.Resolve(ctx, r.Ref, r.Selection)
+		if err == nil {
+			plan.fresh = true
+		}
 		if err != nil && sourceDown(err) {
 			c.ensureIndex(ctx)
 			if _, m := c.indexEntry(r.Ref, ""); m != nil {
@@ -65,6 +69,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 	e = ev(EvPlan)
 	snapshot := *plan // the pull goes on updating plan; listeners get their own copy
 	snapshot.Files = append([]File(nil), plan.Files...)
+	snapshot.Ref = snapshot.Ref.Redacted()
 	e.Plan = &snapshot
 	emit(e)
 	out := &Outcome{Plan: plan}
@@ -82,7 +87,7 @@ func (c *Client) Pull(ctx context.Context, r Request, emit func(Event)) (*Outcom
 		out.Elapsed = time.Since(t0)
 		return out, nil
 	}
-	if r.License != "" && plan.License != r.License && !r.AcceptLicenseChange {
+	if r.License != "" && plan.License != lockedLicense(r.License) && !r.AcceptLicenseChange {
 		now := plan.License
 		if now == "" {
 			now = "no license"

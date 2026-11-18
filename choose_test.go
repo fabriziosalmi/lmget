@@ -181,3 +181,17 @@ func TestNoFitSaysByHowMuch(t *testing.T) {
 		t.Fatalf("fixes: %v", e.Fixes)
 	}
 }
+
+// Found by the 2026-11-18 review: the history's memory ceiling replaced the
+// machine's budget, so a failed variant above it raised the budget. It caps.
+func TestACeilingOnlyLowersTheBudget(t *testing.T) {
+	// mac16: 30% is 5.15 GB, the 4B MLX (3.03 GB) is the pick
+	c, err := ChooseVariant(qwenAlias(), mac16, []string{"omlx"}, ChoiceOptions{Ceiling: 7e9})
+	if err != nil || c.Variant.Ref != "hf:lmstudio-community/Qwen3.5-4B-MLX-4bit" {
+		t.Fatalf("a ceiling above the budget raised it: %s %v", c.Variant.Ref, err)
+	}
+	c, err = ChooseVariant(qwenAlias(), mac16, []string{"omlx"}, ChoiceOptions{Ceiling: 3.03e9 - 1})
+	if err != nil || c.Variant.Ref != "hf:mlx-community/Qwen3.5-0.8B-4bit" {
+		t.Fatalf("a ceiling below the pick did not lower it: %s %v", c.Variant.Ref, err)
+	}
+}

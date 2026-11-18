@@ -248,11 +248,17 @@ func (c *Client) exportHF(plan *Plan) (string, []string, error) {
 	}
 	if plan.Ref.Revision != plan.Commit {
 		ref := filepath.Join(repoDir, "refs", filepath.FromSlash(plan.Ref.Revision))
-		if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
-			return snap, links, diskErr(err)
-		}
-		if err := writeFileAtomic(ref, []byte(plan.Commit)); err != nil {
-			return snap, links, diskErr(err)
+		// a pinned commit fills an empty ref (so offline loading finds the
+		// snapshot) but never moves one that is there: only a commit just
+		// resolved from the revision says where the revision is now
+		_, statErr := os.Stat(ref)
+		if plan.fresh || os.IsNotExist(statErr) {
+			if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
+				return snap, links, diskErr(err)
+			}
+			if err := writeFileAtomic(ref, []byte(plan.Commit)); err != nil {
+				return snap, links, diskErr(err)
+			}
 		}
 	}
 	return snap, links, nil

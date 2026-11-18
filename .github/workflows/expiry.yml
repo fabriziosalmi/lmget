@@ -1,0 +1,42 @@
+name: expiry
+
+# The signed index and the nickname list expire after at most 60 days, and
+# keys.json (once published) after at most 400: without a new signature,
+# nicknames stop and the nodes stop serving. This fails 10 days ahead, every
+# day, so the failure mail arrives while there is time to sign.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: published files expire in more than 10 days
+        run: |
+          python3 - <<'EOF'
+          import json, sys, urllib.request, urllib.error
+          from datetime import datetime, timezone
+          now, worst = datetime.now(timezone.utc), []
+          for name in ["index.json", "aliases.json", "keys.json"]:
+              req = urllib.request.Request("https://lmget.org/" + name, headers={"User-Agent": "lmget-expiry-check"})
+              try:
+                  doc = json.load(urllib.request.urlopen(req, timeout=30))
+              except urllib.error.HTTPError as e:
+                  if name == "keys.json" and e.code == 404:
+                      print(f"{name}: not published")
+                      continue
+                  sys.exit(f"{name}: HTTP {e.code}")
+              exp = datetime.fromisoformat(doc["expires"].replace("Z", "+00:00"))
+              days = (exp - now).total_seconds() / 86400
+              print(f"{name}: sequence {doc.get('sequence')}, expires {doc['expires']}, {days:.1f} days left")
+              if days < 10:
+                  worst.append(f"{name} expires in {days:.1f} days ({doc['expires']}): build, sign and publish a new one")
+          if worst:
+              sys.exit("\n".join(worst))
+          EOF

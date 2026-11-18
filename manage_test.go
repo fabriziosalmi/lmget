@@ -137,10 +137,14 @@ func TestDoctorVerifyQuarantinesAndPullRepairs(t *testing.T) {
 	out := pullTo(t, c, "org/m", Target{Kind: "hf"})
 
 	blob := c.store.BlobPath(sha(f.files[0].data))
+	before, _ := os.Stat(blob)
 	os.Chmod(blob, 0o644)
 	b, _ := os.ReadFile(blob)
 	b[100] ^= 1
 	os.WriteFile(blob, b, 0o644)
+	// the time put back: a change only a re-hash finds (the stamp check in
+	// Has sees the others, see TestARewrittenExportIsCaught)
+	os.Chtimes(blob, before.ModTime(), before.ModTime())
 
 	var verify *Check
 	cs := c.Doctor(context.Background(), DoctorOptions{Verify: true})
@@ -596,5 +600,39 @@ func TestNarrowerRepullKeepsLinkedBlobs(t *testing.T) {
 	w := f.files[0] // the bytes the fake served (modelFiles() makes new random ones)
 	if !c.store.Has(sha(w.data), int64(len(w.data))) {
 		t.Fatal("gc deleted the weights still linked by the first export")
+	}
+}
+
+// Found by the 2026-11-18 review: a tool rewriting an exported file in place
+// (a hard link) rewrote the blob, and lmget kept using it. Its stamp moved,
+// so lmget hashes it again and quarantines it; the next pull repairs it.
+func TestARewrittenExportIsCaught(t *testing.T) {
+	f := &fakeHF{files: modelFiles()}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	c := newTestClient(t, srv, t.TempDir())
+	dir := t.TempDir()
+	pullTo(t, c, "org/m", Target{Kind: "dir", Path: dir})
+	cfg := f.files[1] // config.json
+	exported := filepath.Join(dir, cfg.path)
+	if !c.store.Has(sha(cfg.data), int64(len(cfg.data))) {
+		t.Fatal("the blob is not there to begin with")
+	}
+	os.Chmod(exported, 0o644)                        // as root would not even need
+	time.Sleep(10 * time.Millisecond)                // a modification time the stamp has not seen
+	os.WriteFile(exported, []byte(`{"a":9}`), 0o644) // same size, other bytes, through the link
+	if c.store.Has(sha(cfg.data), int64(len(cfg.data))) {
+		t.Fatal("a blob rewritten through an export is still trusted")
+	}
+	if _, err := os.Stat(filepath.Join(c.store.Root(), "quarantine", sha(cfg.data))); err != nil {
+		t.Fatal("the rewritten blob was not quarantined")
+	}
+	// touched, not changed: still trusted, and not hashed again next time
+	other := f.files[0]
+	p := c.store.BlobPath(sha(other.data))
+	later := time.Now().Add(time.Minute)
+	os.Chtimes(p, later, later)
+	if !c.store.Has(sha(other.data), int64(len(other.data))) {
+		t.Fatal("a blob only touched was refused")
 	}
 }

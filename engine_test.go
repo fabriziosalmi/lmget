@@ -19,6 +19,9 @@ func fakeOMLX(t *testing.T, key string, oom bool) (*httptest.Server, *bool) {
 	reloaded := new(bool)
 	mux := http.NewServeMux()
 	auth := func(r *http.Request) bool { return key == "" || r.Header.Get("Authorization") == "Bearer "+key }
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"status":"healthy","default_model":null,"engine_pool":{"model_count":1},"mcp":null}`)
+	})
 	mux.HandleFunc("GET /v1/models", func(w http.ResponseWriter, r *http.Request) {
 		if !auth(r) {
 			w.WriteHeader(401)
@@ -196,5 +199,26 @@ func TestMemoryCeiling(t *testing.T) {
 	}
 	if len(MemoryCeiling(h, "gemma", now)) != 0 {
 		t.Fatal("another nickname")
+	}
+}
+
+// Found by the 2026-11-18 review: the key for oMLX went to whatever answered
+// on its port before lmget knew it was oMLX. Now nothing does.
+func TestNoKeyBeforeTheAppIsRecognised(t *testing.T) {
+	c := historyClient(t)
+	var gotKey bool
+	impostor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			gotKey = true
+		}
+		fmt.Fprint(w, `{"object":"list","data":[]}`) // an empty list looked like oMLX before
+	}))
+	defer impostor.Close()
+	err := c.Identify(context.Background(), &Engine{App: "omlx", URL: impostor.URL, key: "s3cret"})
+	if err == nil {
+		t.Fatal("a server that is not oMLX was taken for it")
+	}
+	if gotKey {
+		t.Fatal("the key went to a server not yet recognised")
 	}
 }

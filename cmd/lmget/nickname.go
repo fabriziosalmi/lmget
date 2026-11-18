@@ -87,23 +87,21 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 			remembered = strings.Join(what, " and ") + " as you chose on " + last.Time.Local().Format(time.DateOnly) + " (history)"
 		}
 	}
-	// a variant an app could not load for memory lately: stay below it
+	// the user's own choice, as given now or remembered: the only one the
+	// history records as theirs
+	userFor, userFormat := opt.Budget, opt.Format
+	// a variant an app could not load for memory lately: a ceiling below it,
+	// which lowers the budget and never raises it
 	var tooBig string
 	if f.forSize == "" {
-		for ref, when := range lmget.MemoryCeiling(h, name, time.Now()) {
-			for _, v := range a.Variants {
-				if v.Ref == ref && (opt.Budget == 0 || v.Bytes <= opt.Budget) {
-					opt.Budget = v.Bytes - 1
-					tooBig = strings.TrimPrefix(ref, "hf:") + " did not fit in memory on " + when.Local().Format(time.DateOnly) + " (history)"
-				}
-			}
-		}
+		opt.Ceiling, tooBig = memoryCeiling(h, name, a, time.Now())
 	}
 	ch, err := lmget.ChooseVariant(a, m, apps, opt)
 	if err != nil && remembered != "" {
 		// last time's choice does not fit any more (another target, less
 		// disk): it must not lock the user out, so lmget decides afresh
 		opt.Budget, opt.Format, remembered = 0, "", ""
+		userFor, userFormat = 0, ""
 		ch, err = lmget.ChooseVariant(a, m, apps, opt)
 	}
 	if err != nil {
@@ -115,7 +113,7 @@ func resolveNickname(f flags, mode ui.Mode, c *lmget.Client, name string, dry bo
 	if tooBig != "" {
 		ch.Why = append(ch.Why, tooBig)
 	}
-	hc := &lmget.HistoryChoice{Variant: ch.Variant.Ref, Format: opt.Format, For: opt.Budget, Answer: "flag"}
+	hc := &lmget.HistoryChoice{Variant: ch.Variant.Ref, Format: userFormat, For: userFor, Answer: "flag"}
 	showChoice(mode, name, a, m, apps, ch, note)
 
 	if !dry && !f.yes {
@@ -241,4 +239,21 @@ func say(mode ui.Mode, typ string, ev map[string]any, text string) {
 		return
 	}
 	fmt.Fprintln(os.Stderr, "lmget: "+lmget.Printable(text))
+}
+
+// memoryCeiling is the cap the history sets on a nickname: just below the
+// smallest of its variants that an app could not load for memory in the
+// last 7 days, with the reason to show; 0 when there is none.
+func memoryCeiling(h []lmget.HistoryEntry, name string, a lmget.Alias, now time.Time) (int64, string) {
+	var ceiling int64
+	why := ""
+	for ref, when := range lmget.MemoryCeiling(h, name, now) {
+		for _, v := range a.Variants {
+			if v.Ref == ref && (ceiling == 0 || v.Bytes-1 < ceiling) {
+				ceiling = v.Bytes - 1
+				why = strings.TrimPrefix(ref, "hf:") + " did not fit in memory on " + when.Local().Format(time.DateOnly) + " (history)"
+			}
+		}
+	}
+	return ceiling, why
 }

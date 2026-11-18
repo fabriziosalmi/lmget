@@ -76,7 +76,7 @@ func doRun(f flags, args []string) lmget.ExitCode {
 	}
 
 	record := func(code lmget.ExitCode, err error) lmget.ExitCode {
-		e := lmget.HistoryEntry{Command: "run", Ref: p.req.Ref.String(), Target: p.req.Target.Kind, Exit: int(code)}
+		e := lmget.HistoryEntry{Command: "run", Ref: p.req.Ref.Redacted().String(), Target: p.req.Target.Kind, Exit: int(code)}
 		if p.out != nil && p.out.Plan != nil {
 			e.Commit = p.out.Plan.Commit
 		}

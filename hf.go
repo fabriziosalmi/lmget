@@ -62,6 +62,19 @@ func (c *Client) Resolve(ctx context.Context, ref Ref, sel Selection) (*Plan, er
 	if !hex40.MatchString(info.Sha) {
 		return nil, newErr(ExitFailure, "source", "Hugging Face returned no valid commit for "+ref.Display())
 	}
+	// Hugging Face answers qwen/qwen3-0.6b with a redirect to Qwen/Qwen3-0.6B:
+	// the repository's own spelling is the one the HF cache, the lock and the
+	// index use, so a model typed in another case lands where transformers
+	// looks for it. Only the case may differ.
+	if info.ID != "" && info.ID != ref.Repo {
+		if !strings.EqualFold(info.ID, ref.Repo) {
+			return nil, newErr(ExitFailure, "source", "Hugging Face answered for "+quote(info.ID)+", not "+quote(ref.Repo))
+		}
+		if _, err := validRef("hf", info.ID, "main", info.ID); err != nil {
+			return nil, newErr(ExitFailure, "source", "Hugging Face named the repository "+quote(info.ID)+", which is not a valid name")
+		}
+		ref.Repo = info.ID
+	}
 	p := &Plan{Ref: ref, Commit: info.Sha, License: licenseString(info.CardData.License)}
 	if g, ok := info.Gated.(string); ok && g != "" {
 		p.Gated = printable(g)

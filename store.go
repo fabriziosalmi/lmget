@@ -48,12 +48,51 @@ func (s *Store) BlobPath(sha256 string) string {
 }
 
 // Has reports whether a verified blob of that size is present.
+//
+// A blob is hard-linked into the places it is exported to, so a tool that
+// rewrites one of those files in place rewrites the blob. The store keeps a
+// stamp of each blob (size and modification time): when the time moved, the
+// blob is hashed again, and if it no longer has its name's bytes it goes to
+// quarantine, as doctor --verify does, and the next pull fetches it again.
 func (s *Store) Has(sha256 string, size int64) bool {
 	if !hex64.MatchString(sha256) {
 		return false
 	}
-	fi, err := os.Stat(s.BlobPath(sha256))
-	return err == nil && fi.Mode().IsRegular() && fi.Size() == size
+	p := s.BlobPath(sha256)
+	fi, err := os.Stat(p)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() != size {
+		return false
+	}
+	if runtime.GOOS == "windows" && fi.Mode().Perm()&0o200 != 0 {
+		// removing any hard link to it there clears its read-only flag
+		os.Chmod(p, 0o444)
+	}
+	stamp := blobStamp(fi)
+	sp := s.stampPath(sha256)
+	switch old, err := os.ReadFile(sp); {
+	case err != nil: // no stamp yet (a store from before stamps): start one
+		writeFileAtomic(sp, []byte(stamp))
+	case string(old) != stamp:
+		if !hasContent(p, size, sha256) {
+			q := filepath.Join(s.root, "quarantine")
+			os.MkdirAll(q, 0o755)
+			os.Remove(sp)
+			os.Rename(p, filepath.Join(q, sha256))
+			return false
+		}
+		writeFileAtomic(sp, []byte(stamp)) // touched, not changed
+	}
+	return true
+}
+
+func (s *Store) stampPath(sha256 string) string {
+	d := filepath.Join(s.root, "index", "stamp")
+	os.MkdirAll(d, 0o755)
+	return filepath.Join(d, sha256)
+}
+
+func blobStamp(fi os.FileInfo) string {
+	return fmt.Sprintf("%d %d", fi.Size(), fi.ModTime().UnixNano())
 }
 
 func (s *Store) LookupGit(oid string) (string, bool) {
@@ -95,6 +134,11 @@ func (s *Store) commit(part, sha256, gitOID string) error {
 	// links, and removing the .part link clears it: set it again
 	if err := os.Chmod(dst, 0o444); err != nil {
 		return err
+	}
+	if fi, err := os.Stat(dst); err == nil { // the stamp Has compares against
+		if err := writeFileAtomic(s.stampPath(sha256), []byte(blobStamp(fi))); err != nil {
+			return err
+		}
 	}
 	if gitOID != "" && hex40.MatchString(gitOID) {
 		return writeFileAtomic(filepath.Join(s.root, "index", "git-sha1", gitOID), []byte(sha256))
@@ -193,6 +237,12 @@ func (s *Store) saveManifest(p *Plan, rec *ExportRecord, verified map[string]str
 		}
 	}
 	m.Updated = time.Now().UTC()
+	// the manifest is read back for listing and removal only: a signed URL's
+	// credentials are not kept (a URL model is found by its id, the sha1 of
+	// the whole URL, which names this file)
+	shown := *m.Plan
+	shown.Ref = shown.Ref.Redacted()
+	m.Plan = &shown
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
