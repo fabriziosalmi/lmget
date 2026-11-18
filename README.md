@@ -173,13 +173,22 @@ lmget ollama:qwen3:0.6b                        # name[:tag], tag latest by defau
 lmget ollama:huihui_ai/qwen3-abliterated:0.6b  # namespace/name:tag
 lmget https://ollama.com/library/qwen3:0.6b    # URLs work too
 lmget ollama:qwen3:0.6b --to dir:./models/qwen3
+lmget hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M     # a GGUF repository on Hugging Face, for Ollama
 ```
 
 lmget reads the manifest of the tag from `registry.ollama.ai` and identifies the model by the sha256 of that manifest, which is the commit shown in the plan and pinned in `lmget.lock`. Every layer is a file of the plan, named after its type (`model.gguf`, `template`, `system`, `params.json`, `license`, ...), and verified against the sha256 digest the manifest gives for it; `manifest.json` itself is always part of the download. The model layer must be a GGUF file.
 
 Ollama models are exported by default to Ollama's models directory (`$OLLAMA_MODELS`, else `~/.ollama/models`): the layers are linked as `blobs/sha256-<digest>` (hard links on the same disk) and the manifest is written as the tag file, as a copy: a tool that rewrites the tag file cannot change the store. The Ollama export needs every layer, so `--include` and `--exclude` work only with `--to dir:` or `--to none`; otherwise lmget stops with exit code 2 before downloading. `lmget rm ollama:<name>:<tag>` removes only what lmget wrote: blobs and tag files that Ollama downloaded itself are left in place, and so is a layer that another tag still names, whoever wrote that tag.
 
-The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ollama model from the manifest an earlier pull verified for that same name, and fetches missing layers by digest even after the tag has moved; without such a manifest in the store, the tag must still point at the locked one, or `sync` stops with exit code 5. Only public models are supported, and no token is sent to the registry.
+The registry serves manifests by tag only. `sync` therefore rebuilds a locked Ollama model from the manifest an earlier pull verified for that same name, and fetches missing layers by digest even after the tag has moved; without such a manifest in the store, the tag must still point at the locked one, or `sync` stops with exit code 5. Only public models are supported from the Ollama registry, and no token is sent to it.
+
+### GGUF repositories on Hugging Face
+
+Hugging Face serves its GGUF repositories to Ollama under the name `hf.co/<org>/<name>:<quantization>`, the one its "Use this model: Ollama" button gives (also accepted as `ollama:hf.co/...`). For that name lmget asks Hugging Face's registry (`huggingface.co/v2/...`) for the manifest Hugging Face builds: the GGUF file as the model layer, with the chat template and the parameters. The model layer's digest is the sha256 Hugging Face publishes for the GGUF file, so a GGUF already in the store is not downloaded again. The model lands in Ollama as `hf.co/<org>/<name>:<quantization>`, where Ollama's own pull of that name puts it, ready for `ollama run`. The Hugging Face token goes to Hugging Face, so gated repositories work once their terms are accepted.
+
+`lmget <org>/<name> --to ollama` on a GGUF repository stops before downloading and gives the `hf.co/...` name to use instead.
+
+Checked on 2026-11-18 with Ollama 0.40.16 on a Mac mini: lmget fetched `hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M` (397 MB, four layers, every digest verified); with its network cut, Ollama listed the model, read the chat template from the GGUF, and answered a chat.
 
 ## Signed index and nodes
 

@@ -55,12 +55,36 @@ type ollamaManifest struct {
 	Layers        []ollamaDescriptor `json:"layers"`
 }
 
-// parseOllamaRef reads "name", "name:tag", "namespace/name[:tag]". Names
-// without a namespace are in "library", as in Ollama.
+// ollamaHF is the host Ollama names Hugging Face's registry by: Hugging
+// Face serves its GGUF repositories to Ollama as hf.co/<org>/<name>:<quant>,
+// with a manifest it builds (the GGUF file as the model layer, the chat
+// template and parameters from the file's metadata).
+const ollamaHF = "hf.co"
+
+// hfOllamaRepo returns org/name for an Ollama model on Hugging Face.
+func hfOllamaRepo(repo string) (string, bool) { return strings.CutPrefix(repo, ollamaHF+"/") }
+
+// parseOllamaRef reads "name", "name:tag", "namespace/name[:tag]" and
+// "hf.co/org/name[:quant]". Names without a namespace are in "library", as
+// in Ollama.
 func parseOllamaRef(in, orig string) (Ref, error) {
 	name, tag := in, "latest"
 	if i := strings.LastIndex(in, ":"); i >= 0 {
 		name, tag = in[:i], in[i+1:]
+	}
+	if host, rest, ok := strings.Cut(name, "/"); ok && (strings.EqualFold(host, ollamaHF) || strings.EqualFold(host, "huggingface.co")) {
+		r, err := validRef("ollama", rest, "main", orig)
+		if err != nil {
+			return Ref{}, newErr(ExitUsage, "usage", "not a Hugging Face repository for Ollama: "+quote(orig)).
+				why("expected hf.co/Org/Name:QUANT").
+				fix("lmget hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M", "")
+		}
+		if !ollamaTagRe.MatchString(tag) {
+			return Ref{}, newErr(ExitUsage, "usage", "not a valid quantization tag: "+quote(tag)).
+				fix("lmget hf.co/"+rest+":Q4_K_M", "")
+		}
+		r.Repo, r.Revision = ollamaHF+"/"+r.Repo, tag
+		return r, nil
 	}
 	if !strings.Contains(name, "/") {
 		name = "library/" + name
@@ -92,45 +116,68 @@ func parseOllamaURL(u *url.URL, raw string) (Ref, error) {
 // OllamaName is the name Ollama shows for the model of this plan
 // (ollama run <name>).
 func (c *Client) OllamaName(r Ref) string {
-	host := hostOf(c.opt.OllamaRegistry)
-	name := r.Repo + ":" + r.Revision
+	_, repo, host := c.ollamaRegistry(r)
+	name := repo + ":" + r.Revision
 	if host == "registry.ollama.ai" {
 		return strings.TrimPrefix(name, "library/")
 	}
 	return host + "/" + name
 }
 
+// ollamaRegistry returns where an Ollama model comes from: the registry's
+// base URL, the model's path there, and the host Ollama files it under.
+// hf.co/... is Hugging Face's registry, at the Hugging Face endpoint; every
+// other name is in the Ollama registry.
+func (c *Client) ollamaRegistry(r Ref) (base, repo, host string) {
+	if rest, ok := hfOllamaRepo(r.Repo); ok {
+		return c.opt.HFEndpoint, rest, ollamaHF
+	}
+	return c.opt.OllamaRegistry, r.Repo, hostOf(c.opt.OllamaRegistry)
+}
+
 func (c *Client) resolveOllama(ctx context.Context, ref Ref, sel Selection) (*Plan, error) {
-	u := fmt.Sprintf("%s/v2/%s/manifests/%s", c.opt.OllamaRegistry, ref.Repo, url.PathEscape(ref.Revision))
+	base, repo, host := c.ollamaRegistry(ref)
+	onHF := host == ollamaHF
+	u := fmt.Sprintf("%s/v2/%s/manifests/%s", base, repo, url.PathEscape(ref.Revision))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
-	c.authorize(req) // user agent only: the token is for the HF endpoint
+	c.authorize(req) // the token goes only to the HF endpoint: Hugging Face's registry, never Ollama's
 	req.Header.Set("Accept", ollamaManifestType)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, newErr(ExitNetwork, "network", "cannot reach "+hostOf(c.opt.OllamaRegistry)).
+		return nil, newErr(ExitNetwork, "network", "cannot reach "+hostOf(base)).
 			wrap(err).fix("lmget doctor", "check connectivity")
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case 200:
 	case 404:
+		if onHF {
+			return nil, newErr(ExitNotFound, "not_found", ref.Display()+" was not found").
+				why("no such repository on Hugging Face, or no GGUF file for that quantization in it").
+				fix("lmget info "+repo+" --include '*.gguf'", "the GGUF files the repository has")
+		}
 		return nil, newErr(ExitNotFound, "not_found", ref.Display()+" was not found").
 			why("no such model or tag in the Ollama registry").
 			fix("", "check the name at https://ollama.com/"+ref.Repo)
 	case 401, 403:
+		if onHF {
+			return nil, newErr(ExitAuth, "auth", ref.Display()+" needs access").
+				why("the repository is gated or private").
+				fix("", "accept its terms on huggingface.co and set HF_TOKEN")
+		}
 		return nil, newErr(ExitAuth, "auth", ref.Display()+" is not public").
 			why("lmget downloads public Ollama models only")
 	case 429:
-		return nil, newErr(ExitNetwork, "network", "rate limited by "+hostOf(c.opt.OllamaRegistry)).
+		return nil, newErr(ExitNetwork, "network", "rate limited by "+hostOf(base)).
 			fix("", "wait a minute and run again")
 	default:
-		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(c.opt.OllamaRegistry), printable(resp.Status)))
+		return nil, newErr(ExitNetwork, "network", fmt.Sprintf("%s answered %s", hostOf(base), printable(resp.Status)))
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, ollamaMaxManifest+1))
 	if err != nil {
@@ -145,6 +192,7 @@ func (c *Client) resolveOllama(ctx context.Context, ref Ref, sel Selection) (*Pl
 
 // ollamaPlan builds the plan of a manifest whose sha256 is commit.
 func (c *Client) ollamaPlan(ref Ref, body []byte, commit string, sel Selection) (*Plan, error) {
+	base, repo, _ := c.ollamaRegistry(ref)
 	bad := func(format string, a ...any) error {
 		return newErr(ExitFailure, "source", "unexpected manifest for "+ref.Display()).why(format, a...)
 	}
@@ -171,7 +219,7 @@ func (c *Client) ollamaPlan(ref Ref, body []byte, commit string, sel Selection) 
 		}
 		name = uniqueName(used, name) // a second license is license-2, or the next free name
 		p.Files = append(p.Files, File{Path: name, Size: d.Size, SHA256: mm[1],
-			url: fmt.Sprintf("%s/v2/%s/blobs/sha256:%s", c.opt.OllamaRegistry, ref.Repo, mm[1])})
+			url: fmt.Sprintf("%s/v2/%s/blobs/sha256:%s", base, repo, mm[1])})
 		return nil
 	}
 	if err := add(m.Config, "config.json"); err != nil {
@@ -304,7 +352,8 @@ func (c *Client) exportOllama(plan *Plan) (string, []string, error) {
 		}
 	}
 	// a copy, not a link: whoever rewrites the tag file must not change the store
-	tag := filepath.Join(root, "manifests", hostOf(c.opt.OllamaRegistry), filepath.FromSlash(plan.Ref.Repo), plan.Ref.Revision)
+	_, repo, host := c.ollamaRegistry(plan.Ref)
+	tag := filepath.Join(root, "manifests", host, filepath.FromSlash(repo), plan.Ref.Revision)
 	if err := os.MkdirAll(filepath.Dir(tag), 0o755); err != nil {
 		return root, links, diskErr(err)
 	}

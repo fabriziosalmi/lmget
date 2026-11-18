@@ -129,6 +129,15 @@ func TargetAccepts(plan *Plan, t Target) error {
 				fix("--to dir:PATH", "a plain directory (the default for URLs is the current one)")
 		}
 	case "ollama":
+		if plan.Ref.Source == "hf" {
+			if w, _ := ggufWeights(plan); len(w) > 0 {
+				// Hugging Face serves its GGUF files to Ollama with the
+				// manifest Ollama needs: lmget gets them that way
+				return newErr(ExitUsage, "usage", "the Ollama export holds Ollama models: name this one as Ollama does").
+					why("Hugging Face serves %s to Ollama with the chat template and parameters Ollama needs", plan.Ref.Repo).
+					fix("lmget hf.co/"+plan.Ref.Repo+":"+ggufQuant(w[0].Path), "into Ollama, ready for ollama run")
+			}
+		}
 		if plan.Ref.Source != "ollama" {
 			return newErr(ExitUsage, "usage", "the Ollama export holds Ollama models only").
 				fix("--to dir:PATH", "a plain directory")

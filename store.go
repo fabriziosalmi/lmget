@@ -195,7 +195,11 @@ func (s *Store) manifestPath(ref Ref, commit string) (string, error) {
 		}
 		return filepath.Join(s.root, "refs", "oci", filepath.FromSlash(ociDirName(ref.Repo, runtime.GOOS)), commit+".json"), nil
 	}
-	if _, err := validRef(ref.Source, ref.Repo, "main", ref.Repo); err != nil {
+	name := ref.Repo
+	if rest, ok := hfOllamaRepo(name); ok && ref.Source == "ollama" { // hf.co/org/name: Hugging Face's registry
+		name = rest
+	}
+	if _, err := validRef(ref.Source, name, "main", ref.Repo); err != nil {
 		return "", err
 	}
 	return filepath.Join(s.root, "refs", ref.Source, filepath.FromSlash(ref.Repo), commit+".json"), nil
