@@ -22,6 +22,10 @@
 /install.sh
   Content-Type: text/plain; charset=utf-8
   Cache-Control: no-cache
+/site.css
+  Cache-Control: no-cache
+/app.js
+  Cache-Control: no-cache
 /install.ps1
   Content-Type: text/plain; charset=utf-8
   Cache-Control: no-cache
