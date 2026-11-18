@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -162,9 +164,14 @@ func TestAURLServersPartialIsNotResumedByHuggingFace(t *testing.T) {
 // case (TestPullResumesWithoutRefetching interrupts before any timed one).
 func TestChunksAreSyncedInGroups(t *testing.T) {
 	big := fakeSafetensors(16 << 20) // 65 chunks of 256 KiB
-	var syncs atomic.Int64
+	var syncs atomic.Int64           // of the data: the partial file
 	old := syncFile
-	syncFile = func(f *os.File) error { syncs.Add(1); return f.Sync() }
+	syncFile = func(f *os.File) error {
+		if strings.HasSuffix(f.Name(), ".part") {
+			syncs.Add(1)
+		}
+		return f.Sync()
+	}
 	defer func() { syncFile, checkpointEvery, checkpointBytes = old, time.Second, 256<<20 }()
 	for _, tc := range []struct {
 		every    time.Duration
@@ -185,6 +192,79 @@ func TestChunksAreSyncedInGroups(t *testing.T) {
 		srv.Close()
 		if n := syncs.Load(); n < tc.min || n > tc.max {
 			t.Errorf("checkpoint every %v or %d bytes: %d syncs for 65 chunks, want %d to %d", tc.every, tc.bytes, n, tc.min, tc.max)
+		}
+	}
+}
+
+// A small file costs one sync, its data's, before the store takes it: no
+// resume state for a file of one chunk, no sync for the caches lmget can
+// rebuild (a blob's stamp, a git id's sha256). Counted as the syncs one
+// more file adds to a pull, for files in LFS and in git.
+func TestASmallFileCostsOneSync(t *testing.T) {
+	var syncs atomic.Int64
+	old := syncFile
+	syncFile = func(f *os.File) error { syncs.Add(1); return f.Sync() }
+	defer func() { syncFile = old }()
+	pull := func(n int) int64 {
+		var files []fakeFile
+		for i := range n {
+			files = append(files, fakeFile{path: fmt.Sprintf("f%02d.dat", i), data: randBytes(1000 + i), lfs: i%2 == 0})
+		}
+		f := &fakeHF{files: files}
+		srv := httptest.NewServer(f.handler())
+		defer srv.Close()
+		c := newTestClient(t, srv, t.TempDir())
+		syncs.Store(0)
+		if _, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil); err != nil {
+			t.Fatal(err)
+		}
+		return syncs.Load()
+	}
+	one, many := pull(1), pull(21)
+	if per := float64(many-one) / 20; per != 1 {
+		t.Fatalf("%d syncs for 1 file, %d for 21: %.2f per file, want 1", one, many, per)
+	}
+}
+
+// What a power loss can leave of the caches written without a sync: whole,
+// or empty (the rename reached the disk, the bytes did not). Empty costs a
+// check or a download, never trust in other bytes.
+func TestEmptyCachesAfterAPowerLossAreRebuilt(t *testing.T) {
+	f := &fakeHF{files: []fakeFile{
+		{path: "model.safetensors", data: fakeSafetensors(5000), lfs: true},
+		{path: "config.json", data: []byte(`{"a":1}`)}, // in git: known by its git id
+	}}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	home := t.TempDir()
+	c := newTestClient(t, srv, home)
+	if _, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	var emptied int
+	for _, d := range []string{"stamp", "git-sha1"} {
+		ents, _ := os.ReadDir(filepath.Join(home, "index", d))
+		for _, e := range ents {
+			os.WriteFile(filepath.Join(home, "index", d, e.Name()), nil, 0o644)
+			emptied++
+		}
+	}
+	if emptied < 3 {
+		t.Fatalf("%d cache files emptied", emptied)
+	}
+	before := f.served.Load()
+	out, err := c.Pull(context.Background(), Request{Ref: hfRef("org/m"), Target: Target{Kind: "none"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the git file is downloaded and verified again; the LFS blob is checked
+	// against its stamp, which an empty one fails, then by its hash
+	if got := f.served.Load() - before; got != int64(len(f.files[1].data)) {
+		t.Fatalf("%d bytes downloaded again, want the git file's %d", got, len(f.files[1].data))
+	}
+	for _, x := range out.Plan.Files {
+		if !x.Cached && x.Path == "model.safetensors" {
+			t.Fatal("the LFS blob was downloaded again")
 		}
 	}
 }

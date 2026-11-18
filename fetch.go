@@ -141,9 +141,14 @@ func (c *Client) fetchHashed(ctx context.Context, f File, part, statePath string
 		for _, i := range pending {
 			st.Done[i] = true
 		}
-		b, _ := json.Marshal(st)
-		if err := writeFileAtomic(statePath, b); err != nil {
-			return diskErr(err)
+		// a file of one chunk has no progress to keep: done is the whole file,
+		// and an interrupted one starts over. Its state would cost a second
+		// sync per small file (a tokenizer, a config) for nothing.
+		if n > 1 {
+			b, _ := json.Marshal(st)
+			if err := writeFileAtomic(statePath, b); err != nil {
+				return diskErr(err)
+			}
 		}
 		pending, pendingBytes, last = pending[:0], 0, time.Now()
 		return nil
