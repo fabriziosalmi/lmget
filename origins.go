@@ -51,7 +51,9 @@ func (c *Client) fromOrigins(ctx context.Context, f File, part, state string, cn
 	if f.SHA256 == "" || f.data != nil || f.Size == 0 {
 		return f, "", false
 	}
-	for _, o := range c.opt.Origins {
+	// the user's origins first, then the lmget servers found on the LAN
+	origins := append(append([]string(nil), c.opt.Origins...), c.lanOrigins(ctx)...)
+	for _, o := range origins {
 		of := f
 		of.url = o + "/blobs/sha256/" + f.SHA256
 		of.ifRange, of.ociRepo = "", ""

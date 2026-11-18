@@ -207,6 +207,9 @@ func (c *Client) ollamaPlan(ref Ref, body []byte, commit string, sel Selection) 
 		return nil, bad("%d layers", len(m.Layers))
 	}
 	p := &Plan{Ref: ref, Commit: commit}
+	if _, _, host := c.ollamaRegistry(ref); host == "registry.ollama.ai" {
+		p.Access = "public" // lmget takes only public models there, with no token
+	}
 	p.Files = append(p.Files, File{Path: OllamaManifestFile, Size: int64(len(body)), SHA256: commit, data: body})
 	used := map[string]int{OllamaManifestFile: 1}
 	add := func(d ollamaDescriptor, name string) error {

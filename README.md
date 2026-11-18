@@ -334,6 +334,19 @@ lmget sync --origin https://cache.example.lan     # or LMGET_ORIGINS="https://a,
 
 An origin is a server that holds blobs at `<origin>/blobs/sha256/<sha256>`: a LAN cache, a company mirror, an `lmget-node`, or any static file server over another machine's `LMGET_HOME`, whose store uses the same paths (`python3 -m http.server -d ~/.lmget` is enough on a trusted network). lmget asks the origins, in order, for every file whose sha256 the plan knows, before the source; files the source publishes with a git id only (small, non-LFS files) are not asked for, and with a lockfile every file has its sha256. What an origin serves is verified like any download; when no origin serves the right bytes, the file comes from the source, which never resumes an origin's partial chunks. An origin that cannot be reached, answers with an error (any status but 401, 403, 404 and 410) or serves other bytes is skipped for the rest of the run, up to 10 minutes; one that lacks a file (404) is still asked for the others. Origins are separated by commas or spaces. One that refuses the connection costs one request; one that drops packets can cost up to the 15 s connect timeout. A working origin is retried once per chunk (2 attempts). No token is ever sent to an origin or a node. `http` is accepted because integrity rests on the hash, not on TLS; use `https` when the names of the models you fetch are not for the network to see. At most 16 origins are accepted. The log and the `file_done` events name an origin as `origin:` followed by its URL without the scheme. The plan still comes from the source (or the signed index).
 
+## Sharing on the local network
+
+```sh
+lmget serve                          # on one machine: share this store's public models
+LMGET_LAN=on lmget Qwen/Qwen3-0.6B   # on the others: find such servers and ask them first
+```
+
+`lmget serve` shares, read only, the blobs of the models in its store that are public at their source: a Hugging Face repository that Hugging Face reports as neither private nor gated, or a model of the Ollama registry. Gated and private models, direct URLs, OCI images and GGUF repositories fetched for Ollama are never shared: a colleague gets them under their own access. A model pulled with lmget 0.4.0 or earlier is shared once it is pulled again (nothing is downloaded: the plan now records that it is public). It listens on port 7878 (`--listen` changes the address) at `/blobs/sha256/<sha256>`, and announces itself by mDNS as an `_lmget._tcp` service: on macOS through the system's responder (`dns-sd`), on Linux through Avahi when it is installed, and otherwise by answering the queries itself (`--no-mdns` turns the announcement off).
+
+With `LMGET_LAN=on`, lmget asks the local network for such servers once per run (for 0.6 s, on every network interface, since a VPN often holds the default route) and uses what it finds as origins, after the ones `LMGET_ORIGINS` names: every byte is verified against the sha256 the plan knows, and the source is asked when a server lacks a file. Discovery is off by default: the query tells the network that this machine is about to download, and the requests that follow tell a server which models.
+
+Checked on 2026-11-18 between a MacBook and a Mac mini on the same LAN, in both directions: the client found the other machine's server by mDNS and took the model's weights (`prajjwal1/bert-tiny`, 17.8 MB) from it, the small files that the source hashes with git only from Hugging Face.
+
 ## Output for scripts and integrations
 
 When stdout and stderr are both terminals lmget draws a live view. Otherwise it writes stable `lmget: ...` log lines to stderr and the resulting path to stdout; `lmget info` and `--dry-run` print one `size<TAB>hash<TAB>path` row per selected file to stdout, and `ls`, `rm`, `doctor` and `index` print tab-separated rows:
