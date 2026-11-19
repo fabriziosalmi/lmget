@@ -3,11 +3,14 @@
 // and the same answers (site/chat/<lang>.json) the site will use, so what is
 // tried here is what ships. No model: every answer is written and checked.
 //
-//   node scripts/chat/chat.mjs [--lang it] [--fast]
+//   node scripts/chat/chat.mjs [--lang en|it] [--fast] [--debug]
+//   node scripts/chat/chat.mjs --once "how do I install lmget?"
 //   node scripts/chat/chat.mjs --lang it --once "come installo lmget?"
 //
 // In the chat: /debug shows which entry answered and its score, /reset
-// forgets the thread, /esci (or /exit, Ctrl-D) leaves.
+// forgets the thread, /exit (the language's own word too, see config
+// exitCommands; or Ctrl-D) leaves. The few words of the interface come
+// from the config of <lang>.json, like the answers.
 
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -24,10 +27,12 @@ const opt = (name, def) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : def;
 };
-const lang = opt("--lang", "it");
+const lang = opt("--lang", "en");
 const once = opt("--once", null);
 const fast = args.includes("--fast") || !process.stdout.isTTY;
 const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
+const ui = db.config;
+const exits = new Set(["/exit", ...(ui.exitCommands || [])]);
 const byId = new Map([...db.entries, ...(db.smalltalk || [])].map((e) => [e.id, e]));
 
 // --- terminal rendering of the answers' small markdown: black and white ---
@@ -75,7 +80,7 @@ async function say(text) {
 const cursor = Object.create(null); // answer variant per entry
 let ctx = null; // the thread's entry, for short follow-ups
 let fallbackAt = 0;
-let debug = false;
+let debug = args.includes("--debug");
 
 function answer(text) {
   const hit = M.match(text, db, { ctxEntry: ctx });
@@ -99,7 +104,7 @@ async function turn(text) {
   if (debug) process.stdout.write(D(`[${a.id ?? "fallback"} score ${a.id ? scoreOf(text, a.id) : "-"}]`) + "\n");
   await say(render(a.text));
   const next = a.suggest.map((id) => byId.get(id)?.question).filter(Boolean);
-  if (next.length) process.stdout.write(D("\nPuoi chiedermi: " + next.join(" | ")) + "\n");
+  if (next.length) process.stdout.write(D("\n" + ui.suggestLabel + next.join(" | ")) + "\n");
 }
 
 if (once) {
@@ -107,19 +112,19 @@ if (once) {
   process.exit(0);
 }
 
-process.stdout.write(D(`lmget chat (${lang}) · nessun modello: risposte scritte e verificate · /debug /reset /esci`) + "\n\n");
-await say(render(db.config.welcome));
+process.stdout.write(D(ui.header) + "\n\n");
+await say(render(ui.welcome));
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: "\n› " });
 rl.prompt();
 for await (const line of rl) {
   const text = line.trim();
-  if (text === "/esci" || text === "/exit") break;
+  if (exits.has(text)) break;
   if (text === "/debug") {
     debug = !debug;
     process.stdout.write(D(`debug ${debug ? "on" : "off"}`) + "\n");
   } else if (text === "/reset") {
     ctx = null;
-    process.stdout.write(D("thread dimenticato") + "\n");
+    process.stdout.write(D(ui.resetDone) + "\n");
   } else if (text) {
     process.stdout.write("\n");
     await turn(text);

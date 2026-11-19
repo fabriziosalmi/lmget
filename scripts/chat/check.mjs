@@ -2,7 +2,7 @@
 // Quality gates of the lmget.org chat, run with the same matcher the site
 // uses. Exit 1 on any failure.
 //
-//   node scripts/chat/check.mjs [--lang it] [--lmget PATH]
+//   node scripts/chat/check.mjs [--lang en|it] [--lmget PATH]
 //
 // 1. integrity: unique ids, suggestions that exist, tests on every entry,
 //    no em dash or spaced en dash, no emoji, in anything a reader sees;
@@ -25,7 +25,7 @@ const root = join(here, "..", "..");
 const M = createRequire(import.meta.url)(join(root, "site", "chat", "matcher.js"));
 const args = process.argv.slice(2);
 const opt = (n, d) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : d);
-const lang = opt("--lang", "it");
+const lang = opt("--lang", "en");
 const lmgetBin = opt("--lmget", null);
 const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
 const all = [...db.entries, ...(db.smalltalk || [])];
@@ -33,6 +33,7 @@ const fails = [];
 const fail = (gate, msg) => fails.push(`${gate}: ${msg}`);
 
 // 1. integrity
+for (const k of ["welcome", "header", "suggestLabel", "resetDone"]) if (typeof db.config[k] !== "string") fail("integrity", `config.${k} missing`);
 const ids = new Set();
 for (const e of all) {
   if (ids.has(e.id)) fail("integrity", `duplicate id ${e.id}`);
@@ -41,7 +42,7 @@ for (const e of all) {
   if (!e.answers?.length) fail("integrity", `${e.id} has no answers`);
 }
 for (const e of all) for (const s of e.suggest || []) if (!ids.has(s)) fail("integrity", `${e.id} suggests missing ${s}`);
-const visible = [db.config.welcome, ...db.fallbacks, ...all.flatMap((e) => [e.question, ...e.answers])];
+const visible = [db.config.welcome, db.config.header, db.config.suggestLabel, db.config.resetDone, ...db.fallbacks, ...all.flatMap((e) => [e.question, ...e.answers])];
 for (const t of visible) {
   if (t.includes("—")) fail("integrity", `em dash in: ${t.slice(0, 60)}`);
   if (/ – /.test(t)) fail("integrity", `spaced en dash in: ${t.slice(0, 60)}`);
@@ -120,11 +121,15 @@ for (const e of db.entries) {
       .concat([...a.replace(/```[a-z]*\n[\s\S]*?```/g, " ").matchAll(/`([^`\n]+)`/g)].map((m) => m[1]));
     for (const s of snippets) {
       const at = s.search(/(^|\s)lmget(\s|$)/);
-      const toks = (at >= 0 ? s.slice(at).trim() : s.trim()).split(/\s+/);
+      let toks = (at >= 0 ? s.slice(at).trim() : s.trim()).split(/\s+/);
+      // `claude mcp add lmget -- lmget mcp`: the command lmget runs is after the
+      // end-of-options marker, and the marker itself is no flag
+      const dd = toks.indexOf("--");
+      if (dd >= 0 && toks[dd + 1] === "lmget") toks = toks.slice(dd + 1);
       if (toks[0] === "lmget") {
         cmds++;
         const sub = subs.has(toks[1]) ? toks[1] : "";
-        for (const f of toks.filter((t) => t.startsWith("--"))) {
+        for (const f of toks.filter((t) => t.startsWith("--") && t !== "--")) {
           const flag = f.split("=")[0];
           if (!new RegExp(`(^|\\s)${flag}(\\s|=|,|$)`, "m").test(help(sub))) fail("commands", `${e.id}: "${s}": ${flag} not in lmget ${sub || "get"} --help`);
         }
