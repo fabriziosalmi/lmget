@@ -32,7 +32,7 @@ scoop bucket add lmget https://github.com/fabriziosalmi/lmget
 scoop install lmget
 ```
 
-With pip or uv, from the releases after v0.3.2: each release carries Python wheels for macOS, Linux (glibc and musl) and Windows, amd64 and arm64, that hold the release binary unchanged and no Python code, with their build provenance attested. Once lmget is on PyPI (published when a release is, by `pypi.yml`):
+With pip or uv, from the releases after v0.3.2: each release carries Python wheels for macOS, Linux (glibc and musl) and Windows, amd64 and arm64, that hold the release binary unchanged and no Python code, with their build provenance attested. They are on PyPI from v0.4.0 (published when a release is, by `pypi.yml`):
 
 ```sh
 uv tool install lmget     # or: pipx install lmget, pip install lmget
@@ -53,7 +53,7 @@ In GitHub Actions, the [setup action](setup/action.yml) installs a release, chec
     sync: 'true'        # run lmget sync on ./lmget.lock (lockfile: changes the path)
 ```
 
-The action is in the repository from the commit after v0.3.2, so `@v0.3.2` does not have it: until the next release, pin a commit of `main` by its SHA. The `version` input is independent of that ref.
+The action is in the releases from v0.4.0; `@v0.3.2` and earlier do not have it. The `version` input is independent of that ref.
 
 On Windows, lmget is tested by CI on Windows Server 2025 (the whole test suite, and `install.ps1` against a good and a bad checksum), not yet on a Windows desktop. There: a model is hard-linked where it is exported when the store and the target are on one drive, and copied otherwise, since symlinks need Developer Mode; lmget checks the free space of that drive before copying, and knows its copies by their bytes: `rm` removes them, an update replaces them, and the Hugging Face snapshot is not copied again. Keeping the store (`LMGET_HOME`) on the drive of your caches avoids the copies. In the Hugging Face cache the snapshot holds the files themselves, as `huggingface_hub` does on Windows without symlinks. Read-only is an attribute shared by all hard links of a file there, and removing one clears it: lmget sets it again on a blob each time it checks it. File paths that Windows would not store as written are refused: device names (`NUL`, `COM1`, ...), `:`, `<>"|?*`, a trailing dot or space, and 8.3 short names such as `GIT~1`.
 
