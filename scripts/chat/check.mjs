@@ -10,6 +10,8 @@
 // 3. typos: the same questions with one letter changed, transposed, dropped
 //    or doubled in one word, deterministic: at least 90% still answer right;
 // 4. negatives: questions out of scope get the fallback, never an entry;
+// 4b. prep: every normalisation rule is needed by its own example;
+// 7. ids: scripts/chat/ids-<lang>.tsv matches the json (ids.mjs writes it);
 // 5. commands: every `lmget ...` in an answer names a real subcommand, and
 //    every --flag it uses (and every --flag quoted alone) is in that
 //    subcommand's --help of the real binary (--lmget, else go run).
@@ -19,12 +21,14 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { idsTsv, idsPath } from "./ids.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
 const req = createRequire(import.meta.url);
 const M = req(join(root, "site", "chat", "matcher.js"));
 const Spell = req(join(root, "site", "chat", "spell.js"));
+const Prep = req(join(root, "site", "chat", "prep.js"));
 const args = process.argv.slice(2);
 const opt = (n, d) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : d);
 const lang = opt("--lang", "en");
@@ -128,6 +132,20 @@ for (const q of db.negatives || []) {
   if (hit) fail("negatives", `"${q}" -> ${hit.id}, want the fallback`);
 }
 
+// 4b. normalisation: every prep.js rule of this language rewrites its own
+// example, which then answers with its entry; with that rule off, the
+// example does not: a rule no example needs is a rule to remove
+let prepRules = 0;
+for (const [name, , , ex, want] of Prep.RULES[lang] || []) {
+  prepRules++;
+  const off = new Set([name]);
+  if (Prep.prep(ex, lang) === Prep.prep(ex, lang, { off })) fail("prep", `${name}: does not rewrite its example "${ex}"`);
+  const on = ask(ex)?.id ?? "fallback";
+  const without = Spell.ask(ex, db, M, vocab, { prepOff: off }).hit?.id ?? "fallback";
+  if (on !== want) fail("prep", `${name}: "${ex}" -> ${on}, want ${want}`);
+  if (without === want) fail("prep", `${name}: "${ex}" answers ${want} without the rule too`);
+}
+
 // 5. commands against the real binary
 const lmget = (...a) => {
   try {
@@ -194,7 +212,12 @@ for (const s of covSubs) if (!new RegExp(`lmget ${s}\\b`).test(answersText)) fai
 for (const f of covFlags) if (!named(f)) fail("coverage", `flag ${f} is in no answer`);
 for (const v of covEnv) if (!named(v)) fail("coverage", `variable ${v} is in no answer`);
 
-console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; commands checked ${cmds}; coverage ${covSubs.length} subcommands, ${covFlags.size} flags, ${covEnv.size} variables; subcommands known ${subs.size}`);
+// 7. ids-<lang>.tsv is what ids.mjs writes from this json
+let idsNow = null;
+try { idsNow = readFileSync(idsPath(lang), "utf8"); } catch {}
+if (idsNow !== idsTsv(db)) fail("ids", `${idsPath(lang)} is out of date: run node scripts/chat/ids.mjs`);
+
+console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; prep rules ${prepRules}; commands checked ${cmds}; coverage ${covSubs.length} subcommands, ${covFlags.size} flags, ${covEnv.size} variables; subcommands known ${subs.size}`);
 if (fails.length) {
   console.log(`FAIL (${fails.length})`);
   for (const f of fails) console.log("  " + f);

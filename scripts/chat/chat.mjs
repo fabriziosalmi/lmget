@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// The lmget.org chat in a terminal: the same matcher (site/chat/matcher.js)
+// The lmget.org chat in a terminal: the same pipeline (site/chat/prep.js,
+// matcher.js, spell.js)
 // and the same answers (site/chat/<lang>.json) the site will use, so what is
 // tried here is what ships. No model: every answer is written and checked.
 //
@@ -86,11 +87,13 @@ let debug = args.includes("--debug");
 
 let vocab = null;
 let lastFix = null; // the repaired input, when the matcher needed it
+let lastPrep = null; // the canonical form the matcher saw
 
 function answer(text) {
   vocab ??= Spell.vocabulary(db, M);
-  const { hit, corrected } = Spell.ask(text, db, M, vocab, { ctxEntry: ctx });
+  const { hit, corrected, prepped } = Spell.ask(text, db, M, vocab, { ctxEntry: ctx });
   lastFix = corrected;
+  lastPrep = prepped;
   if (!hit) {
     const f = db.fallbacks[fallbackAt++ % db.fallbacks.length];
     return { id: null, text: f, suggest: [] };
@@ -109,8 +112,8 @@ function scoreOf(text, id) {
 async function turn(text) {
   const a = answer(text);
   if (debug) {
-    const q = lastFix ?? text;
-    process.stdout.write(D(`[${a.id ?? "fallback"} score ${a.id ? scoreOf(q, a.id) : "-"}${lastFix ? ` · corrected: "${lastFix}"` : ""}]`) + "\n");
+    const q = lastFix ?? lastPrep;
+    process.stdout.write(D(`[${a.id ?? "fallback"} score ${a.id ? scoreOf(q, a.id) : "-"} · prepped: "${lastPrep}"${lastFix ? ` · corrected: "${lastFix}"` : ""}]`) + "\n");
   }
   await say(render(a.text));
   const next = a.suggest.map((id) => byId.get(id)?.question).filter(Boolean);

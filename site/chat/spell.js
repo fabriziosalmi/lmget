@@ -1,13 +1,15 @@
-/* Spelling repair for the lmget chat, used only when the matcher finds nothing.
+/* ask() of the lmget chat: the question-form normalisation (prep.js), the
+ * matcher, then a spelling repair used only when the matcher finds nothing.
  * A word of 6 or more letters that is no keyword becomes the one keyword word
  * within two edits of it (insertion, deletion, substitution, or a swap of two
  * neighbours), with the same first letter; when two are equally close, it is
- * left as it is: a guess would be an invented answer. No dependencies; the
- * browser gets window.ZeroSpell, Node gets module.exports. */
+ * left as it is: a guess would be an invented answer. Needs prep.js: the
+ * browser loads it first (window.ZeroPrep) and gets window.ZeroSpell, Node
+ * gets module.exports. */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.ZeroSpell = factory();
-})(typeof self !== "undefined" ? self : this, function () {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./prep.js"));
+  else root.ZeroSpell = factory(root.ZeroPrep);
+})(typeof self !== "undefined" ? self : this, function (Prep) {
   "use strict";
 
   // optimal string alignment distance, 3 meaning "more than 2"
@@ -54,23 +56,26 @@
     return changed ? out.join(" ") : null;
   }
 
-  // the matcher, then the repaired input when the matcher found nothing. The
+  // the canonical form of the question (prep.js, in the language of db), the
+  // matcher on it, then the repaired input when the matcher found nothing. The
   // repair is trusted only where a misspelling is the likely story: a short
   // input (at most 2 words that are not stopwords), or a repaired input that
   // scores strongly (a keyword phrase, 1.8 or more). A sentence of ordinary
   // words is never rewritten into a question about lmget.
   const SHORT = 2;
   const STRONG = 1.8;
+  // options.prepOff: names of prep rules to skip (the gates use it)
   function ask(text, db, M, vocab, options) {
-    const hit = M.match(text, db, options);
-    if (hit) return { hit, corrected: null };
-    const fixed = correct(text, vocab, M);
-    if (!fixed) return { hit: null, corrected: null };
+    const prepped = Prep.prep(text, db.config && db.config.lang, { off: options && options.prepOff });
+    const hit = M.match(prepped, db, options);
+    if (hit) return { hit, corrected: null, prepped };
+    const fixed = correct(prepped, vocab, M);
+    if (!fixed) return { hit: null, corrected: null, prepped };
     const again = M.match(fixed, db, options);
-    if (!again) return { hit: null, corrected: null };
-    const short = M.tokens(text).length <= SHORT;
+    if (!again) return { hit: null, corrected: null, prepped };
+    const short = M.tokens(prepped).length <= SHORT;
     const strong = M.scoreEntry(again, M.norm(fixed), M.tokens(fixed)) >= STRONG;
-    return short || strong ? { hit: again, corrected: fixed } : { hit: null, corrected: null };
+    return short || strong ? { hit: again, corrected: fixed, prepped } : { hit: null, corrected: null, prepped };
   }
 
   return { osa, vocabulary, correct, ask };
