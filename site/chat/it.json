@@ -10,7 +10,10 @@
     "exitCommands": [
       "/esci",
       "/exit"
-    ]
+    ],
+    "codeAnswer": "Questa è una domanda sul codice sorgente di lmget, e questa chat risponde a domande sull'uso di lmget. Dove sta quel codice:\n\n- {refs}",
+    "closestLabel": "La domanda più vicina a cui so rispondere: **{q}**",
+    "framedExample": "Quali sottocomandi mette a disposizione la CLI per maintainer lmget-index?"
   },
   "entries": [
     {
@@ -4438,7 +4441,8 @@
         "chiaro",
         "ho capito",
         "perfetto",
-        "ottimo"
+        "ottimo",
+        "Va bene, sto uscendo. Buona serata!"
       ]
     },
     {
@@ -5307,7 +5311,8 @@
         "ti ricordi di me?",
         "ti ricordi cosa ti ho chiesto prima?",
         "sai chi sono?",
-        "te lo ricorderai domani?"
+        "te lo ricorderai domani?",
+        "Ti ricordi di cosa abbiamo parlato ieri, oppure ogni nuova chat riparte da zero?"
       ]
     },
     {
@@ -5523,7 +5528,8 @@
         "parli inglese?",
         "speak english",
         "rispondi in inglese per favore",
-        "english please"
+        "english please",
+        "Parli altre lingue oltre all'inglese?"
       ]
     },
     {
@@ -5632,6 +5638,10 @@
     "che nome do al mio gatto",
     "come si fa il pane con la pasta madre",
     "chi ha dipinto la gioconda",
-    "come imparo a suonare la chitarra"
+    "come imparo a suonare la chitarra",
+    "Come si dice 'Mi scusi, parla inglese?' in coreano?",
+    "Come faccio a verificare perché un servizio systemd non è riuscito ad avviarsi?",
+    "Come annullo il mio ultimo commit Git senza perdere le modifiche nella working directory?",
+    "Traduci in italiano: 'Thank you very much for your hospitality'."
   ]
 }

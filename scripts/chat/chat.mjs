@@ -13,17 +13,8 @@
 // exitCommands; or Ctrl-D) leaves. The few words of the interface come
 // from the config of <lang>.json, like the answers.
 
-import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import readline from "node:readline";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, "..", "..");
-const req = createRequire(import.meta.url);
-const M = req(join(root, "site", "chat", "matcher.js"));
-const Spell = req(join(root, "site", "chat", "spell.js"));
+import { Spell, loadChat } from "./load.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
@@ -33,7 +24,8 @@ const opt = (name, def) => {
 const lang = opt("--lang", "en");
 const once = opt("--once", null);
 const fast = args.includes("--fast") || !process.stdout.isTTY;
-const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
+const chat = loadChat(lang);
+const db = chat.db;
 const ui = db.config;
 const exits = new Set(["/exit", ...(ui.exitCommands || [])]);
 const byId = new Map([...db.entries, ...(db.smalltalk || [])].map((e) => [e.id, e]));
@@ -85,15 +77,16 @@ let ctx = null; // the thread's entry, for short follow-ups
 let fallbackAt = 0;
 let debug = args.includes("--debug");
 
-let vocab = null;
 let lastFix = null; // the repaired input, when the matcher needed it
 let lastPrep = null; // the canonical form the matcher saw
+let lastScore = null;
 
 function answer(text) {
-  vocab ??= Spell.vocabulary(db, M);
-  const { hit, corrected, prepped } = Spell.ask(text, db, M, vocab, { ctxEntry: ctx });
+  const { hit, corrected, prepped, code, related, score, weak } = chat.ask(text, { ctxEntry: ctx });
   lastFix = corrected;
   lastPrep = prepped;
+  lastScore = score;
+  if (code) return { id: "code", text: Spell.codeAnswer(code, db, chat.code), suggest: related ? [related.id] : [] };
   if (!hit) {
     const f = db.fallbacks[fallbackAt++ % db.fallbacks.length];
     return { id: null, text: f, suggest: [] };
@@ -101,19 +94,16 @@ function answer(text) {
   const n = cursor[hit.id] || 0;
   cursor[hit.id] = n + 1;
   if (!hit.id.startsWith("st-")) ctx = hit;
-  return { id: hit.id, text: hit.answers[n % hit.answers.length], suggest: hit.suggest || [] };
-}
-
-function scoreOf(text, id) {
-  const e = byId.get(id);
-  return e ? M.scoreEntry(e, M.norm(text), M.tokens(text)).toFixed(2) : "-";
+  const body = hit.answers[n % hit.answers.length];
+  // a weak match says which question it answers, so a near answer is not
+  // taken for the answer
+  return { id: hit.id, text: weak ? ui.closestLabel.replace("{q}", hit.question) + "\n\n" + body : body, suggest: hit.suggest || [] };
 }
 
 async function turn(text) {
   const a = answer(text);
   if (debug) {
-    const q = lastFix ?? lastPrep;
-    process.stdout.write(D(`[${a.id ?? "fallback"} score ${a.id ? scoreOf(q, a.id) : "-"} · prepped: "${lastPrep}"${lastFix ? ` · corrected: "${lastFix}"` : ""}]`) + "\n");
+    process.stdout.write(D(`[${a.id ?? "fallback"} score ${lastScore != null ? lastScore.toFixed(2) : "-"} · prepped: "${lastPrep}"${lastFix ? ` · corrected: "${lastFix}"` : ""}]`) + "\n");
   }
   await say(render(a.text));
   const next = a.suggest.map((id) => byId.get(id)?.question).filter(Boolean);

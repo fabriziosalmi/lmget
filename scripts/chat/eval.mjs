@@ -8,23 +8,19 @@
 //
 //   node scripts/chat/eval.mjs [--lang en|it] [--file PATH] [--misses]
 
-import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, "..", "..");
-const req = createRequire(import.meta.url);
-const M = req(join(root, "site", "chat", "matcher.js"));
-const Spell = req(join(root, "site", "chat", "spell.js"));
+import { loadChat } from "./load.mjs";
 const args = process.argv.slice(2);
 const opt = (n, d) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : d);
 const lang = opt("--lang", "en");
 const showMisses = args.includes("--misses");
 const file = opt("--file", join(here, `eval-dev-${lang}.txt`));
-const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
-const vocab = Spell.vocabulary(db, M);
+const chat = loadChat(lang);
+const db = chat.db;
 const ids = new Set([...db.entries, ...(db.smalltalk || [])].map((e) => e.id));
 // a question that is also a test (or a negative) was tuned on: the rate on
 // the other lines is the one that says how the chat does on new questions
@@ -35,7 +31,7 @@ let inTotal = 0, inOK = 0, inFallback = 0, outTotal = 0, outOK = 0, unknown = 0,
 const misses = [];
 for (const line of lines) {
   const [want, q] = line.split("\t");
-  const got = Spell.ask(q, db, M, vocab).hit?.id ?? "fallback";
+  const got = chat.ask(q).hit?.id ?? "fallback";
   if (!seen.has(q.toLowerCase().trim())) {
     newTotal++;
     if (got === want) newOK++;

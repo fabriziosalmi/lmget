@@ -10,7 +10,10 @@
     "exitCommands": [
       "/exit",
       "/quit"
-    ]
+    ],
+    "codeAnswer": "That is a question about lmget's source code, and this chat answers questions about using lmget. Where that code is:\n\n- {refs}",
+    "closestLabel": "The closest question I have an answer for: **{q}**",
+    "framedExample": "What subcommands are provided by the lmget-index maintainer CLI?"
   },
   "entries": [
     {
@@ -4344,7 +4347,8 @@
         "great, thx",
         "ty",
         "cheers mate",
-        "thanks a lot!"
+        "thanks a lot!",
+        "Just wanted to say thanks, you saved me a ton of time."
       ]
     },
     {
@@ -4913,7 +4917,8 @@
         "what's your model",
         "which ai are you",
         "are you a language model",
-        "what runs this chat"
+        "what runs this chat",
+        "What version or model are you, if you don't mind me asking?"
       ]
     },
     {
@@ -5095,7 +5100,9 @@
         "how do you pick your answers",
         "what's under the hood",
         "how do you choose what to say",
-        "is this deterministic"
+        "is this deterministic",
+        "What happens if I ask you something you don't know the answer to?",
+        "Hey, why did you answer so fast? Are these replies pre-written?"
       ]
     },
     {
@@ -5176,7 +5183,8 @@
         "how do you know that",
         "what's your source",
         "prove it",
-        "seriously?"
+        "seriously?",
+        "Wait, that contradicts what you said earlier, which one is true?"
       ]
     },
     {
@@ -5339,7 +5347,8 @@
         "do you remember me?",
         "do you remember what I asked before",
         "do you know who I am",
-        "will you remember this tomorrow"
+        "will you remember this tomorrow",
+        "Do you remember what we talked about yesterday, or does every new chat start fresh?"
       ]
     },
     {
@@ -5505,7 +5514,8 @@
         "test test",
         "testing 123",
         "just testing",
-        "ping"
+        "ping",
+        "Hey, I'm just testing out this chat interface to see how responsive it is."
       ]
     },
     {
@@ -5672,6 +5682,13 @@
     "what's a good name for my cat",
     "how do I make sourdough bread",
     "who painted the mona lisa",
-    "how do I learn to play guitar"
+    "how do I learn to play guitar",
+    "How do you say 'Excuse me, do you speak English?' in Korean?",
+    "Translate 'Thank you very much for your hospitality' into Italian.",
+    "How is a relational database different from a spreadsheet?",
+    "How do I check which directory is eating up all the disk space on a Linux server?",
+    "Can I squash the last four commits on my branch before opening a pull request?",
+    "Draft a quick thank-you email to send after a job interview for a marketing coordinator role.",
+    "Give me five options that are completely different from the first batch."
   ]
 }

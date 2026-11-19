@@ -12,36 +12,35 @@
 // 4. negatives: questions out of scope get the fallback, never an entry;
 // 4b. prep: every normalisation rule is needed by its own example;
 // 7. ids: scripts/chat/ids-<lang>.tsv matches the json (ids.mjs writes it);
+// 8. code: site/chat/code.json matches the tracked files (code.mjs writes it);
+// 9. rules: every rule of ask() is needed by an example (see below).
 // 5. commands: every `lmget ...` in an answer names a real subcommand, and
 //    every --flag it uses (and every --flag quoted alone) is in that
 //    subcommand's --help of the real binary (--lmget, else go run).
 
-import { createRequire } from "node:module";
 import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { idsTsv, idsPath } from "./ids.mjs";
+import { M, Spell, Prep, loadChat } from "./load.mjs";
+import { codeJson, codePath } from "./code.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const req = createRequire(import.meta.url);
-const M = req(join(root, "site", "chat", "matcher.js"));
-const Spell = req(join(root, "site", "chat", "spell.js"));
-const Prep = req(join(root, "site", "chat", "prep.js"));
 const args = process.argv.slice(2);
 const opt = (n, d) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : d);
 const lang = opt("--lang", "en");
 const lmgetBin = opt("--lmget", null);
-const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
+const chat = loadChat(lang);
+const db = chat.db;
 const all = [...db.entries, ...(db.smalltalk || [])];
-const vocab = Spell.vocabulary(db, M);
-const ask = (q) => Spell.ask(q, db, M, vocab).hit; // what the chat answers: matcher, then spelling repair
+const ask = (q) => chat.ask(q).hit; // what the chat answers: code index, matcher, spelling repair
 const fails = [];
 const fail = (gate, msg) => fails.push(`${gate}: ${msg}`);
 
 // 1. integrity
-for (const k of ["welcome", "header", "suggestLabel", "resetDone"]) if (typeof db.config[k] !== "string") fail("integrity", `config.${k} missing`);
+for (const k of ["welcome", "header", "suggestLabel", "resetDone", "codeAnswer", "closestLabel"]) if (typeof db.config[k] !== "string") fail("integrity", `config.${k} missing`);
 const ids = new Set();
 for (const e of all) {
   if (ids.has(e.id)) fail("integrity", `duplicate id ${e.id}`);
@@ -50,7 +49,7 @@ for (const e of all) {
   if (!e.answers?.length) fail("integrity", `${e.id} has no answers`);
 }
 for (const e of all) for (const s of e.suggest || []) if (!ids.has(s)) fail("integrity", `${e.id} suggests missing ${s}`);
-const visible = [db.config.welcome, db.config.header, db.config.suggestLabel, db.config.resetDone, ...db.fallbacks, ...all.flatMap((e) => [e.question, ...e.answers])];
+const visible = [db.config.welcome, db.config.header, db.config.suggestLabel, db.config.resetDone, db.config.codeAnswer, db.config.closestLabel, ...db.fallbacks, ...all.flatMap((e) => [e.question, ...e.answers])];
 for (const t of visible) {
   if (t.includes("—")) fail("integrity", `em dash in: ${t.slice(0, 60)}`);
   if (/ – /.test(t)) fail("integrity", `spaced en dash in: ${t.slice(0, 60)}`);
@@ -141,7 +140,7 @@ for (const [name, , , ex, want] of Prep.RULES[lang] || []) {
   const off = new Set([name]);
   if (Prep.prep(ex, lang) === Prep.prep(ex, lang, { off })) fail("prep", `${name}: does not rewrite its example "${ex}"`);
   const on = ask(ex)?.id ?? "fallback";
-  const without = Spell.ask(ex, db, M, vocab, { prepOff: off }).hit?.id ?? "fallback";
+  const without = chat.ask(ex, { prepOff: off }).hit?.id ?? "fallback";
   if (on !== want) fail("prep", `${name}: "${ex}" -> ${on}, want ${want}`);
   if (without === want) fail("prep", `${name}: "${ex}" answers ${want} without the rule too`);
 }
@@ -217,7 +216,43 @@ let idsNow = null;
 try { idsNow = readFileSync(idsPath(lang), "utf8"); } catch {}
 if (idsNow !== idsTsv(db)) fail("ids", `${idsPath(lang)} is out of date: run node scripts/chat/ids.mjs`);
 
-console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; prep rules ${prepRules}; commands checked ${cmds}; coverage ${covSubs.length} subcommands, ${covFlags.size} flags, ${covEnv.size} variables; subcommands known ${subs.size}`);
+// 9. the rules of ask() (spell.js): each one is needed. With "floor",
+// "smalltalk-floor" or "quotes" off, some negative gets an answer; every name
+// of code.json makes "how does NAME work?" a question about the code, and
+// with "code" off none does; config.framedExample is answered and framed,
+// and with "framed" off it is not; no test question is framed
+let rules = 0;
+for (const r of Spell.RULES) {
+  rules++;
+  if (["floor", "smalltalk-floor", "quotes"].includes(r)) {
+    if (!(db.negatives || []).some((q) => chat.ask(q, { rulesOff: [r] }).hit)) fail("rules", `${r}: no negative needs it`);
+  }
+}
+let codeNames = 0;
+for (const name of [...Object.keys(chat.code.symbols), ...Object.keys(chat.code.methods), ...Object.keys(chat.code.files)]) {
+  codeNames++;
+  const q = `how does ${name} work?`;
+  if (!(chat.ask(q).code || []).some((r) => r.name === name)) fail("rules", `code: "${q}" is not a question about the code`);
+  if (chat.ask(q, { rulesOff: ["code"] }).code) fail("rules", `code: "${q}" is a question about the code with the rule off`);
+}
+{
+  const ex = db.config.framedExample;
+  const r = chat.ask(ex || "");
+  if (!r.hit || !r.weak) fail("rules", `framed: "${ex}" -> ${r.hit?.id ?? "fallback"}${r.hit ? " unframed" : ""}, want a framed answer`);
+  if (chat.ask(ex || "", { rulesOff: ["framed"] }).weak) fail("rules", `framed: "${ex}" is framed with the rule off`);
+  for (const e of all) for (const q of e.tests || []) if (chat.ask(q).weak) fail("rules", `framed: test "${q}" (${e.id}) is framed`);
+}
+
+// 8. code.json is what code.mjs writes from the tracked files and these
+// answers: a stale index misses new code names, or takes a name an answer
+// now shows for code
+let codeNow = null;
+try { codeNow = readFileSync(codePath, "utf8"); } catch {}
+if (codeNow !== codeJson()) fail("code", "site/chat/code.json is out of date: run node scripts/chat/code.mjs");
+if (!db.config.codeAnswer?.includes("{refs}")) fail("integrity", "config.codeAnswer has no {refs}");
+if (!db.config.closestLabel?.includes("{q}")) fail("integrity", "config.closestLabel has no {q}");
+
+console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; prep rules ${prepRules}; commands checked ${cmds}; coverage ${covSubs.length} subcommands, ${covFlags.size} flags, ${covEnv.size} variables; rules ${rules}, code names ${codeNames}; subcommands known ${subs.size}`);
 if (fails.length) {
   console.log(`FAIL (${fails.length})`);
   for (const f of fails) console.log("  " + f);
