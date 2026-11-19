@@ -1,0 +1,140 @@
+license-policy	Can I allow only some model licenses?
+what-is	What is lmget?
+why-not-hf-cli	Why not just use huggingface-cli?
+why-not-git	Why not git clone with Git LFS?
+why-not-ollama-pull	Why not just use ollama pull?
+is-it-safe	Is lmget safe?
+phone-home	Does lmget phone home or collect telemetry?
+offline	Does lmget work offline?
+status	Is lmget stable? Can I use it in production?
+lmget-license	What license is lmget under? Is it free?
+who-made	Who made lmget?
+report-bug	How do I report a bug?
+security-report	How do I report a security vulnerability?
+contribute	How can I contribute to lmget?
+roadmap	Is there a roadmap?
+datasets	Can lmget download datasets or Spaces?
+models-available	Which models can I download?
+sources	Which sources can lmget download from?
+install-windows	How do I install lmget on Windows?
+windows-copies	Does lmget copy the files on Windows?
+install-pip	Can I install lmget with pip or uv?
+install-docker	Is there a Docker image of lmget?
+install-ci	Can I use lmget in GitHub Actions or CI?
+install-source	Can I build lmget from source?
+platforms	Which operating systems and CPUs does lmget run on?
+binary-size	How big is the lmget binary?
+written-in	What language is lmget written in? Does it need Python?
+update	How do I update lmget, and which version do I have?
+uninstall	How do I uninstall lmget?
+completion	Does lmget have shell completion?
+commands	Which commands does lmget have?
+docs	Where is the documentation?
+install	How do I install lmget?
+nickname-own	Can I make my own nicknames?
+nickname-list	Which nicknames are there?
+nickname-script	How do I use a nickname in a script or CI?
+nickname-choice	How does a nickname pick the variant?
+nicknames	What is a nickname like lmget qwen?
+run-endpoint	Can lmget run use vLLM or llama-server?
+run-apps	How does lmget run find oMLX, LM Studio or Ollama?
+run	Can lmget run a model?
+app-omlx	How do I put a model into oMLX?
+app-lmstudio	How do I put a model into LM Studio?
+app-jan	How do I put a model into Jan?
+app-localai	How do I put a model into LocalAI?
+app-exo	How do I put a model into exo?
+app-colibri	How do I put a model into colibri?
+app-comfyui	How do I put a model into ComfyUI?
+app-textgen	How do I use lmget with Text Generation WebUI, KoboldCpp or llamafile?
+works-with	Which apps does lmget work with?
+app-revisions	What happens when I update a model in an app?
+gguf-hf-ollama	How do I put a GGUF from Hugging Face into Ollama?
+ollama	Does lmget work with Ollama?
+revocations	What if a model turns out to be malicious?
+index-keys	Which keys sign the index?
+run-a-node	Can I run my own node or index?
+nodes	What are the lmget nodes?
+signed-index	What is the signed index?
+no-mirror	Can I turn off the ModelScope fallback?
+hf-endpoint	Can I use a Hugging Face mirror (HF_ENDPOINT)?
+hf-down	What happens when Hugging Face is down?
+gated-token	How do I download a gated or private model?
+license-change	Why did lmget stop because the license changed?
+sbom	Can lmget write an SBOM?
+lockfile-trust	Is it safe to sync a lockfile from a cloned repository?
+sync	What does lmget sync do?
+lockfile	How do I pin a project's models with a lockfile?
+ls	How do I see the models I downloaded?
+rm	How do I delete a model and free space?
+doctor	How do I check that my store is healthy?
+history	What does lmget remember about my downloads?
+url-hash	How do I give the expected hash for a URL?
+oci	Can lmget pull models from Docker Hub or OCI registries?
+direct-url	Can I download from any https URL?
+hf-url	Can I paste a Hugging Face link, or get one file?
+origins	Can I use my own cache server or mirror?
+lan-security	Is lmget serve safe on my network?
+lan-serve	Can I share my models with other machines on the LAN?
+json	Does lmget have JSON output?
+scripts-output	How do I use lmget in a script?
+mcp	Can AI agents use lmget (MCP)?
+library	Can I use lmget from Go code?
+pickle	Why were the .bin files skipped?
+content-checks	Does lmget check what is inside a file, not only the hash?
+verify	How does lmget verify the files?
+memory-fit	Will the model fit in my memory?
+needs-gpu	Do I need a GPU to use lmget?
+info	Can I see what it will download before downloading?
+include-exclude	How do I download only some files, like one quantization?
+revision	How do I get a specific branch, tag or commit?
+dir-target	Can I save the model into a folder of my choice?
+hf-cache	Where is the Hugging Face cache, and will transformers find the model?
+store	Where does lmget keep its files?
+targets	Where does lmget put the models?
+disk-space	How much disk space does lmget need?
+resume	What if a download is interrupted?
+speed	Can lmget download faster?
+proxy	Does lmget work behind a proxy?
+exit-codes	What do lmget's exit codes mean?
+first-download	How do I download a model?
+st-hello	Hi
+st-how-are-you	How are you?
+st-thanks	Thanks
+st-bye	Bye
+st-ok	OK
+st-yes	Yes
+st-no	No
+st-sorry	Sorry
+st-laugh	Haha
+st-wow	Wow
+st-compliment	Nice work
+st-love	I love you
+st-frustrated	That did not help
+st-insult	(an insult)
+st-who	Who are you?
+st-name	What is your name?
+st-are-you-ai	Are you an AI?
+st-human	Can I talk to a human?
+st-which-model	Which model are you?
+st-chatgpt	Are you ChatGPT?
+st-claude	Are you Claude?
+st-other-llm	Are you Llama, Gemini or Mistral?
+st-speed	How fast are you?
+st-how-work	How do you work?
+st-invent	Can you make things up?
+st-sure	Are you sure?
+st-what-can-you-do	What can you do?
+st-help	Help
+st-start	Where do I start?
+st-who-made-you	Who made this chat?
+st-memory	Do you remember me?
+st-privacy-chat	Do you store what I write?
+st-learn	Do you learn from me?
+st-internet	Can you search the web?
+st-joke	Tell me a joke
+st-test	Test
+st-empty	?
+st-lang-en	Speak English
+st-lang-it	Parla italiano
+st-lang-other	Other languages
