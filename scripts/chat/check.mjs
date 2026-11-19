@@ -22,13 +22,17 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const M = createRequire(import.meta.url)(join(root, "site", "chat", "matcher.js"));
+const req = createRequire(import.meta.url);
+const M = req(join(root, "site", "chat", "matcher.js"));
+const Spell = req(join(root, "site", "chat", "spell.js"));
 const args = process.argv.slice(2);
 const opt = (n, d) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : d);
 const lang = opt("--lang", "en");
 const lmgetBin = opt("--lmget", null);
 const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
 const all = [...db.entries, ...(db.smalltalk || [])];
+const vocab = Spell.vocabulary(db, M);
+const ask = (q) => Spell.ask(q, db, M, vocab).hit; // what the chat answers: matcher, then spelling repair
 const fails = [];
 const fail = (gate, msg) => fails.push(`${gate}: ${msg}`);
 
@@ -54,7 +58,7 @@ let tests = 0;
 for (const e of all) {
   for (const q of e.tests || []) {
     tests++;
-    const hit = M.match(q, db);
+    const hit = ask(q); // what the chat answers
     if (hit?.id !== e.id) fail("battery", `"${q}" -> ${hit?.id ?? "fallback"}, want ${e.id}`);
   }
 }
@@ -84,16 +88,43 @@ for (const e of db.entries) {
     const m = mutate(q);
     if (!m) continue;
     typoTotal++;
-    if (M.match(m, db)?.id === e.id) typoOK++;
+    if (ask(m)?.id === e.id) typoOK++;
     else typoMiss.push(`"${m}" (${e.id})`);
   }
 }
 const typoRate = typoTotal ? typoOK / typoTotal : 1;
 if (typoRate < 0.9) fail("typos", `${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%) < 90%: ${typoMiss.slice(0, 5).join(", ")}`);
 
+// 3b. heavy typos: two edits in one word of 7+ letters; answered by the
+// spelling repair when the matcher alone misses
+function mutate2(q) {
+  const words = q.split(" ");
+  const cand = words.map((w, i) => [w, i]).filter(([w]) => /^[\p{L}]{7,}$/u.test(w));
+  if (!cand.length) return null;
+  const [w0, i] = cand[rnd(cand.length)];
+  let w = w0;
+  for (let n = 0; n < 2; n++) {
+    const k = 1 + rnd(w.length - 3);
+    w = n === 0 ? w.slice(0, k) + w[k + 1] + w[k] + w.slice(k + 2) : w.slice(0, k) + w.slice(k + 1);
+  }
+  words[i] = w;
+  return words.join(" ");
+}
+let heavyTotal = 0, heavyOK = 0;
+for (const e of db.entries) {
+  for (const q of e.tests || []) {
+    const m = mutate2(q);
+    if (!m) continue;
+    heavyTotal++;
+    if (ask(m)?.id === e.id) heavyOK++;
+  }
+}
+const heavyRate = heavyTotal ? heavyOK / heavyTotal : 1;
+if (heavyRate < 0.6) fail("heavy typos", `${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%) < 60%`);
+
 // 4. negatives
 for (const q of db.negatives || []) {
-  const hit = M.match(q, db);
+  const hit = ask(q);
   if (hit) fail("negatives", `"${q}" -> ${hit.id}, want the fallback`);
 }
 
@@ -142,7 +173,7 @@ for (const e of db.entries) {
   }
 }
 
-console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; commands checked ${cmds}; subcommands known ${subs.size}`);
+console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; commands checked ${cmds}; subcommands known ${subs.size}`);
 if (fails.length) {
   console.log(`FAIL (${fails.length})`);
   for (const f of fails) console.log("  " + f);

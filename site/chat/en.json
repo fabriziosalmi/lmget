@@ -410,6 +410,37 @@
       ]
     },
     {
+      "id": "models-available",
+      "source": "README.md#usage, README.md#nicknames, cmd/lmget index",
+      "question": "Which models can I download?",
+      "keywords": [
+        "which models",
+        "what models",
+        "models available",
+        "available models",
+        "catalog",
+        "catalogue",
+        "model list"
+      ],
+      "answers": [
+        "Any open model: from Hugging Face (with ModelScope as a second origin), the Ollama registry, an OCI registry or an https URL. lmget has no catalogue of its own: it takes the model from its source and verifies it.\n\nTo start with a short name there are the nicknames: `qwen`, `gemma`, `smollm`, `granite`, `olmo`, `gpt-oss`, `whisper`, `embed`, `rerank`, `siglip`.\n\nThe models the project mirrors on its nodes, which you get even when Hugging Face is down, are listed by:\n\n```sh\nlmget index\n```",
+        "Put another way: you pick the model, lmget downloads and verifies it. For example:\n\n```sh\nlmget Qwen/Qwen3-0.6B\nlmget ollama:qwen3:0.6b\nlmget qwen\n```\n\nTo see what a nickname would propose on this machine, without downloading the weights: `lmget info qwen`. For the models mirrored on the project's nodes: `lmget index`."
+      ],
+      "suggest": [
+        "nickname-list",
+        "sources",
+        "nicknames"
+      ],
+      "tests": [
+        "what models are there?",
+        "which models?",
+        "which models can I download",
+        "is there a model catalog?",
+        "what models can lmget download",
+        "what models can it download"
+      ]
+    },
+    {
       "id": "sources",
       "question": "Which sources can lmget download from?",
       "source": "README.md (intro), README.md#usage",
@@ -417,8 +448,6 @@
         "sources",
         "source",
         "supported",
-        "which models",
-        "what models",
         "kind of models",
         "registries",
         "where from",
@@ -436,7 +465,6 @@
       ],
       "tests": [
         "which sources does lmget support?",
-        "what models can it download",
         "where can it download from",
         "does it only work with hugging face",
         "supported registries"
@@ -944,7 +972,9 @@
         "short name",
         "shortcut",
         "lmget qwen",
-        "just qwen"
+        "just qwen",
+        "nick",
+        "nicks"
       ],
       "answers": [
         "A short lowercase name, such as `qwen`, is a nickname:\n\n```sh\nlmget qwen\nlmget info qwen\n```\n\nlmget reads this machine (memory, Apple Silicon, an NVIDIA GPU) and the apps installed (oMLX, LM Studio, Ollama), proposes the largest variant of the family that fits, names the next size up, and asks before downloading. `lmget info qwen` shows the proposal and downloads no weights."
@@ -959,7 +989,9 @@
         "what does lmget qwen do",
         "how do nicknames work",
         "can I just type qwen",
-        "what are aliases in lmget"
+        "what are aliases in lmget",
+        "nickanem?",
+        "what are nicks?"
       ]
     },
     {

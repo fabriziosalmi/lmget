@@ -410,6 +410,38 @@
       ]
     },
     {
+      "id": "models-available",
+      "source": "README.md#usage, README.md#nicknames, cmd/lmget index",
+      "question": "Quali modelli posso scaricare?",
+      "keywords": [
+        "quali modelli",
+        "che modelli",
+        "modelli disponibili",
+        "modelli ci sono",
+        "catalogo",
+        "lista modelli",
+        "modelli posso scaricare"
+      ],
+      "answers": [
+        "Qualsiasi modello aperto: da Hugging Face (con ModelScope come seconda origine), dal registro di Ollama, da un registro OCI o da un URL https. lmget non ha un catalogo suo: prende il modello dalla fonte e lo verifica.\n\nPer partire con un nome corto ci sono i soprannomi: `qwen`, `gemma`, `smollm`, `granite`, `olmo`, `gpt-oss`, `whisper`, `embed`, `rerank`, `siglip`.\n\nI modelli che il progetto copia sui suoi nodi, che scarichi anche quando Hugging Face non risponde, li elenca:\n\n```sh\nlmget index\n```",
+        "Detto in un altro modo: il modello lo scegli tu, lmget lo scarica e lo verifica. Per esempio:\n\n```sh\nlmget Qwen/Qwen3-0.6B\nlmget ollama:qwen3:0.6b\nlmget qwen\n```\n\nPer vedere cosa ti proporrebbe un soprannome su questa macchina, senza scaricare i pesi: `lmget info qwen`. Per i modelli copiati sui nodi del progetto: `lmget index`."
+      ],
+      "suggest": [
+        "nickname-list",
+        "sources",
+        "nicknames"
+      ],
+      "tests": [
+        "che modelli ci sono?",
+        "quali modelli?",
+        "quali modelli posso scaricare",
+        "c'è un catalogo di modelli?",
+        "che modelli posso scaricare con lmget",
+        "che modelli può scaricare?",
+        "che modelli ci sono ?"
+      ]
+    },
+    {
       "id": "sources",
       "question": "Da quali fonti scarica lmget?",
       "source": "README.md (intro), README.md#usage",
@@ -417,8 +449,6 @@
         "fonti",
         "fonte",
         "supportate",
-        "quali modelli",
-        "che modelli",
         "tipi di modelli",
         "registri",
         "da dove",
@@ -434,7 +464,6 @@
       ],
       "tests": [
         "da quali fonti scarica lmget?",
-        "che modelli può scaricare?",
         "da dove scarica?",
         "funziona solo con hugging face?",
         "quali registri supporta?"
@@ -957,7 +986,9 @@
         "scorciatoia",
         "lmget qwen",
         "solo qwen",
-        "fa lmget qwen"
+        "fa lmget qwen",
+        "nick",
+        "nicks"
       ],
       "answers": [
         "Un nome corto in minuscolo, come `qwen`, è un soprannome:\n\n```sh\nlmget qwen\nlmget info qwen\n```\n\nlmget guarda questa macchina (memoria, Apple Silicon, una GPU NVIDIA) e le app installate (oMLX, LM Studio, Ollama), propone la variante più grande della famiglia che ci sta, nomina la taglia successiva e chiede prima di scaricare. `lmget info qwen` mostra la proposta e non scarica i pesi."
@@ -972,7 +1003,9 @@
         "cosa fa lmget qwen?",
         "come funzionano i soprannomi?",
         "posso scrivere solo qwen?",
-        "cosa sono gli alias in lmget?"
+        "cosa sono gli alias in lmget?",
+        "nickanem?",
+        "cosa sono inick?"
       ]
     },
     {

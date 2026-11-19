@@ -20,7 +20,9 @@ import readline from "node:readline";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..");
-const M = createRequire(import.meta.url)(join(root, "site", "chat", "matcher.js"));
+const req = createRequire(import.meta.url);
+const M = req(join(root, "site", "chat", "matcher.js"));
+const Spell = req(join(root, "site", "chat", "spell.js"));
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
@@ -82,8 +84,13 @@ let ctx = null; // the thread's entry, for short follow-ups
 let fallbackAt = 0;
 let debug = args.includes("--debug");
 
+let vocab = null;
+let lastFix = null; // the repaired input, when the matcher needed it
+
 function answer(text) {
-  const hit = M.match(text, db, { ctxEntry: ctx });
+  vocab ??= Spell.vocabulary(db, M);
+  const { hit, corrected } = Spell.ask(text, db, M, vocab, { ctxEntry: ctx });
+  lastFix = corrected;
   if (!hit) {
     const f = db.fallbacks[fallbackAt++ % db.fallbacks.length];
     return { id: null, text: f, suggest: [] };
@@ -101,7 +108,10 @@ function scoreOf(text, id) {
 
 async function turn(text) {
   const a = answer(text);
-  if (debug) process.stdout.write(D(`[${a.id ?? "fallback"} score ${a.id ? scoreOf(text, a.id) : "-"}]`) + "\n");
+  if (debug) {
+    const q = lastFix ?? text;
+    process.stdout.write(D(`[${a.id ?? "fallback"} score ${a.id ? scoreOf(q, a.id) : "-"}${lastFix ? ` · corrected: "${lastFix}"` : ""}]`) + "\n");
+  }
   await say(render(a.text));
   const next = a.suggest.map((id) => byId.get(id)?.question).filter(Boolean);
   if (next.length) process.stdout.write(D("\n" + ui.suggestLabel + next.join(" | ")) + "\n");
