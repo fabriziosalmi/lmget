@@ -337,7 +337,10 @@ func TestMCPURLsReachPublicHostsOnly(t *testing.T) {
 	for i, u := range []string{local.URL + "/model.gguf", "https://169.254.169.254/latest/meta-data/x.gguf"} {
 		for _, tool := range []string{"info", "get"} {
 			text, isErr := toolText(t, s.call(10+i, "tools/call", map[string]any{"name": tool, "arguments": map[string]any{"model": u, "confirm": true}}))
-			if !isErr || !strings.Contains(text, "not a public address") {
+			// refused either way: the address is not public, or (with a proxy
+			// in the environment, as on CI machines behind one) it cannot be
+			// checked through the proxy
+			if !isErr || !(strings.Contains(text, "not a public address") || strings.Contains(text, "through a proxy")) {
 				t.Errorf("%s %s: %v %s", tool, u, isErr, text)
 			}
 		}
