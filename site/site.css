@@ -294,6 +294,178 @@ dd {
   font-size: 0.8125rem;
 }
 
+/* --- the chat under the install command: written answers, no model.
+   Shown only with scripts (intro.js marks <html class="js"> before the
+   first paint), so it never appears late and moves nothing --- */
+
+.ask {
+  display: none;
+  inline-size: min(33rem, 100%);
+  margin-block-start: 0.25rem;
+  text-align: start;
+}
+
+.js .ask {
+  display: block;
+}
+
+.ask-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ask-row input {
+  flex: 1;
+  min-inline-size: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 1rem/1.4 var(--sans); /* 16px: no zoom on focus in iOS Safari */
+}
+
+.ask-row input::placeholder {
+  color: var(--faint);
+}
+
+.ask-row input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ask-row button {
+  padding: 0 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 500 0.875rem/1 var(--sans);
+  cursor: pointer;
+}
+
+.ask-row button:hover,
+.ask-row button:focus-visible {
+  border-color: var(--dim);
+}
+
+.ask-note {
+  margin: 0.5rem 0 0;
+  color: var(--dim);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.ask-lang {
+  min-block-size: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.ask-lang:hover {
+  color: var(--accent);
+}
+
+.ask-log {
+  position: relative; /* the turns' offsetTop: ui.js scrolls the newest to the top */
+  max-block-size: min(60vh, 34rem);
+  margin-block-start: 1rem;
+  padding: 0 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 0.9375rem;
+}
+
+.ask-log[hidden] {
+  display: none;
+}
+
+.ask-turn {
+  padding-block: 0.9rem;
+}
+
+.ask-turn + .ask-turn {
+  border-block-start: 1px solid var(--rule);
+}
+
+.ask-q {
+  margin: 0 0 0.5rem;
+  color: var(--dim);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.ask-a p,
+.ask-a ul {
+  margin: 0.5rem 0;
+}
+
+.ask-a ul {
+  padding-inline-start: 1.25rem;
+}
+
+.ask-a > :first-child {
+  margin-block-start: 0;
+}
+
+.ask-a > :last-child {
+  margin-block-end: 0;
+}
+
+.ask-a code {
+  overflow-wrap: anywhere;
+}
+
+.ask-a pre {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--bg);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.ask-a pre code {
+  font-size: inherit;
+  overflow-wrap: normal;
+}
+
+.ask-next {
+  margin: 0.75rem 0 0;
+  color: var(--dim);
+  font-size: 0.8125rem;
+  line-height: 2;
+}
+
+.ask-chip {
+  min-block-size: 24px;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 0.8125rem/1.4 var(--sans);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ask-chip:hover,
+.ask-chip:focus-visible {
+  border-color: var(--dim);
+}
+
 /* --- facts read from the signed files --- */
 
 .facts {

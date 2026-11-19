@@ -1,0 +1,477 @@
+what-is	cosa è lmget?
+what-is	cos e lmget
+what-is	cosè sto lmget
+what-is	a cosa serve?
+what-is	Buongiorno, mi spiegate in due parole cosa fa questo programma?
+what-is	che roba è
+what-is	lmget a che serve di preciso
+install	dove si scarica?
+install	come lo installo
+install	intallare lmget su linux
+install	installarlo su mac
+install	comando per installare?
+install	installazione
+install	Salve, qual è il modo più semplice per installare lmget su un Mac con M2?
+install	si installa con homebrew?
+install	lo script curl install.sh usa sudo?
+install-windows	windows
+install-windows	funziona su windows?
+install-windows	come lo metto su windows 11
+install-windows	c'è per windows? uso powershell
+install-windows	installare su win
+install-windows	si trova su scoop?
+install-windows	Buonasera, in ufficio abbiamo solo pc Windows, si può installare lì?
+windows-copies	su windows mi raddoppia lo spazio, copia i file?
+windows-copies	perche su windows non usa i symlink
+install-pip	pip install lmget
+install-pip	si puo installare con uv?
+install-pip	c'è su pypi?
+install-docker	docker?
+install-docker	c'è un container ufficiale
+install-docker	posso farlo girare in docker e tenere i modelli in un volume
+install-ci	github actions
+install-ci	lo voglio usare nella pipeline di ci, come faccio
+install-source	go install?
+install-source	voglio compilarlo da me dai sorgenti
+update	come lo aggiorno
+update	che versione ho installato?
+update	aggiornare all ultima versione
+uninstall	come lo tolgo
+uninstall	disinstallare
+uninstall	voglio rimuovere lmget dal computer, cosa cancello?
+completion	autocompletamento zsh
+completion	tab completion in bash c'è?
+commands	quali comandi ci sono
+commands	lista comandi
+commands	che sottocomandi ha
+nicknames	cos'è lmget qwen
+nicknames	cosa sono i soprannomi
+nicknames	nickname?
+nickname-own	posso farmi un alias mio per un modello che uso sempre
+nickname-own	creare un soprannome personalizzato
+nickname-list	che soprannomi esistono oltre a qwen?
+nickname-list	elenco nickname
+nickname-script	nello script lmget qwen si blocca e vuole la conferma
+nickname-script	in ci lmget qwen esce con codice 2, come lo uso senza terminale?
+nickname-choice	lmget qwen come decide quale variante prendere?
+nickname-choice	perchè con lmget qwen mi ha proposto il 4B e non il 9B
+run	lmget fa girare i modelli?
+run	si può chattare col modello direttamente da lmget?
+run	esegue anche i modelli o li scarica solo
+run-endpoint	posso usare lmget run con vllm che ho già acceso
+run-endpoint	llama-server con lmget run?
+run-apps	lmget run come trova lm studio
+run-apps	ollama gira su un'altra porta, lmget run la trova?
+app-omlx	omlx
+app-omlx	come metto un modello in omlx
+app-lmstudio	lm studio?
+app-lmstudio	funziona con lmstudio
+app-lmstudio	voglio scaricare un gguf e vederlo comparire in LM Studio
+app-jan	jan.ai è supportato?
+app-localai	localai
+app-localai	come ci metto un gguf in local ai
+app-exo	exo, si può?
+app-colibri	colibri?
+app-comfyui	comfyui
+app-comfyui	scaricare flux per comfy
+app-comfyui	dove mette i file per comfyui, nella cartella checkpoints?
+app-textgen	oobabooga
+app-textgen	koboldcpp
+app-textgen	llamafile?
+works-with	con che programmi funziona
+works-with	funziona con open webui?
+works-with	va bene anche con sillytavern o lobechat?
+works-with	compatibile con quali app?
+app-revisions	se aggiorno il modello in lm studio mi ritrovo due versioni mischiate?
+gguf-hf-ollama	voglio mettere in ollama un gguf preso da huggingface
+gguf-hf-ollama	hf.co/unsloth/... in ollama si può con lmget?
+ollama	ollama?
+ollama	funziona con ollama
+ollama	lmget ollama:qwen3 come funziona
+ollama	scarico con lmget e poi lo vedo in ollama run?
+ollama	Ciao, il modello scaricato finisce nella cartella di Ollama o devo spostarlo io?
+why-not-ollama-pull	perché non usare ollama pull e basta
+why-not-ollama-pull	che differenza c'è con ollama pull
+why-not-hf-cli	perche non huggingface-cli download
+why-not-hf-cli	che vantaggi ha rispetto a hf download
+why-not-hf-cli	huggingface_hub fa gia tutto, a che mi serve questo?
+why-not-git	git lfs clone non basta?
+why-not-git	perche non git clone
+is-it-safe	è sicuro?
+is-it-safe	e sicuro
+is-it-safe	posso fidarmi
+is-it-safe	mi posso fidare a scaricare modelli con questo coso?
+is-it-safe	sicurezza
+is-it-safe	non è che mi installa un virus?
+phone-home	manda telemetria?
+phone-home	raccoglie dati?
+phone-home	traccia quello che scarico e lo manda a qualcuno?
+offline	funziona senza internet
+offline	offline?
+offline	in aereo posso usarlo con i modelli già scaricati?
+status	è stabile
+status	lo posso usare in produzione?
+status	è ancora in beta?
+lmget-license	è open ?
+lmget-license	licenza
+lmget-license	è gratis?
+lmget-license	è open source?
+lmget-license	si paga?
+lmget-license	posso usarlo in azienda per lavoro senza pagare
+report-bug	ho trovato un bug, dove lo segnalo
+report-bug	dove apro una issue
+security-report	ho trovato una vulnerabilità
+security-report	come segnalo una falla in privato
+datasets	scarica anche dataset?
+datasets	posso scaricare uno space di hugging face?
+datasets	dataset
+models-available	quali modelli posso scaricare
+models-available	che modelli ci sono
+models-available	posso scaricare qualsiasi modello di huggingface?
+models-available	deepseek si puo scaricare?
+sources	da dove scarica
+sources	da quali siti prende i modelli
+sources	solo huggingface?
+hf-down	se huggingface è down?
+hf-down	hugging face non risponde, che succede ai miei download
+no-mirror	non voglio che scarichi da modelscope
+no-mirror	disattivare modelscope
+hf-endpoint	sono in cina, posso usare hf-mirror.com?
+hf-endpoint	HF_ENDPOINT è supportato?
+gated-token	non riesco a scaricare un modello gated
+gated-token	token?
+gated-token	dove metto il token di hugging face
+gated-token	mi da errore 401 su llama
+gated-token	modelli privati
+gated-token	HF_TOKEN lo legge?
+gated-token	Buongiorno, ho accettato la licenza di Llama su Hugging Face ma il download continua a fallire, come faccio?
+license-change	mi dice che la licenza è cambiata e si ferma
+license-change	accept-license-change cosa fa
+license-policy	posso bloccare i modelli con licenza non commerciale?
+license-policy	permettere solo modelli apache e mit nel progetto
+sbom	sbom cyclonedx
+sbom	mi serve una distinta dei modelli per l'audit, la genera?
+lockfile-trust	ho clonato un repo con un lmget.lock, è pericoloso fare sync?
+lockfile-trust	un lockfile scritto da altri può farmi danni?
+sync	a cosa serve lmget sync
+sync	lmget sync --update cosa fa
+lockfile	lockfile?
+lockfile	come blocco le versioni dei modelli del progetto, tipo package-lock
+lockfile	lmget.lock
+ls	come vedo i modelli scaricati
+ls	elenco dei modelli che ho
+ls	lmget ls
+rm	come cancello un modello
+rm	liberare spazio
+rm	ho il disco pieno di modelli vecchi, come li tolgo
+doctor	lmget doctor
+doctor	controllare che non ci siano file corrotti nello store
+history	tiene una cronologia?
+history	cancellare la cronologia
+history	cosa c'è dentro history.jsonl
+url-hash	come gli passo lo sha256 atteso di un url
+oci	modelli ai/ di docker hub?
+oci	oci registry
+oci	posso scaricare da ghcr?
+direct-url	posso scaricare da un link qualsiasi
+direct-url	un gguf da un sito che non è huggingface
+hf-url	posso incollare il link di huggingface?
+hf-url	ho il link di un solo file .gguf su hugging face, posso scaricare solo quello?
+origins	abbiamo un server di cache in ufficio, lmget può scaricare da lì?
+origins	--origin a cosa serve
+lan-security	lmget serve espone i miei modelli su internet?
+lan-security	serve è sicuro sulla rete dell ufficio?
+lan-serve	condividere i modelli in lan
+lan-serve	ho due mac, posso passare i modelli dall'uno all'altro senza riscaricarli
+json	output json?
+json	--json
+scripts-output	usarlo in uno script bash
+scripts-output	come prendo il percorso del modello in uno script
+mcp	mcp
+mcp	funziona con claude code?
+mcp	cursor può usarlo come tool?
+library	c'è una libreria go?
+library	posso chiamarlo da codice go
+pickle	perché ha saltato i .bin
+pickle	non mi scarica pytorch_model.bin
+pickle	allow-pickle
+content-checks	controlla solo l'hash o anche dentro i file?
+content-checks	un safetensors malevolo lo becca?
+verify	come verifica i file
+verify	verifcare l'integrità dei download
+verify	controlla gli hash?
+memory-fit	ci sta nella mia ram?
+memory-fit	mi dice se un 32B entra nei miei 24 giga?
+info	posso vedere cosa scarica prima
+info	dry run
+info	lmget info
+include-exclude	scaricare solo la Q4_K_M
+include-exclude	non voglio tutte le quantizzazioni del repo, solo una
+include-exclude	--include
+revision	scaricare un commit preciso
+revision	voglio un branch specifico, non main
+dir-target	salvare in una cartella mia
+dir-target	--to dir
+hf-cache	transformers non trova il modello
+hf-cache	dov'è la cache di huggingface
+hf-cache	funziona con from_pretrained?
+store	dove salva i file
+store	cos'è ~/.lmget
+store	spostare lo store su un altro disco, LMGET_HOME
+targets	dove finiscono i modelli scaricati?
+targets	--to quali opzioni ha
+targets	dovè che mette i modelli
+disk-space	quanto spazio occupa
+disk-space	quanto disco serve
+disk-space	errore spazio insufficiente codice 7
+resume	il download si è interrotto a metà
+resume	se cade la connessione riparte da capo?
+resume	riprendere un download
+speed	va lento
+speed	si puo velocizzare il download
+speed	connessioni parallele
+proxy	proxy aziendale
+proxy	dietro proxy funziona?
+exit-codes	exit code 5 cosa vuol dire
+exit-codes	codici di uscita
+first-download	come scarico un modello
+first-download	come scaricre qwen 0.6b
+first-download	primo download, che comando uso
+first-download	downloadare un modello da huggingface
+who-made	chi l'hafatto?
+who-made	chi l'ha fatto?
+who-made	chi c'è dietro
+who-made	chi lo mantiene
+roadmap	roadmap
+roadmap	cosa avete in programma
+contribute	posso contribuire
+contribute	come faccio una pull request
+platforms	gira su linux arm?
+platforms	raspberry pi?
+platforms	freebsd?
+binary-size	quanto pesa il binario
+binary-size	è leggero?
+written-in	in che linguaggio è scritto
+written-in	serve python?
+written-in	è in go?
+needs-gpu	serve la gpu?
+needs-gpu	senza scheda video funziona?
+docs	documentazione
+docs	dov e il manuale
+docs	c'è una guida?
+signed-index	indice firmato?
+signed-index	cos'è index.json su lmget.org
+index-keys	che chiave pubblica minisign usate per l'indice
+nodes	cosa sono i nodi
+nodes	node1.lmget.org cos'è
+run-a-node	posso farmi il mio indice
+run-a-node	voglio ospitare un nodo
+revocations	se un modello è malevolo lo bloccate?
+revocations	revoca
+st-hello	ciao
+st-hello	buongiorno
+st-hello	salve
+st-hello	ehi
+st-hello	buonasera
+st-how-are-you	come stai
+st-how-are-you	come va?
+st-thanks	grazie
+st-thanks	grazie mille
+st-thanks	thx
+st-bye	buonanotte
+st-bye	arrivederci
+st-bye	a presto
+st-ok	ok
+st-ok	capito
+st-yes	si
+st-yes	certo
+st-no	no
+st-sorry	scusa
+st-sorry	scusami ho sbagliato
+st-laugh	ahahah
+st-laugh	lol
+st-wow	wow
+st-wow	interessante
+st-compliment	sei bravissimo
+st-compliment	bel sito
+st-love	ti amo
+st-love	sposami
+st-frustrated	non mi hai aiutato
+st-frustrated	risposta sbagliata
+st-frustrated	non capisci niente
+st-insult	sei stupido
+st-insult	fai schifo
+st-insult	idiota
+st-who	chi sei?
+st-who	cosa sei
+st-name	come ti chiami
+st-are-you-ai	sei un bot?
+st-are-you-ai	sei una persona vera?
+st-human	voglio parlare con un umano
+st-human	c'è un operatore?
+st-which-model	che modello sei
+st-which-model	che llm usi dietro
+st-chatgpt	sei chatgpt?
+st-chatgpt	sei gpt
+st-claude	sei claude?
+st-other-llm	sei llama?
+st-other-llm	sei gemini
+st-speed	quanti token al secondo fai
+st-how-work	come funzioni?
+st-how-work	come scegli le risposte
+st-invent	puoi inventare cose?
+st-invent	ti inventi le risposte?
+st-sure	sei sicuro?
+st-sure	davvero?
+st-sure	fonte?
+st-what-can-you-do	cosa posso chiederti
+st-what-can-you-do	cosa sai fare
+st-help	aiuto
+st-help	help
+st-start	da dove comincio
+st-start	da dove parto
+st-who-made-you	chi ha fatto questa chat?
+st-who-made-you	chi ti ha programmato
+st-memory	ti ricordi di me?
+st-privacy-chat	salvi quello che scrivo?
+st-privacy-chat	registrate le conversazioni?
+st-learn	impari da me?
+st-internet	puoi cercare su internet?
+st-internet	sei collegato a internet
+st-joke	raccontami una barzelletta
+st-test	prova
+st-test	test
+st-empty	?
+st-empty	...
+st-empty	!!
+st-lang-en	parla inglese
+st-lang-en	speak english
+st-lang-en	can you answer in english please
+st-lang-it	rispondi in italiano
+st-lang-other	parli francese?
+st-lang-other	hablas español?
+fallback	che tempo fa a genova domani
+fallback	ricetta della carbonara
+fallback	quanto fa 17 per 23
+fallback	chi ha vinto lo scudetto
+fallback	come centro un div in css
+fallback	scrivimi una funzione python che ordina una lista
+fallback	traducimi questa frase in tedesco
+fallback	qual è la capitale dell'australia
+fallback	consigliami un film per stasera
+fallback	come si fa il pesto
+fallback	quanto costa un iphone 16
+fallback	chi è il presidente della repubblica
+fallback	come faccio una regex per le email
+fallback	come esco da vim
+fallback	mi scrivi una mail per il mio capo
+fallback	come si fa una tabella pivot in excel
+fallback	risolvi x^2 - 4 = 0
+fallback	che ore sono
+fallback	oroscopo vergine
+fallback	come si dice gatto in giapponese
+fallback	mi aiuti con la versione di latino
+fallback	quanto dista milano da roma
+fallback	come configuro nginx come reverse proxy
+fallback	differenza tra let e const in javascript
+fallback	come installo docker su ubuntu
+fallback	bitcoin conviene comprarlo adesso?
+fallback	dove si mangia bene a genova
+fallback	come faccio il backup dell iphone
+fallback	come faccio il fine-tuning di llama
+fallback	qual è la quantizzazione migliore per programmare
+fallback	come installo ollama
+fallback	che gpu compro per un 70B
+fallback	è meglio qwen o llama
+fallback	come uso vllm su kubernetes
+fallback	scrivimi uno script python per scaricare da huggingface
+fallback	quanto costa l'abbonamento pro di hugging face
+fallback	chi ha fondato hugging face
+fallback	come creo un account su hugging face
+fallback	come carico un mio modello su hugging face
+fallback	come converto un modello safetensors in gguf
+fallback	cosa vuol dire Q4_K_M esattamente
+fallback	qual è il miglior modello per l'italiano
+fallback	come faccio partire ollama all'avvio del mac
+fallback	lm studio non vede la mia gpu
+fallback	quanti token al secondo fa qwen3 8b su un m4
+fallback	come si scrive un modelfile di ollama
+fallback	come uso transformers per generare testo
+fallback	cos'è un llm
+fallback	come funziona il rag
+fallback	ollama non parte su windows
+fallback	quanto consuma in watt un modello 7b
+fallback	come faccio il merge di due lora
+fallback	come aggiorno ollama all'ultima versione
+fallback	dove scarico i pesi di gpt-4
+fallback	è meglio mlx o llama.cpp sul mac
+fallback	come uso le api di openai in python
+fallback	docker compose per open webui
+fallback	quale modello mi consigli per scrivere codice
+fallback	come addestro un modello da zero
+fallback	come si usa pytorch su mac con mps
+fallback	quanta vram serve per far girare stable diffusion
+fallback	llama.cpp mi da segmentation fault quando carico il modello
+what-is	cose lmget
+what-is	ma lmget cosa fa esattamente?
+install	come si installa
+install	instalare
+install	installalo su ubuntu come
+install	link per scaricarlo
+install-windows	si puo usare su windows
+install-windows	installare su windwos
+ollama	lo posso usare con olama?
+ollama	va con ollama o no
+gated-token	non scarica i modelli gated, cosa sbaglio
+gated-token	come faccio il login su hugging face per i modelli gated
+gated-token	mi dice errore codice 4 token mancante
+is-it-safe	e sicuro usarlo?
+is-it-safe	ma e affidabile per la sicurezza
+hf-cache	transformers non lo trova, perche?
+hf-cache	dove li mette per huggingface transformers
+targets	dove li salva i modelli
+store	dov e lo store
+resume	si e bloccato il download a meta
+resume	se interrompo con ctrl c perdo tutto?
+lmget-license	e gratis
+lmget-license	che licenza ha
+who-made	chi la fatto lmget
+who-made	chi e l'autore
+platforms	funziona su mac intel?
+platforms	su che sistemi gira
+first-download	come si scarica un modello da hugging face?
+first-download	voglio scaricre phi-4, come faccio?
+rm	come cancello i modeli
+ls	vedere i modelli che ho gia scaricato
+why-not-hf-cli	perche dovrei usarlo al posto di huggingface cli
+phone-home	manda dati a casa?
+offline	funziona offline o deve sempre collegarsi
+speed	il download e lentissimo
+proxy	sono dietro un proxy in azienda e non scarica niente
+install-docker	ce un immagine docker?
+install-pip	installarlo con pip
+needs-gpu	serve una scheda grafica
+include-exclude	scaricare solo un file del repo con la quantizzazione che voglio
+disk-space	quanto spazio serve su disco per lmget
+verify	verifica gli hash dei file scaricati?
+update	come faccio a sapere che versione e
+uninstall	come si disinstalla
+docs	dove trovo la documentazione completa
+memory-fit	il modello ci sta nella memoria del mio mac?
+nicknames	lmget qwen che cosa fa
+works-with	funziona con jan, lm studio e company?
+st-hello	ciao!
+st-how-work	hey ciao come funziona qui
+st-thanks	grazie mille, gentilissimo
+st-insult	sei inutile
+st-compliment	complimenti per il progetto
+st-chatgpt	ma sei chat gpt
+st-which-model	che modello ce dietro a questa chat
+st-privacy-chat	quello che scrivo qui viene salvato da qualche parte?
+st-lang-en	english please
+fallback	che tempo fa oggi
+fallback	come faccio una torta di mele
+fallback	quanto fa la radice quadrata di 144
+fallback	chi ha vinto le elezioni americane
+fallback	come scrivo un ciclo for in rust
+fallback	come intallo ollama su linux

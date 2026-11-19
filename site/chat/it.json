@@ -1,0 +1,5702 @@
+{
+  "config": {
+    "lang": "it",
+    "botName": "lmget",
+    "welcome": "Ciao. Chiedimi di lmget: come si installa, come scarica e verifica un modello, dove lo mette. Nessun modello dietro questa chat: ogni risposta è scritta e controllata sul codice di lmget.",
+    "matchThreshold": 0.75,
+    "header": "lmget chat (it) · nessun modello: risposte scritte e verificate · /debug /reset /esci",
+    "suggestLabel": "Puoi chiedermi: ",
+    "resetDone": "conversazione dimenticata",
+    "exitCommands": [
+      "/esci",
+      "/exit"
+    ],
+    "codeAnswer": "Questa è una domanda sul codice sorgente di lmget, e questa chat risponde a domande sull'uso di lmget. Dove sta quel codice:\n\n- {refs}",
+    "closestLabel": "La domanda più vicina a cui so rispondere: **{q}**",
+    "framedExample": "Quali sottocomandi mette a disposizione la CLI per maintainer lmget-index?",
+    "siteLabel": "Chiedi di lmget",
+    "sitePlaceholder": "Fai una domanda su lmget",
+    "siteAsk": "Chiedi",
+    "siteNote": "Nessun modello dietro questa chat: ogni risposta è scritta prima e controllata sul codice di lmget.",
+    "siteOther": "en",
+    "siteOtherLabel": "In English",
+    "siteError": "Non è stato possibile caricare le risposte. La documentazione: https://github.com/fabriziosalmi/lmget#readme",
+    "siteYou": "Hai chiesto"
+  },
+  "entries": [
+    {
+      "id": "license-policy",
+      "question": "Posso ammettere solo alcune licenze dei modelli?",
+      "source": "README.md#license-policy",
+      "keywords": [
+        "politica delle licenze",
+        "policy delle licenze",
+        "licenze ammesse",
+        "licenze consentite",
+        "lmget licenses",
+        "policy",
+        "politica",
+        "allowlist",
+        "solo apache",
+        "solo mit",
+        "licenza del modello",
+        "conformita",
+        "apache o mit",
+        "mit",
+        "bloccare i modelli",
+        "non commerciale",
+        "rifiutare i modelli",
+        "ammettere solo",
+        "solo modelli con licenza",
+        "licenza apache nel progetto"
+      ],
+      "answers": [
+        "Sì, nel lockfile:\n\n```toml\n[policy]\nlicenses = [\"apache-2.0\", \"mit\", \"none\"]\n```\n\noppure per una macchina, un job di CI o un agente: `LMGET_LICENSES=\"apache-2.0 mit\"`. I nomi sono i tag di licenza della fonte; `none` è un modello che non ne dichiara. Quando ci sono tutte e due, un modello deve passarle entrambe. `get`, `sync`, `info` e il server MCP rifiutano prima di scaricare un modello che la politica non ammette (codice di uscita 5). `lmget info` mostra la licenza di un modello."
+      ],
+      "suggest": [
+        "license-change",
+        "lockfile",
+        "sbom"
+      ],
+      "tests": [
+        "posso ammettere solo alcune licenze dei modelli?",
+        "bloccare i modelli che non sono apache o mit",
+        "come funziona la politica delle licenze?",
+        "cos'è LMGET_LICENSES?",
+        "controllare la licenza di un modello",
+        "solo modelli con licenza apache nel progetto",
+        "ammettere solo modelli apache",
+        "politica delle licenze?",
+        "posso rifiutare i modelli con licenza non commerciale in ci",
+        "LMGET_LICENSES",
+        "limitare le licenze dei modelli del progetto",
+        "vorrei solo modelli mit o apache, lmget lo fa rispettare?",
+        "bloccare i modelli con licenza llama"
+      ]
+    },
+    {
+      "id": "what-is",
+      "question": "Cos'è lmget?",
+      "source": "README.md (intro)",
+      "keywords": [
+        "spiegami lmget",
+        "panoramica",
+        "zwhatz lmget",
+        "wget per i modelli"
+      ],
+      "answers": [
+        "lmget scarica modelli aperti dalla loro fonte (Hugging Face, il registro di Ollama, i registri OCI, URL https) e controlla ogni file contro l'hash che la fonte pubblica prima di tenerlo. Poi collega il modello dove i tuoi strumenti lo cercano: la cache di Hugging Face, Ollama, LM Studio, oMLX e altre app.\n\n```sh\nlmget Qwen/Qwen3-0.6B\n```\n\nUn file che non corrisponde non viene mai salvato. lmget non esegue nessun modello."
+      ],
+      "suggest": [
+        "install",
+        "first-download",
+        "verify"
+      ],
+      "tests": [
+        "cos'è lmget?",
+        "a cosa serve lmget",
+        "che cosa fa questo strumento",
+        "in breve, lmget cosa fa?",
+        "che roba è lmget",
+        "ma che cos'è questo lmget",
+        "cosa è lmget?",
+        "cos'è?",
+        "che cos'è lmget",
+        "a cosa serve?",
+        "a che serve sto programma",
+        "cosa fa lmget",
+        "che cosa fa di preciso",
+        "Salve, mi spiegate in breve cos'è lmget?",
+        "ma lmget che roba è"
+      ]
+    },
+    {
+      "id": "why-not-hf-cli",
+      "question": "Perché non usare semplicemente huggingface-cli?",
+      "source": "README.md#usage, README.md#when-hugging-face-fails",
+      "keywords": [
+        "huggingface cli",
+        "hf cli",
+        "hf download",
+        "snapshot download",
+        "huggingface hub",
+        "invece di huggingface",
+        "perche cambiare",
+        "sostituisce",
+        "sostituire",
+        "rimpiazza",
+        "aggiunge rispetto"
+      ],
+      "answers": [
+        "Puoi continuare a usarlo: lmget riempie la stessa cache di Hugging Face, quindi transformers e gli altri strumenti trovano i file dove se li aspettano. Cosa aggiunge lmget:\n\n- prima il piano: commit, file, dimensioni, hash, licenza\n- ogni file controllato contro l'hash pubblicato, e la sua intestazione controllata come la legge il suo caricatore\n- i pesi pickle saltati quando ci sono i safetensors\n- ModelScope e i nodi del progetto quando Hugging Face non risponde\n- un lockfile, e una copia sola sul disco collegata in Ollama, LM Studio e altre app"
+      ],
+      "suggest": [
+        "verify",
+        "lockfile",
+        "targets"
+      ],
+      "tests": [
+        "perché non usare semplicemente huggingface-cli?",
+        "che differenza c'è con hf download",
+        "in cosa è meglio di snapshot_download di huggingface_hub",
+        "uso già la hf cli, perché cambiare",
+        "lmget sostituisce huggingface-cli?",
+        "hf cli o lmget?",
+        "perché non huggingface_hub",
+        "differenza con huggingface-cli download",
+        "cosa aggiunge rispetto a hf download",
+        "uso già hf download",
+        "è meglio di huggingface cli?",
+        "perché dovrei lasciare huggingface-cli"
+      ]
+    },
+    {
+      "id": "why-not-git",
+      "question": "Perché non git clone con Git LFS?",
+      "source": "README.md#usage",
+      "keywords": [
+        "git lfs",
+        "git clone",
+        "clonare il repo",
+        "clonare",
+        "clono",
+        "clone",
+        "git",
+        "clono con git"
+      ],
+      "answers": [
+        "lmget scarica solo i file che scegli, con richieste parallele che riprendono dopo un'interruzione, controlla ognuno contro il suo hash pubblicato e lo conserva una volta sola per sha256, collegato dove lo cercano i tuoi strumenti:\n\n```sh\nlmget unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\n```\n\nI pesi pickle vengono saltati quando ci sono i safetensors, e il piano viene mostrato prima di scaricare un solo byte."
+      ],
+      "suggest": [
+        "include-exclude",
+        "verify",
+        "store"
+      ],
+      "tests": [
+        "perché non git clone con git lfs?",
+        "non posso semplicemente clonare il repo?",
+        "e git lfs?",
+        "è meglio che clonare un repo di hugging face con git?",
+        "git lfs?",
+        "perché non git lfs",
+        "clonare il repo del modello non va bene?",
+        "io clono con git e funziona",
+        "lmget contro git clone",
+        "non basta git?"
+      ]
+    },
+    {
+      "id": "why-not-ollama-pull",
+      "question": "Perché non usare semplicemente ollama pull?",
+      "source": "README.md#ollama",
+      "keywords": [
+        "ollama pull",
+        "invece di ollama",
+        "rispetto a ollama",
+        "ollama gia",
+        "ollama scarica gia",
+        "perche lmget",
+        "meglio di ollama"
+      ],
+      "answers": [
+        "Per i modelli di Ollama lmget legge lo stesso registro e scrive nella cartella dei modelli di Ollama, quindi `ollama run` trova il modello. Cosa aggiunge: prima il piano, ogni layer controllato contro lo sha256 del manifest, un lockfile che fissa il manifest, e i repository GGUF di Hugging Face con il loro nome `hf.co/...`.\n\n```sh\nlmget ollama:qwen3:0.6b\n```"
+      ],
+      "suggest": [
+        "ollama",
+        "gguf-hf-ollama",
+        "lockfile"
+      ],
+      "tests": [
+        "perché non usare semplicemente ollama pull?",
+        "cosa aggiunge lmget rispetto a ollama pull",
+        "ollama scarica già i modelli, perché lmget?",
+        "lmget è meglio di ollama pull?",
+        "ollama pull o lmget?",
+        "perché usarlo se c'è ollama pull",
+        "è meglio di ollama pull?",
+        "a che serve se ho già ollama pull",
+        "perché non ollama pull",
+        "invece di ollama pull perché lmget"
+      ]
+    },
+    {
+      "id": "is-it-safe",
+      "question": "lmget è sicuro?",
+      "source": "README.md#usage, README.md#content-checks, SECURITY.md",
+      "keywords": [
+        "sicuro",
+        "sicura",
+        "sicurezza",
+        "fidarmi",
+        "fidarsi",
+        "pericoloso",
+        "malware",
+        "virus",
+        "attacco",
+        "attaccare",
+        "dannoso",
+        "contenere malware",
+        "bucarmi",
+        "bucare",
+        "hackerare",
+        "e pericoloso",
+        "pericoloso scaricare",
+        "fidare",
+        "posso fidare",
+        "installa un virus",
+        "attaccare tramite",
+        "modello attaccare",
+        "bucarmi il computer"
+      ],
+      "answers": [
+        "lmget tratta ogni fonte come non fidata:\n\n- ogni file è controllato contro l'hash che la fonte pubblica; se non corrisponde viene scartato (codice di uscita 5)\n- le intestazioni di `.safetensors` e `.gguf` sono controllate come le leggono i loro caricatori\n- il contenuto pickle che esegue codice è rifiutato, se il file non ha un nome da pickle\n- i percorsi che escono dalla cartella del modello o passano per `.git` sono rifiutati\n- un `lmget.lock` clonato è trattato come input non fidato\n\nlmget non esegue nessun modello. Le segnalazioni di sicurezza vanno in un advisory privato, vedi SECURITY.md."
+      ],
+      "suggest": [
+        "verify",
+        "content-checks",
+        "report-bug"
+      ],
+      "tests": [
+        "lmget è sicuro?",
+        "è sicuro da usare?",
+        "un modello mi può attaccare tramite lmget?",
+        "come mi protegge dal malware?",
+        "posso fidarmi?",
+        "un modello scaricato può contenere malware?",
+        "è sicuro?",
+        "e sicuro",
+        "sicurezza?",
+        "posso fidarmi di lmget",
+        "è un malware?",
+        "un file di modello può bucarmi il computer?",
+        "quanto è sicuro?",
+        "è pericoloso scaricare modelli?",
+        "affidabile per la sicurezza?"
+      ]
+    },
+    {
+      "id": "phone-home",
+      "question": "lmget manda dati a casa o raccoglie telemetria?",
+      "source": "README.md#history, README.md#signed-index-and-nodes, README.md#nicknames, lmget.go, nodes.go",
+      "keywords": [
+        "telemetria",
+        "tracciamento",
+        "traccia",
+        "tracciare",
+        "analytics",
+        "privacy",
+        "dati personali",
+        "spia",
+        "spiare",
+        "raccoglie dati",
+        "raccoglie",
+        "manda dati",
+        "invia dati",
+        "manda qualcosa",
+        "invia qualcosa",
+        "chiama casa",
+        "comunica cosa",
+        "manda i miei dati"
+      ],
+      "answers": [
+        "Nessuna telemetria. lmget parla con la fonte del modello che hai chiesto. Contatta lmget.org e i suoi nodi solo per l'indice firmato e la lista dei soprannomi: con `lmget index`, quando un soprannome ha una lista più vecchia di un giorno, e quando una fonte non risponde e non c'è un indice valido nello store.\n\nLa tua cronologia resta in `~/.lmget/history.jsonl` e non va da nessuna parte; `LMGET_HISTORY=off` la spegne. La ricerca in rete locale è spenta se non imposti `LMGET_LAN=on`."
+      ],
+      "suggest": [
+        "history",
+        "signed-index",
+        "offline"
+      ],
+      "tests": [
+        "lmget manda dati a casa?",
+        "c'è telemetria?",
+        "raccoglie dati su di me?",
+        "traccia quello che scarico?",
+        "e la privacy?",
+        "lmget invia dati da qualche parte?",
+        "telemetria",
+        "mi spia?",
+        "c'è tracciamento?",
+        "lmget manda i miei dati da qualche parte?",
+        "privacy?",
+        "comunica cosa scarico?",
+        "analytics?"
+      ]
+    },
+    {
+      "id": "offline",
+      "question": "lmget funziona offline?",
+      "source": "README.md#lockfile, README.md#bill-of-materials, get.go",
+      "keywords": [
+        "offline",
+        "senza internet",
+        "senza rete",
+        "senza connessione",
+        "air gapped",
+        "airgapped",
+        "isolata",
+        "disconnesso",
+        "internet",
+        "aereo",
+        "in aereo",
+        "connessione",
+        "non ho connessione",
+        "online",
+        "ambiente isolato",
+        "non ho internet",
+        "sempre online",
+        "essere online"
+      ],
+      "answers": [
+        "In parte. `lmget <model>` risolve la revisione alla fonte, quindi serve la rete (oppure, quando la fonte non risponde, l'indice firmato per un modello indicizzato).\n\n`lmget sync` riproduce `lmget.lock` senza rete per un modello i cui file del lock sono già stati verificati da un pull precedente su questa macchina e sono ancora nello store. Riempie `refs/main` della cache di Hugging Face se è vuoto, così il caricamento offline trova lo snapshot."
+      ],
+      "suggest": [
+        "sync",
+        "lockfile",
+        "hf-down"
+      ],
+      "tests": [
+        "lmget funziona offline?",
+        "posso usarlo senza internet?",
+        "macchina air-gapped",
+        "e se non ho connessione?",
+        "sync ha bisogno di internet?",
+        "posso usare lmget in aereo?",
+        "offline?",
+        "senza rete",
+        "funziona senza connessione?",
+        "posso usare lmget in un ambiente isolato",
+        "in ufficio non ho internet, funziona lo stesso?",
+        "deve essere sempre online?"
+      ]
+    },
+    {
+      "id": "status",
+      "question": "lmget è stabile? Posso usarlo in produzione?",
+      "source": "README.md (status), SECURITY.md, README.md#apps",
+      "keywords": [
+        "stabile",
+        "stabilita",
+        "produzione",
+        "maturo",
+        "maturita",
+        "beta",
+        "sviluppo iniziale",
+        "affidabile",
+        "pronto per la produzione",
+        "affidarsi",
+        "affidare",
+        "ci si puo affidare"
+      ],
+      "answers": [
+        "lmget è in sviluppo iniziale (0.x). Solo l'ultima release riceve le correzioni di sicurezza, quindi tienilo aggiornato. La CI esegue tutta la suite di test, anche su Windows Server 2025.\n\nAlcune parti sono controllate solo contro server simulati o documentazione: per esempio le cartelle di LM Studio, Jan, LocalAI, exo, colibri e ComfyUI non sono ancora state provate con le app in esecuzione."
+      ],
+      "suggest": [
+        "update",
+        "install-ci",
+        "report-bug"
+      ],
+      "tests": [
+        "lmget è stabile?",
+        "posso usarlo in produzione?",
+        "è pronto per la produzione?",
+        "quanto è maturo?",
+        "è ancora in beta?",
+        "è stabile?",
+        "in produzione?",
+        "è pronto per la produzione",
+        "è in beta?",
+        "quanto è stabile lmget",
+        "la mia azienda ci si può affidare?",
+        "è maturo?"
+      ]
+    },
+    {
+      "id": "lmget-license",
+      "question": "Con che licenza è distribuito lmget? È gratis?",
+      "source": "README.md#license",
+      "keywords": [
+        "open source",
+        "opensource",
+        "apache",
+        "apache 2",
+        "gratis",
+        "gratuito",
+        "gratuita",
+        "licenza di lmget",
+        "codice sorgente",
+        "sorgenti",
+        "costo lmget",
+        "che licenza ha",
+        "paga",
+        "licenza",
+        "software libero",
+        "per lavoro",
+        "uso commerciale",
+        "commerciale",
+        "devo pagare"
+      ],
+      "answers": [
+        "lmget è open source con licenza Apache-2.0, gratuito.\n\nCodice, issue e release: https://github.com/fabriziosalmi/lmget"
+      ],
+      "suggest": [
+        "who-made",
+        "install",
+        "report-bug"
+      ],
+      "tests": [
+        "con che licenza è distribuito lmget?",
+        "lmget è open source?",
+        "è gratis?",
+        "quanto costa?",
+        "dov'è il codice sorgente?",
+        "licenza",
+        "licenza?",
+        "e gratis",
+        "è open source",
+        "è open ?",
+        "apache?",
+        "costa qualcosa?",
+        "devo pagare?",
+        "lmget è software libero?",
+        "posso usarlo per lavoro?"
+      ]
+    },
+    {
+      "id": "who-made",
+      "question": "Chi ha fatto lmget?",
+      "source": "go.mod (module github.com/fabriziosalmi/lmget), README.md, LICENSE",
+      "keywords": [
+        "zwhoz",
+        "zwhoz lmget",
+        "autore",
+        "autori",
+        "sviluppatore",
+        "sviluppatori",
+        "creatore",
+        "manutentore",
+        "maintainer",
+        "dietro lmget",
+        "dietro al progetto",
+        "azienda dietro",
+        "una persona sola"
+      ],
+      "answers": [
+        "lmget è sviluppato apertamente su GitHub, sotto l'account fabriziosalmi: https://github.com/fabriziosalmi/lmget\n\nÈ open source con licenza Apache-2.0; i commit lì mostrano chi ha scritto cosa."
+      ],
+      "suggest": [
+        "lmget-license",
+        "contribute",
+        "status"
+      ],
+      "tests": [
+        "chi ha fatto lmget?",
+        "chi l'ha fatto?",
+        "chi l'hafatto?",
+        "chi lo ha creato",
+        "chi c'è dietro lmget",
+        "chi lo mantiene",
+        "chi è l'autore",
+        "chi lo sviluppa",
+        "c'è un'azienda dietro lmget?",
+        "chi l ha scritto",
+        "autore?",
+        "chi la fatto"
+      ]
+    },
+    {
+      "id": "report-bug",
+      "question": "Come segnalo un bug?",
+      "source": "SECURITY.md, README.md",
+      "keywords": [
+        "bug",
+        "segnalare",
+        "segnalo",
+        "segnalazione",
+        "richiesta",
+        "funzionalita",
+        "feedback",
+        "contatto",
+        "issue",
+        "crash",
+        "in crash",
+        "a chi lo dico",
+        "proporre una funzionalita",
+        "propongo",
+        "suggerimento",
+        "issues",
+        "issue su github",
+        "segnalare un problema"
+      ],
+      "answers": [
+        "Apri una issue su https://github.com/fabriziosalmi/lmget/issues, con `lmget --version`, il sistema operativo e il comando.\n\nUn problema di sicurezza è diverso: mai in una issue pubblica. Chiedimi come segnalare una vulnerabilità."
+      ],
+      "suggest": [
+        "security-report",
+        "contribute"
+      ],
+      "tests": [
+        "come segnalo un bug?",
+        "dove mando un feedback?",
+        "posso chiedere una nuova funzionalità?",
+        "bug",
+        "ho trovato un bug",
+        "dove segnalo i bug",
+        "è andato in crash, a chi lo dico?",
+        "segnalare un problema",
+        "richiesta di funzionalità",
+        "dove propongo una funzionalità",
+        "issue su github?"
+      ]
+    },
+    {
+      "id": "security-report",
+      "question": "Come segnalo una vulnerabilità di sicurezza?",
+      "source": "SECURITY.md",
+      "keywords": [
+        "vulnerabilita",
+        "vulnerabilità",
+        "problema di sicurezza",
+        "bug di sicurezza",
+        "falla",
+        "falla di sicurezza",
+        "buco di sicurezza",
+        "exploit",
+        "cve",
+        "divulgazione responsabile",
+        "advisory",
+        "advisory di sicurezza",
+        "politica di sicurezza",
+        "security md",
+        "in privato",
+        "segnalazione privata",
+        "bug bounty",
+        "di sicurezza",
+        "in modo privato"
+      ],
+      "answers": [
+        "Mai in una issue o in una pull request pubblica. Apri un advisory di sicurezza privato: https://github.com/fabriziosalmi/lmget/security/advisories/new\n\nIndica `lmget --version`, il sistema operativo, il comando e la riproduzione più piccola che hai. SECURITY.md promette una conferma entro 7 giorni, una correzione con un test di regressione, poi una release e l'advisory, con il merito a te, salvo tu preferisca altrimenti. Solo l'ultima release riceve correzioni di sicurezza: aggiorna prima di segnalare."
+      ],
+      "suggest": [
+        "is-it-safe",
+        "report-bug"
+      ],
+      "tests": [
+        "come segnalo una vulnerabilità di sicurezza?",
+        "ho trovato una vulnerabilità",
+        "problema di sicurezza",
+        "dove segnalo un bug di sicurezza",
+        "c'è una politica di sicurezza?",
+        "divulgazione responsabile",
+        "ho trovato un exploit in lmget",
+        "come segnalo una falla in modo privato",
+        "advisory di sicurezza",
+        "avete un bug bounty?",
+        "cve?"
+      ]
+    },
+    {
+      "id": "contribute",
+      "question": "Come posso contribuire a lmget?",
+      "source": "README.md, SECURITY.md, Makefile",
+      "keywords": [
+        "contribuire",
+        "contribuisco",
+        "contributo",
+        "contributi",
+        "contributore",
+        "pull request",
+        "pr",
+        "mandare una patch",
+        "patch",
+        "aiutare a sviluppare",
+        "aiutare il progetto",
+        "dare una mano",
+        "fork",
+        "contributing",
+        "aiuto a sviluppare",
+        "sviluppare lmget"
+      ],
+      "answers": [
+        "Il codice, le issue e le pull request sono su GitHub: https://github.com/fabriziosalmi/lmget. Il repository non ha una guida per chi contribuisce. `make ci` esegue vet, i test con il race detector, la build, lint e un test smoke dal vivo; il Makefile dice che deve passare prima di ogni tag.\n\nUn problema di sicurezza non va mai in una issue o in una pull request pubblica: va in un advisory privato."
+      ],
+      "suggest": [
+        "report-bug",
+        "security-report",
+        "install-source"
+      ],
+      "tests": [
+        "come posso contribuire a lmget?",
+        "posso contribuire",
+        "accettate pull request?",
+        "come mando una patch",
+        "voglio dare una mano al progetto",
+        "c'è una guida per contribuire?",
+        "posso aprire una pr?",
+        "come contribuisco con del codice",
+        "pull request?",
+        "come aiuto a sviluppare lmget",
+        "dove mando una pull request"
+      ]
+    },
+    {
+      "id": "roadmap",
+      "question": "C'è una roadmap?",
+      "source": "README.md (nessuna roadmap pubblicata)",
+      "keywords": [
+        "roadmap",
+        "piani",
+        "in programma",
+        "previsto",
+        "prossimamente",
+        "prossima release",
+        "prossima versione",
+        "futuro",
+        "in arrivo",
+        "aggiungerete",
+        "supporterete",
+        "novita",
+        "cosa arriva",
+        "lista delle cose da fare",
+        "aggiungerete altre app",
+        "funzionalita previste",
+        "previste"
+      ],
+      "answers": [
+        "Nel repository non è pubblicata una roadmap, quindi non posso dirti cosa arriverà. Cosa fa lmget oggi è nel README; cosa è cambiato è nei commit e nelle release: https://github.com/fabriziosalmi/lmget/releases\n\nPer chiedere qualcosa, apri una issue."
+      ],
+      "suggest": [
+        "report-bug",
+        "status"
+      ],
+      "tests": [
+        "c'è una roadmap?",
+        "roadmap",
+        "cosa è previsto",
+        "cosa arriva nella prossima release",
+        "aggiungerete altre app?",
+        "piani per il futuro?",
+        "novità in arrivo",
+        "cosa avete in mente per le prossime versioni",
+        "quali funzionalità sono previste",
+        "ci sono piani per il futuro?"
+      ]
+    },
+    {
+      "id": "datasets",
+      "question": "lmget scarica dataset o Spaces?",
+      "source": "ref.go (parseHFURL)",
+      "keywords": [
+        "dataset",
+        "spaces",
+        "space di hugging face",
+        "hf space",
+        "un dataset"
+      ],
+      "answers": [
+        "No: i dataset e gli Spaces di Hugging Face sono fuori dal suo scopo, lmget scarica modelli. Un URL `huggingface.co/datasets/...` o `/spaces/...` si ferma con codice di uscita 2."
+      ],
+      "suggest": [
+        "sources",
+        "first-download"
+      ],
+      "tests": [
+        "lmget scarica dataset?",
+        "supporta gli spaces di hugging face?",
+        "scaricare un dataset da huggingface",
+        "e i dataset?",
+        "dataset?",
+        "scaricare un dataset",
+        "prende i dataset di hf?",
+        "supporta gli spaces?",
+        "dataset di hugging face",
+        "lmget può scaricare un dataset da hugging face?",
+        "spaces?"
+      ]
+    },
+    {
+      "id": "models-available",
+      "source": "README.md#usage, README.md#nicknames, cmd/lmget index",
+      "question": "Quali modelli posso scaricare?",
+      "keywords": [
+        "quali modelli",
+        "che modelli",
+        "modelli disponibili",
+        "modelli ci sono",
+        "catalogo",
+        "lista modelli",
+        "modelli posso scaricare",
+        "qualsiasi modello"
+      ],
+      "answers": [
+        "Qualsiasi modello aperto: da Hugging Face (con ModelScope come seconda origine), dal registro di Ollama, da un registro OCI o da un URL https. lmget non ha un catalogo suo: prende il modello dalla fonte e lo verifica.\n\nPer partire con un nome corto ci sono i soprannomi: `qwen`, `gemma`, `smollm`, `granite`, `olmo`, `gpt-oss`, `whisper`, `embed`, `rerank`, `siglip`.\n\nI modelli che il progetto copia sui suoi nodi, che scarichi anche quando Hugging Face non risponde, li elenca:\n\n```sh\nlmget index\n```",
+        "Detto in un altro modo: il modello lo scegli tu, lmget lo scarica e lo verifica. Per esempio:\n\n```sh\nlmget Qwen/Qwen3-0.6B\nlmget ollama:qwen3:0.6b\nlmget qwen\n```\n\nPer vedere cosa ti proporrebbe un soprannome su questa macchina, senza scaricare i pesi: `lmget info qwen`. Per i modelli copiati sui nodi del progetto: `lmget index`."
+      ],
+      "suggest": [
+        "nickname-list",
+        "sources",
+        "nicknames"
+      ],
+      "tests": [
+        "che modelli ci sono?",
+        "quali modelli?",
+        "quali modelli posso scaricare",
+        "c'è un catalogo di modelli?",
+        "che modelli posso scaricare con lmget",
+        "che modelli può scaricare?",
+        "che modelli ci sono ?",
+        "quali modelli",
+        "che modelli posso prendere",
+        "lista dei modelli?",
+        "posso scaricare qualsiasi modello?",
+        "c'è un catalogo?",
+        "che modelli supporta",
+        "quali modelli sono supportati"
+      ]
+    },
+    {
+      "id": "sources",
+      "question": "Da quali fonti scarica lmget?",
+      "source": "README.md (intro), README.md#usage",
+      "keywords": [
+        "fonti",
+        "fonte",
+        "supportate",
+        "tipi di modelli",
+        "registri",
+        "funziona solo",
+        "scarica da dove",
+        "da dove scarica",
+        "da quali siti",
+        "solo huggingface",
+        "anche altro",
+        "quali registri",
+        "prende i modelli",
+        "quali fonti",
+        "fonti scarica"
+      ],
+      "answers": [
+        "In questa versione:\n\n- i repository di Hugging Face (`Org/Name` o il loro URL), con ModelScope come seconda origine\n- il registro di Ollama (`ollama:name:tag`)\n- i repository GGUF di Hugging Face, per Ollama (`hf.co/org/name:quant`)\n- i registri OCI (`oci://docker.io/ai/smollm2`, ghcr.io, ...)\n- qualsiasi URL https\n- i soprannomi come `qwen`"
+      ],
+      "suggest": [
+        "first-download",
+        "ollama",
+        "oci"
+      ],
+      "tests": [
+        "da quali fonti scarica lmget?",
+        "da dove scarica?",
+        "funziona solo con hugging face?",
+        "quali registri supporta?",
+        "fonti?",
+        "da dove scarica",
+        "solo huggingface?",
+        "quali registri",
+        "che fonti supporta",
+        "solo hugging face o anche altro"
+      ]
+    },
+    {
+      "id": "install-windows",
+      "question": "Come installo lmget su Windows?",
+      "source": "README.md#install",
+      "keywords": [
+        "windows",
+        "powershell",
+        "scoop",
+        "win11",
+        "win10",
+        "lmget exe",
+        "exe",
+        "installare windows",
+        "installo windows",
+        "win",
+        "installare su windows",
+        "pc windows"
+      ],
+      "answers": [
+        "In PowerShell (amd64 e arm64):\n\n```powershell\nirm https://lmget.org/install.ps1 | iex\n```\n\nInstalla `lmget.exe` in `%LOCALAPPDATA%\\Programs\\lmget` e ti dice come aggiungerlo al PATH; il PATH non lo cambia da solo. Con Scoop:\n\n```powershell\nscoop bucket add lmget https://github.com/fabriziosalmi/lmget\nscoop install lmget\n```\n\nLa CI lo prova su Windows Server 2025, non ancora su un Windows desktop."
+      ],
+      "suggest": [
+        "windows-copies",
+        "install"
+      ],
+      "tests": [
+        "come installo lmget su windows?",
+        "funziona su windows 11?",
+        "c'è un pacchetto scoop?",
+        "installazione da powershell",
+        "posso usarlo sul mio pc windows?",
+        "windows?",
+        "windows",
+        "installare su windows",
+        "gira su windows?",
+        "powershell?",
+        "scoop?",
+        "come installo lmget su windows 10",
+        "c'è la versione per windows?",
+        "installazione su win11"
+      ]
+    },
+    {
+      "id": "windows-copies",
+      "question": "Su Windows lmget copia i file?",
+      "source": "README.md#install (Windows paragraph)",
+      "keywords": [
+        "modalita sviluppatore",
+        "developer mode",
+        "windows copia",
+        "windows copie",
+        "windows symlink",
+        "windows link",
+        "altro disco",
+        "altra unita",
+        "unita diversa",
+        "stessa unita",
+        "windows doppio",
+        "windows spazio",
+        "store su windows",
+        "windows e su d",
+        "windows occupa",
+        "windows copiati",
+        "modelli copiati",
+        "modalita sviluppatore windows"
+      ],
+      "answers": [
+        "Su Windows un modello viene collegato con un hard link dove viene esportato quando lo store e la destinazione sono sulla stessa unità, e copiato altrimenti, perché i symlink richiedono la modalità sviluppatore. lmget controlla lo spazio libero di quell'unità prima di copiare, e `lmget rm` rimuove anche le sue copie.\n\nPer evitare le copie, tieni lo store sull'unità delle tue cache con `LMGET_HOME`."
+      ],
+      "suggest": [
+        "store",
+        "install-windows"
+      ],
+      "tests": [
+        "su windows lmget copia i file?",
+        "serve la modalità sviluppatore su windows?",
+        "lo store è su C e la cache su un'altra unità",
+        "windows usa symlink o copie?",
+        "su windows occupa il doppio dello spazio?",
+        "su windows copia i file?",
+        "su windows occupa il doppio?",
+        "serve la modalità sviluppatore?",
+        "symlink su windows",
+        "su windows i modelli vengono copiati?",
+        "il mio store su windows è su D e la cache su C"
+      ]
+    },
+    {
+      "id": "install-pip",
+      "question": "Posso installare lmget con pip o uv?",
+      "source": "README.md#install",
+      "keywords": [
+        "pip",
+        "pipx",
+        "pypi",
+        "uv tool",
+        "uv",
+        "wheel",
+        "wheels",
+        "pip install",
+        "pipx install",
+        "pacchetto python",
+        "installare con uv",
+        "installarlo con pip",
+        "con pip"
+      ],
+      "answers": [
+        "Sì, da PyPI. Le wheel contengono il binario della release così com'è, nessun codice Python, per macOS, Linux (glibc e musl) e Windows, amd64 e arm64:\n\n```sh\nuv tool install lmget\n```\n\noppure `pipx install lmget`, o `pip install lmget`."
+      ],
+      "suggest": [
+        "install",
+        "update"
+      ],
+      "tests": [
+        "posso installare lmget con pip?",
+        "è su pypi?",
+        "uv tool install",
+        "pipx install lmget",
+        "c'è una wheel python?",
+        "pip?",
+        "pip install",
+        "uv?",
+        "pypi?",
+        "installare con uv",
+        "lmget è un pacchetto python?",
+        "pipx?"
+      ]
+    },
+    {
+      "id": "install-docker",
+      "question": "C'è un'immagine Docker di lmget?",
+      "source": "README.md#install",
+      "keywords": [
+        "docker",
+        "immagine docker",
+        "container",
+        "contenitore",
+        "in docker",
+        "podman",
+        "kubernetes",
+        "distroless",
+        "lmget container",
+        "container store",
+        "docker run"
+      ],
+      "answers": [
+        "Sì: `ghcr.io/fabriziosalmi/lmget`, per linux/amd64 e linux/arm64, il binario della release su una base distroless (niente shell, un utente non root). Lo store è `/home/nonroot/.lmget`: monta lì un volume per conservarlo.\n\n```sh\ndocker run --rm -v lmget:/home/nonroot/.lmget ghcr.io/fabriziosalmi/lmget info Qwen/Qwen3-0.6B\n```"
+      ],
+      "suggest": [
+        "install",
+        "install-ci"
+      ],
+      "tests": [
+        "c'è un'immagine docker?",
+        "posso usare lmget in un container?",
+        "lmget dentro docker",
+        "funziona con podman?",
+        "dov'è lo store nel container?",
+        "docker?",
+        "immagine docker",
+        "c'è un container?",
+        "posso eseguirlo in un container",
+        "podman?",
+        "docker run lmget",
+        "c'è un container docker?"
+      ]
+    },
+    {
+      "id": "install-ci",
+      "question": "Posso usare lmget in GitHub Actions o in CI?",
+      "source": "README.md#install, setup/action.yml",
+      "keywords": [
+        "github actions",
+        "github action",
+        "github",
+        "pipeline",
+        "workflow",
+        "setup action",
+        "integrazione continua",
+        "cicd",
+        "gitlab",
+        "cache dei modelli",
+        "nella cicd",
+        "in cicd",
+        "di cicd",
+        "per la cicd",
+        "in un workflow"
+      ],
+      "answers": [
+        "In GitHub Actions la setup action installa una release (controllata contro `checksums.txt` e la sua provenienza di build) e conserva lo store tra un'esecuzione e l'altra, con la chiave data dall'hash di `lmget.lock`:\n\n```yaml\n- uses: fabriziosalmi/lmget/setup@<tag o commit>\n  with:\n    version: latest\n    sync: 'true'\n```\n\n`sync: 'true'` esegue `lmget sync` su `./lmget.lock`. Altrove usa lo script di installazione. Con un soprannome in CI aggiungi `--yes`."
+      ],
+      "suggest": [
+        "sync",
+        "nickname-script",
+        "install"
+      ],
+      "tests": [
+        "posso usare lmget in github actions?",
+        "c'è una setup action?",
+        "come tengo in cache i modelli nella ci?",
+        "lmget nella mia pipeline",
+        "un esempio di workflow",
+        "ci?",
+        "github actions?",
+        "come uso lmget nella ci",
+        "gitlab ci",
+        "cache dei modelli in github actions",
+        "setup action?",
+        "posso installarlo in un workflow"
+      ]
+    },
+    {
+      "id": "install-source",
+      "question": "Posso compilare lmget dai sorgenti?",
+      "source": "README.md#install",
+      "keywords": [
+        "dai sorgenti",
+        "da sorgente",
+        "go install",
+        "compilare",
+        "compilo",
+        "compilarlo",
+        "build",
+        "golang",
+        "compila",
+        "si compila"
+      ],
+      "answers": [
+        "```sh\ngo install github.com/fabriziosalmi/lmget/cmd/lmget@latest\n```\n\nUna build dai sorgenti riporta la versione `dev`. lmget si compila anche su FreeBSD, OpenBSD e NetBSD, senza release. Gli strumenti del maintainer `lmget-index` e `lmget-node` non sono negli archivi delle release: compilali anche loro dai sorgenti."
+      ],
+      "suggest": [
+        "install",
+        "run-a-node"
+      ],
+      "tests": [
+        "posso compilare lmget dai sorgenti?",
+        "go install lmget",
+        "come lo compilo da solo?",
+        "compilare dai sorgenti",
+        "go install",
+        "compilarlo da me",
+        "come si compila lmget",
+        "si può compilare con go?",
+        "compilare lmget dal repository git",
+        "compilare dai sorgenti con go",
+        "posso fare go install dell'ultimo commit"
+      ]
+    },
+    {
+      "id": "platforms",
+      "question": "Su quali sistemi operativi e CPU gira lmget?",
+      "source": "README.md#install, scripts/release-build.sh",
+      "keywords": [
+        "piattaforme",
+        "piattaforma",
+        "sistema operativo",
+        "sistemi operativi",
+        "quali sistemi",
+        "che sistemi",
+        "cpu",
+        "architettura cpu",
+        "quali architetture",
+        "amd64",
+        "x86",
+        "x86 64",
+        "intel",
+        "mac intel",
+        "apple silicon",
+        "arm",
+        "aarch64",
+        "raspberry pi",
+        "raspberry",
+        "gira su linux",
+        "gira su mac",
+        "linux arm64",
+        "linux arm",
+        "freebsd",
+        "openbsd",
+        "netbsd",
+        "bsd"
+      ],
+      "answers": [
+        "Le release sono compilate per macOS, Linux e Windows, ognuno su amd64 e arm64. Lo script di installazione copre macOS e Linux, quello PowerShell Windows. lmget si compila dai sorgenti anche su FreeBSD, OpenBSD e NetBSD, senza release.\n\nSu Windows è provato dalla CI su Windows Server 2025, non ancora su un Windows desktop."
+      ],
+      "suggest": [
+        "install",
+        "install-windows",
+        "install-source"
+      ],
+      "tests": [
+        "gira su freebsd?",
+        "freebsd?",
+        "su quali sistemi operativi gira lmget?",
+        "piattaforme?",
+        "che sistemi supporta",
+        "gira su linux arm64?",
+        "mac intel?",
+        "apple silicon?",
+        "funziona su un raspberry pi?",
+        "x86_64 o arm?",
+        "quali architetture cpu",
+        "supporto aarch64"
+      ]
+    },
+    {
+      "id": "binary-size",
+      "question": "Quanto è grande il binario di lmget?",
+      "source": "misurato il 2026-11-19: go build con i flag di scripts/release-build.sh, commit 32d0d49, ls -l",
+      "keywords": [
+        "dimensione del binario",
+        "quanto e grande lmget",
+        "quanto pesa lmget",
+        "quanto pesa il binario",
+        "binario",
+        "eseguibile",
+        "megabyte",
+        "mb",
+        "leggero",
+        "pesante",
+        "ingombro",
+        "quanto pesa",
+        "dimensione lmget",
+        "dimensione",
+        "binario di lmget",
+        "occupa il binario"
+      ],
+      "answers": [
+        "Misurato il 2026-11-19, compilato dal commit 32d0d49 con i flag della build di release: 12,6 MB (linux/arm64), 12,8 MB (windows/arm64), 12,9 MB (darwin/arm64), 13,7 MB (linux/amd64), 13,9 MB (darwin/amd64), 14,1 MB (windows/amd64).\n\nÈ un solo binario statico, senza runtime da installare, e non include un client torrent."
+      ],
+      "suggest": [
+        "written-in",
+        "platforms"
+      ],
+      "tests": [
+        "quanto è grande il binario di lmget?",
+        "dimensione del binario",
+        "quanti megabyte è",
+        "lmget è leggero?",
+        "quanto pesa l'eseguibile",
+        "quanto pesa?",
+        "quanto pesa lmget da scaricare",
+        "che dimensione ha lmget",
+        "quanto spazio occupa il binario di lmget",
+        "l'eseguibile è grosso?"
+      ]
+    },
+    {
+      "id": "written-in",
+      "question": "In che linguaggio è scritto lmget? Serve Python?",
+      "source": "go.mod, README.md#install, README.md#library",
+      "keywords": [
+        "scritto in",
+        "linguaggio",
+        "linguaggio di programmazione",
+        "golang",
+        "in go",
+        "rust",
+        "serve python",
+        "richiede python",
+        "python serve",
+        "dipendenze",
+        "runtime",
+        "nodejs",
+        "java",
+        "e in python",
+        "strumento python"
+      ],
+      "answers": [
+        "Go. lmget è un solo binario e non serve Python: le wheel per pip e uv contengono il binario della release così com'è e nessun codice Python. Lo stesso codice è un pacchetto Go che puoi importare (`github.com/fabriziosalmi/lmget`)."
+      ],
+      "suggest": [
+        "library",
+        "install-pip",
+        "binary-size"
+      ],
+      "tests": [
+        "in che linguaggio è scritto lmget?",
+        "è scritto in go",
+        "rust o go?",
+        "serve python?",
+        "richiede python?",
+        "che dipendenze ha",
+        "serve un runtime?",
+        "è uno strumento python?",
+        "scritto in cosa?",
+        "che linguaggio di programmazione",
+        "lmget è scritto in python?"
+      ]
+    },
+    {
+      "id": "update",
+      "question": "Come aggiorno lmget, e che versione ho?",
+      "source": "README.md#install, SECURITY.md",
+      "keywords": [
+        "aggiornare lmget",
+        "aggiorno lmget",
+        "aggiorna lmget",
+        "aggiornamento",
+        "upgrade",
+        "nuova versione",
+        "ultima versione",
+        "ultima release",
+        "che versione",
+        "quale versione",
+        "versione di lmget",
+        "versione installata",
+        "lmget version",
+        "si aggiorna",
+        "lo aggiorno"
+      ],
+      "answers": [
+        "`lmget --version` stampa la versione (una build dai sorgenti dice `dev`).\n\nPer aggiornarlo, installalo di nuovo come l'hai installato: lo script di installazione prende sempre l'ultima release (`LMGET_VERSION` ne sceglie un'altra), e pip, uv o Scoop aggiornano il loro pacchetto come al solito. Solo l'ultima release riceve le correzioni di sicurezza."
+      ],
+      "suggest": [
+        "install",
+        "status"
+      ],
+      "tests": [
+        "come aggiorno lmget?",
+        "come passo all'ultima versione?",
+        "che versione ho?",
+        "lmget --version",
+        "c'è una versione nuova?",
+        "aggiornare lmget",
+        "come si aggiorna",
+        "che versione ho",
+        "come prendo l'ultima release",
+        "aggiornare all'ultima versione di lmget",
+        "come lo aggiorno"
+      ]
+    },
+    {
+      "id": "uninstall",
+      "question": "Come disinstallo lmget?",
+      "source": "README.md#install, README.md#managing-the-store",
+      "keywords": [
+        "disinstallare",
+        "disinstallo",
+        "togliere lmget",
+        "rimuovere lmget",
+        "cancellare lmget",
+        "eliminare lmget",
+        "sbarazzarmi",
+        "sbarazzo",
+        "tolgo lmget",
+        "si toglie",
+        "lo tolgo",
+        "togliere",
+        "si disinstalla",
+        "disinstalla",
+        "sbarazzo di lmget"
+      ],
+      "answers": [
+        "lmget è un file solo: cancella `~/.local/bin/lmget` (su Windows `lmget.exe` in `%LOCALAPPDATA%\\Programs\\lmget`), oppure disinstalla il pacchetto pip, uv o Scoop.\n\nI suoi dati sono lo store, `~/.lmget` (o `$LMGET_HOME`). Per togliere prima i collegamenti che ha creato nelle app e nelle cache, esegui `lmget rm` su ogni modello che `lmget ls` elenca."
+      ],
+      "suggest": [
+        "rm",
+        "store"
+      ],
+      "tests": [
+        "come disinstallo lmget?",
+        "come rimuovo lmget del tutto?",
+        "voglio cancellare lmget",
+        "come mi sbarazzo di lmget e dei suoi file?",
+        "come tolgo lmget dal mac",
+        "disinstallare",
+        "disinstallare lmget",
+        "come si toglie lmget",
+        "cancellare lmget dal mac",
+        "come lo tolgo",
+        "come disinstallo questo"
+      ]
+    },
+    {
+      "id": "completion",
+      "question": "lmget ha il completamento nella shell?",
+      "source": "lmget completion --help",
+      "keywords": [
+        "completamento",
+        "completion",
+        "autocompletamento",
+        "autocomplete",
+        "tab",
+        "zsh",
+        "fish",
+        "completamento shell"
+      ],
+      "answers": [
+        "```sh\nlmget completion zsh\n```\n\nstampa lo script di completamento per zsh; funzionano anche `bash`, `fish` e `powershell`. `lmget completion zsh --help` spiega come caricarlo."
+      ],
+      "suggest": [
+        "commands"
+      ],
+      "tests": [
+        "lmget ha il completamento nella shell?",
+        "come attivo il completamento con tab?",
+        "autocompletamento per zsh",
+        "completion per fish",
+        "completamento?",
+        "completamento della shell",
+        "autocompletamento",
+        "completamento con tab",
+        "completamento bash",
+        "completamento zsh",
+        "completamento fish"
+      ]
+    },
+    {
+      "id": "commands",
+      "question": "Quali comandi ha lmget?",
+      "source": "lmget --help",
+      "keywords": [
+        "comandi",
+        "sottocomandi",
+        "tutti i comandi",
+        "elenco dei comandi",
+        "lista dei comandi",
+        "cheat sheet",
+        "promemoria",
+        "lmget help",
+        "lmget --help",
+        "uso di base",
+        "sintassi",
+        "comandi ci sono"
+      ],
+      "answers": [
+        "- `lmget <model>` (uguale a `lmget get`): risolve, scarica, verifica, collega\n- `lmget info`: solo il piano\n- `lmget run`: prende un modello e lo interroga in un'app\n- `lmget sync`: riproduce `lmget.lock`\n- `lmget ls`, `lmget rm`, `lmget doctor`: lo store\n- `lmget index`, `lmget history`, `lmget sbom`\n- `lmget serve`: condivide in rete locale\n- `lmget mcp`: per gli agenti AI\n\n`lmget --help` e `lmget <command> --help` danno tutti i flag."
+      ],
+      "suggest": [
+        "first-download",
+        "info"
+      ],
+      "tests": [
+        "quali comandi ha lmget?",
+        "elencami tutti i sottocomandi",
+        "lmget --help",
+        "mi fai un promemoria dei comandi?",
+        "qual è la sintassi?",
+        "comandi",
+        "comandi?",
+        "tutti i comandi",
+        "quali comandi ci sono",
+        "sottocomandi?",
+        "sintassi?",
+        "elenco comandi"
+      ]
+    },
+    {
+      "id": "docs",
+      "question": "Dov'è la documentazione?",
+      "source": "README.md, lmget --help",
+      "keywords": [
+        "documentazione",
+        "docs",
+        "doc",
+        "manuale",
+        "readme",
+        "guida",
+        "tutorial",
+        "riferimento",
+        "man page",
+        "wiki",
+        "leggere di piu",
+        "saperne di piu",
+        "scopro di piu"
+      ],
+      "answers": [
+        "La documentazione è il README: https://github.com/fabriziosalmi/lmget#readme\n\nOgni comando ha anche il suo aiuto: `lmget --help`, `lmget get --help`, `lmget info --help` e così via."
+      ],
+      "suggest": [
+        "commands",
+        "first-download"
+      ],
+      "tests": [
+        "dov'è la documentazione?",
+        "documentazione",
+        "docs?",
+        "c'è un manuale?",
+        "readme?",
+        "c'è una guida o un tutorial?",
+        "dove posso leggere di più",
+        "man page?",
+        "la documentazione completa per favore",
+        "leggere la documentazione",
+        "dove scopro di più su lmget"
+      ]
+    },
+    {
+      "id": "install",
+      "question": "Come installo lmget?",
+      "source": "README.md#install",
+      "keywords": [
+        "installare",
+        "installo",
+        "installazione",
+        "curl",
+        "macos",
+        "macbook",
+        "linux",
+        "ubuntu",
+        "debian",
+        "homebrew",
+        "brew",
+        "arm64",
+        "raspberry",
+        "sudo",
+        "local bin",
+        "prendo lmget",
+        "dove trovo lmget",
+        "metterlo su",
+        "installarlo",
+        "link per scaricarlo"
+      ],
+      "answers": [
+        "Su macOS e Linux (amd64 e arm64):\n\n```sh\ncurl -fsSL https://lmget.org/install.sh | sh\n```\n\nScarica l'ultima release, la controlla contro il `checksums.txt` della release (e la sua provenienza di build quando `gh` è installato e collegato) e installa `lmget` in `~/.local/bin`, senza sudo. `LMGET_INSTALL_DIR` cambia la cartella.\n\nIl README non documenta una formula Homebrew. Altri modi: Windows, pip o uv, un container, GitHub Actions."
+      ],
+      "suggest": [
+        "install-windows",
+        "install-pip",
+        "first-download"
+      ],
+      "tests": [
+        "come installo lmget?",
+        "come si installa su ubuntu?",
+        "c'è una formula brew?",
+        "l'installer vuole sudo?",
+        "installarlo su linux arm64",
+        "come prendo lmget sul mio macbook?",
+        "installare",
+        "come si installa",
+        "come installo",
+        "dove si scarica?",
+        "dove lo scarico",
+        "installare su mac",
+        "brew?",
+        "homebrew?",
+        "dove trovo lmget"
+      ]
+    },
+    {
+      "id": "nickname-own",
+      "question": "Posso creare i miei soprannomi?",
+      "source": "README.md#nicknames",
+      "keywords": [
+        "miei soprannomi",
+        "mio soprannome",
+        "soprannome mio",
+        "soprannomi personali",
+        "soprannome personalizzato",
+        "aliases toml",
+        "definire un soprannome",
+        "aggiungere un soprannome",
+        "creare un soprannome",
+        "mio alias",
+        "alias personale",
+        "nome corto mio",
+        "dare un nome",
+        "creare un alias",
+        "alias per",
+        "un mio alias"
+      ],
+      "answers": [
+        "Sì, in `aliases.toml` nello store (`~/.lmget/aliases.toml`, o `$LMGET_HOME/aliases.toml`); i tuoi vincono su quelli del progetto:\n\n```toml\n[aliases]\nmine = \"hf:mlx-community/Qwen3.5-4B-4bit\"\nasr  = \"openai/whisper-small\"\n```\n\nPoi `lmget mine`."
+      ],
+      "suggest": [
+        "nicknames",
+        "nickname-list"
+      ],
+      "tests": [
+        "posso creare i miei soprannomi?",
+        "come aggiungo un alias personale?",
+        "dov'è aliases.toml?",
+        "definire un soprannome per un modello che uso spesso",
+        "posso farmi un nome corto mio?",
+        "soprannome personalizzato",
+        "un mio alias",
+        "aliases.toml",
+        "aggiungere un mio soprannome",
+        "posso dare un nome io a un modello?",
+        "creare un alias per un repo"
+      ]
+    },
+    {
+      "id": "nickname-list",
+      "question": "Quali soprannomi ci sono?",
+      "source": "aliases.toml, cmd/lmget/nickname.go",
+      "keywords": [
+        "quali soprannomi",
+        "elenco dei soprannomi",
+        "lista dei soprannomi",
+        "soprannomi disponibili",
+        "tutti i soprannomi",
+        "che soprannomi",
+        "soprannome per",
+        "soprannomi per",
+        "soprannome gemma",
+        "soprannome whisper",
+        "soprannome zllamaz",
+        "elenco nickname",
+        "lista nickname"
+      ],
+      "answers": [
+        "La lista costruita da `aliases.toml` nel repository contiene: `qwen` (Qwen3.5), `gemma` (Gemma 4), `smollm`, `granite` (Granite 4), `olmo`, `gpt-oss`, `whisper` (trascrizione), `embed` (multilingual E5), `rerank` (BGE reranker) e `siglip` (SigLIP 2, embedding di immagini).\n\nUn soprannome sconosciuto elenca quelli noti. Qualsiasi altro modello funziona con il nome del repository: `lmget Org/Name`."
+      ],
+      "suggest": [
+        "nicknames",
+        "nickname-own"
+      ],
+      "tests": [
+        "quali soprannomi ci sono?",
+        "posso prendere whisper con un soprannome?",
+        "che soprannomi ci sono oltre a qwen?",
+        "elenco soprannomi",
+        "quali soprannomi",
+        "lista dei soprannomi",
+        "c'è un soprannome per whisper",
+        "che soprannomi sono disponibili",
+        "soprannome per deepseek",
+        "soprannomi disponibili?",
+        "c'è un soprannome per gpt-oss"
+      ]
+    },
+    {
+      "id": "nickname-script",
+      "question": "Come uso un soprannome in uno script o in CI?",
+      "source": "README.md#nicknames",
+      "keywords": [
+        "senza chiedere",
+        "non interattivo",
+        "non interattiva",
+        "senza conferma",
+        "saltare la conferma",
+        "conferma",
+        "continua a chiedere",
+        "mi chiede",
+        "rispondere si",
+        "soprannome script",
+        "codice 2",
+        "salto la conferma",
+        "codice di uscita 2",
+        "interattiva",
+        "soprannome in uno script",
+        "chiede conferma",
+        "saltare la domanda",
+        "qwen script",
+        "qwen cicd",
+        "lmget qwen cicd",
+        "lmget qwen script",
+        "soprannome cicd",
+        "non interattivo soprannome",
+        "interattivo"
+      ],
+      "answers": [
+        "Non si scarica niente senza un sì. Sul terminale lmget chiede; `--yes` (o `-y`) risponde in anticipo:\n\n```sh\nlmget qwen --yes\n```\n\nSenza terminale (uno script, la CI, `--json`) e senza `--yes`, si ferma con codice di uscita 2 e stampa il comando concreto, perché uno script deve nominare il suo modello. `lmget.lock` registra il modello concreto e il commit, mai il soprannome."
+      ],
+      "suggest": [
+        "nicknames",
+        "scripts-output"
+      ],
+      "tests": [
+        "come uso un soprannome in uno script?",
+        "continua a chiedermi conferma",
+        "come salto la conferma?",
+        "modalità non interattiva per la ci",
+        "perché nel mio script è uscito con codice 2?",
+        "mi chiede conferma",
+        "saltare la domanda",
+        "lmget qwen in uno script",
+        "lmget qwen nella ci",
+        "soprannome non interattivo",
+        "perché codice 2 con un soprannome"
+      ]
+    },
+    {
+      "id": "nickname-choice",
+      "question": "Come sceglie la variante un soprannome?",
+      "source": "README.md#nicknames, README.md#history",
+      "keywords": [
+        "variante",
+        "varianti",
+        "quale variante",
+        "sceglie",
+        "budget",
+        "proposta",
+        "propone",
+        "variante piu piccola",
+        "variante piu grande",
+        "qwen gguf",
+        "versione gguf",
+        "versione mlx",
+        "flag for",
+        "opzione for",
+        "serve il flag for",
+        "ha preso",
+        "ha scelto",
+        "for 4gb",
+        "4gb",
+        "format gguf",
+        "format",
+        "come sceglie"
+      ],
+      "answers": [
+        "Da questa macchina, non da quanto è libero adesso:\n\n- destinazione: la prima app installata tra oMLX (solo Apple Silicon), LM Studio e Ollama con una variante che ci sta, altrimenti la cache di Hugging Face\n- formato: il migliore che quella destinazione carica\n- dimensione: la più grande i cui pesi stanno nel budget: 30% della memoria su Apple Silicon (5,15 GB su un Mac da 16 GB), 85% di quella di una GPU NVIDIA, 50% altrove\n\n`--to`, `--format` e `--for` la cambiano, e un soprannome riusa `--for` e `--format` del tuo ultimo pull accettato:\n\n```sh\nlmget qwen --for 4GB --format gguf\n```"
+      ],
+      "suggest": [
+        "nicknames",
+        "memory-fit"
+      ],
+      "tests": [
+        "come sceglie la variante un soprannome?",
+        "perché ha scelto quella dimensione?",
+        "posso forzare una variante più piccola?",
+        "come prendo la versione gguf di qwen?",
+        "a cosa serve il flag --for?",
+        "perché ha preso il 4b e non l'8b",
+        "quale variante",
+        "come sceglie la dimensione",
+        "perché ha preso quel modello",
+        "--for 4GB",
+        "--format gguf",
+        "posso prendere una variante più grande?",
+        "come sceglie qwen"
+      ]
+    },
+    {
+      "id": "nicknames",
+      "question": "Cos'è un soprannome come lmget qwen?",
+      "source": "README.md#nicknames",
+      "keywords": [
+        "soprannome",
+        "nickname",
+        "alias",
+        "nome corto",
+        "scorciatoia",
+        "lmget qwen",
+        "solo qwen",
+        "fa lmget qwen",
+        "nick",
+        "nicks",
+        "aliases",
+        "scrivere un nome corto"
+      ],
+      "answers": [
+        "Un nome corto in minuscolo, come `qwen`, è un soprannome:\n\n```sh\nlmget qwen\nlmget info qwen\n```\n\nlmget guarda questa macchina (memoria, Apple Silicon, una GPU NVIDIA) e le app installate (oMLX, LM Studio, Ollama), propone la variante più grande della famiglia che ci sta, nomina la taglia successiva e chiede prima di scaricare. `lmget info qwen` mostra la proposta e non scarica i pesi."
+      ],
+      "suggest": [
+        "nickname-choice",
+        "nickname-list",
+        "nickname-own"
+      ],
+      "tests": [
+        "cos'è un soprannome?",
+        "cosa fa lmget qwen?",
+        "come funzionano i soprannomi?",
+        "posso scrivere solo qwen?",
+        "cosa sono gli alias in lmget?",
+        "nickanem?",
+        "cosa sono inick?",
+        "soprannome?",
+        "soprannomi",
+        "lmget qwen",
+        "cos'è lmget qwen",
+        "cos'è un nickname",
+        "alias?",
+        "posso scrivere un nome corto?"
+      ]
+    },
+    {
+      "id": "run-endpoint",
+      "question": "lmget run può usare vLLM o llama-server?",
+      "source": "README.md#lmget-run",
+      "keywords": [
+        "endpoint",
+        "vllm",
+        "llama server",
+        "compatibile openai",
+        "openai compatibile",
+        "api openai",
+        "mio server",
+        "run vllm",
+        "run llama server",
+        "prompt server",
+        "server compatibile"
+      ],
+      "answers": [
+        "Sì, con `--endpoint`, qualsiasi server compatibile con OpenAI:\n\n```sh\nlmget run Qwen/Qwen3-0.6B \"ciao\" --endpoint http://127.0.0.1:8000\n```\n\nIl modello va nella cache di Hugging Face, dove quei server lo leggono. `LMGET_RUN_API_KEY` viene mandata a quell'indirizzo quando è impostata."
+      ],
+      "suggest": [
+        "run",
+        "run-apps"
+      ],
+      "tests": [
+        "lmget run può usare vllm?",
+        "usare il mio llama-server con lmget run",
+        "endpoint compatibile openai",
+        "mandare il prompt al mio server",
+        "vllm?",
+        "llama-server?",
+        "--endpoint",
+        "server compatibile openai",
+        "usare il mio server vllm",
+        "mandare il prompt a llama-server"
+      ]
+    },
+    {
+      "id": "run-apps",
+      "question": "Come trova lmget run oMLX, LM Studio o Ollama?",
+      "source": "README.md#lmget-run",
+      "keywords": [
+        "indirizzo",
+        "porta",
+        "lmget omlx url",
+        "lmget lmstudio url",
+        "ollama host",
+        "chiave api",
+        "api key",
+        "11434",
+        "1234",
+        "ricaricare",
+        "ricarica",
+        "riavviare omlx",
+        "model id",
+        "memoria insufficiente",
+        "senza memoria",
+        "run trova",
+        "trova ollama",
+        "trova l app",
+        "altra porta",
+        "non vede",
+        "omlx non vede",
+        "run porta",
+        "porta usa",
+        "run dice",
+        "run memoria"
+      ],
+      "answers": [
+        "Ai loro indirizzi soliti, o a quelli che imposti:\n\n- oMLX: `server.host` e `server.port` dalle sue impostazioni, altrimenti `127.0.0.1:8000`, o `LMGET_OMLX_URL`\n- LM Studio: `127.0.0.1:1234`, o `LMGET_LMSTUDIO_URL`; `LMGET_LMSTUDIO_API_KEY` viene mandata solo quando LM Studio chiede una chiave\n- Ollama: `OLLAMA_HOST`, altrimenti `127.0.0.1:11434`\n\nUn'app si riconosce da come risponde, non dalla porta. Dopo il collegamento lmget chiede a oMLX di ricaricare, cosa che richiede `LMGET_OMLX_API_KEY` (o il controllo delle chiavi spento su loopback); altrimenti ti dice di riavviare oMLX. Quando l'app non ha memoria abbastanza, lmget lo dice e per 7 giorni un soprannome propone una variante più piccola."
+      ],
+      "suggest": [
+        "run",
+        "run-endpoint"
+      ],
+      "tests": [
+        "come trova ollama lmget run?",
+        "lm studio gira su un'altra porta",
+        "omlx non vede il nuovo modello",
+        "dove metto la chiave api di omlx?",
+        "l'app è rimasta senza memoria",
+        "lmget run non trova ollama",
+        "che porta usa lmget run",
+        "LMGET_OMLX_URL",
+        "lm studio su un'altra porta",
+        "chiave api di omlx",
+        "run dice memoria insufficiente"
+      ]
+    },
+    {
+      "id": "run",
+      "question": "lmget può eseguire un modello?",
+      "source": "README.md#lmget-run",
+      "keywords": [
+        "lmget run",
+        "eseguire un modello",
+        "eseguire",
+        "esegue",
+        "eseguo",
+        "chattare",
+        "chatto",
+        "inferenza",
+        "fare domande",
+        "chiedere al modello",
+        "parlare con",
+        "generare testo",
+        "max tokens",
+        "mandare un prompt",
+        "run",
+        "eseguire i modelli",
+        "esegue i modelli",
+        "fa girare",
+        "girare i modelli",
+        "fare domande al modello",
+        "prompt al modello",
+        "domanda al modello"
+      ],
+      "answers": [
+        "lmget non esegue nessun modello da sé. `lmget run` prende il modello, lo collega dove un'app lo carica e manda il prompt a quell'app in esecuzione (oMLX, LM Studio o Ollama):\n\n```sh\nlmget run qwen \"che modello sei?\"\nlmget run ollama:smollm2:135m \"ciao\"\necho \"riassumi questo\" | lmget run qwen --yes\n```\n\nLa risposta va su stdout; `--max-tokens` la limita (default 512). lmget cerca il nome del modello nell'elenco dell'app; `--model-id` dà il nome con cui l'app lo conosce, quando la ricerca non lo trova. Il prompt e la risposta non vengono mai scritti nella cronologia."
+      ],
+      "suggest": [
+        "run-apps",
+        "run-endpoint",
+        "nicknames"
+      ],
+      "tests": [
+        "lmget può eseguire un modello?",
+        "come funziona lmget run?",
+        "posso chattare con un modello?",
+        "fa inferenza?",
+        "mandare un prompt al modello che ho scaricato",
+        "posso fare domande al modello dal terminale?",
+        "run?",
+        "lmget run",
+        "può eseguire i modelli?",
+        "lmget esegue i modelli?",
+        "inferenza?",
+        "chattare con un modello",
+        "posso fare una domanda al modello?",
+        "fa inferenza"
+      ]
+    },
+    {
+      "id": "app-omlx",
+      "question": "Come metto un modello in oMLX?",
+      "source": "README.md#apps",
+      "keywords": [
+        "omlx",
+        "to omlx",
+        "modello mlx",
+        "modelli mlx"
+      ],
+      "answers": [
+        "```sh\nlmget mlx-community/Qwen3.5-0.8B-4bit --to omlx\n```\n\nLa cartella è `$LMGET_OMLX_DIR`, altrimenti `model.model_dir` in `~/.omlx/settings.json`, altrimenti `~/.omlx/models`, come `<org>/<name>/`. oMLX carica `config.json` e `*.safetensors`, quindi modelli MLX. Provato dal vivo con oMLX 0.8.0rc1."
+      ],
+      "suggest": [
+        "run",
+        "targets"
+      ],
+      "tests": [
+        "come metto un modello in omlx?",
+        "funziona con omlx?",
+        "scaricare un modello mlx per omlx",
+        "dove lo mette --to omlx?",
+        "omlx",
+        "omlx?",
+        "--to omlx",
+        "mettere un modello in omlx",
+        "supporta omlx?",
+        "modello mlx per omlx"
+      ]
+    },
+    {
+      "id": "app-lmstudio",
+      "question": "Come metto un modello in LM Studio?",
+      "source": "README.md#apps",
+      "keywords": [
+        "lm studio",
+        "lmstudio",
+        "to lmstudio",
+        "modello in lm studio"
+      ],
+      "answers": [
+        "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_0*' --to lmstudio\n```\n\nLa cartella è `$LMGET_LMSTUDIO_DIR`, altrimenti `~/.lmstudio/models`, come `<org>/<name>/`. LM Studio carica GGUF, e MLX su Apple Silicon. Se hai spostato la cartella dei modelli nell'app, imposta `LMGET_LMSTUDIO_DIR`: LM Studio non tiene quell'impostazione in un file documentato."
+      ],
+      "suggest": [
+        "run",
+        "targets"
+      ],
+      "tests": [
+        "come metto un modello in lm studio?",
+        "lmget funziona con lmstudio?",
+        "scaricare un gguf per lm studio",
+        "ho spostato la cartella dei modelli di lm studio",
+        "lm studio",
+        "lm studio?",
+        "lmstudio",
+        "--to lmstudio",
+        "mettere un modello in lm studio",
+        "funziona con lm studio?",
+        "gguf per lm studio"
+      ]
+    },
+    {
+      "id": "app-jan",
+      "question": "Come metto un modello in Jan?",
+      "source": "README.md#apps",
+      "keywords": [
+        "jan",
+        "jan ai",
+        "model yml",
+        "to jan"
+      ],
+      "answers": [
+        "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to jan\n```\n\nlmget collega un GGUF (e al massimo un file `mmproj`) nella cartella dati di Jan sotto `llamacpp/models/<org>/<name>/`, e scrive il `model.yml` che Jan scrive quando importa, marcato `lmget_export: true`. Un `model.yml` di Jan non viene mai sovrascritto. `LMGET_JAN_DIR` imposta la cartella."
+      ],
+      "suggest": [
+        "targets",
+        "include-exclude"
+      ],
+      "tests": [
+        "come metto un modello in jan?",
+        "funziona con jan ai?",
+        "scaricare un gguf per jan",
+        "chi scrive model.yml?",
+        "jan",
+        "jan?",
+        "jan.ai",
+        "--to jan",
+        "mettere un modello in jan",
+        "supporta jan?"
+      ]
+    },
+    {
+      "id": "app-localai",
+      "question": "Come metto un modello in LocalAI?",
+      "source": "README.md#apps",
+      "keywords": [
+        "localai",
+        "local ai",
+        "local-ai",
+        "to localai"
+      ],
+      "answers": [
+        "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to localai\n```\n\nIl GGUF va direttamente in `$LMGET_LOCALAI_DIR`, altrimenti `$LOCALAI_MODELS_PATH`, altrimenti `$MODELS_PATH`, altrimenti `~/.localai/models`; il nome del file è il nome del modello. Il comando `local-ai` legge `./models` nella cartella da cui parte, se non gli dici altro: punta `LMGET_LOCALAI_DIR` alla stessa cartella."
+      ],
+      "suggest": [
+        "targets",
+        "include-exclude"
+      ],
+      "tests": [
+        "come metto un modello in localai?",
+        "lmget supporta local ai?",
+        "percorso dei modelli di localai",
+        "scaricare un gguf per localai",
+        "localai",
+        "localai?",
+        "local-ai",
+        "--to localai",
+        "mettere un modello in localai",
+        "supporta localai?"
+      ]
+    },
+    {
+      "id": "app-exo",
+      "question": "Come metto un modello in exo?",
+      "source": "README.md#apps",
+      "keywords": [
+        "exo",
+        "to exo",
+        "cluster exo",
+        "exo modello"
+      ],
+      "answers": [
+        "```sh\nlmget mlx-community/Qwen3-0.6B-4bit --to exo\n```\n\nIl modello va in `<org>--<name>/` nella cartella dei modelli di exo (`$LMGET_EXO_DIR`, altrimenti `$EXO_DEFAULT_MODELS_DIR`, altrimenti `~/$EXO_HOME/models`, altrimenti `~/.exo/models` su macOS e Windows, `$XDG_DATA_HOME/exo/models` o `~/.local/share/exo/models` su Linux), con il manifest `.exo-download.json` che exo scrive dopo un download verificato. exo esegue solo i modelli per cui ha una model card: un altro repository viene salvato ma non proposto."
+      ],
+      "suggest": [
+        "targets"
+      ],
+      "tests": [
+        "come metto un modello in exo?",
+        "lmget funziona con exo?",
+        "exo non mi mostra il modello",
+        "scaricare per un cluster exo",
+        "exo",
+        "exo?",
+        "--to exo",
+        "mettere un modello in exo",
+        "cluster exo",
+        "supporto per exo?",
+        "usare i modelli di lmget in exo"
+      ]
+    },
+    {
+      "id": "app-colibri",
+      "question": "Come metto un modello in colibri?",
+      "source": "README.md#apps",
+      "keywords": [
+        "colibri",
+        "to colibri",
+        "coli"
+      ],
+      "answers": [
+        "```sh\nlmget Justvugg/Qwen3-Coder-30B-A3B-colibri-int4 --to colibri\n```\n\nLa cartella è `~/colibri-models/<org>--<name>` (o sotto `$LMGET_COLIBRI_DIR`), con il manifest `.colibri-download.json` che scrive il setup di colibri. Avvialo con:\n\n```sh\n./start-here.sh --model-dir ~/colibri-models/<org>--<name>\n```\n\nUn GGUF va in `--to dir:PATH`, poi `./coli import`."
+      ],
+      "suggest": [
+        "targets"
+      ],
+      "tests": [
+        "come metto un modello in colibri?",
+        "funziona con colibri?",
+        "come avvio colibri con il modello?",
+        "colibri e i gguf",
+        "colibri",
+        "colibri?",
+        "--to colibri",
+        "mettere un modello in colibri",
+        "supporta colibri?",
+        "supporto per colibri",
+        "collegare un modello per colibri"
+      ]
+    },
+    {
+      "id": "app-comfyui",
+      "question": "Come metto un modello in ComfyUI?",
+      "source": "README.md#apps",
+      "keywords": [
+        "comfyui",
+        "comfy",
+        "to comfyui",
+        "diffusion",
+        "flux",
+        "stable diffusion",
+        "generazione di immagini",
+        "immagini",
+        "vae",
+        "lora",
+        "text encoders",
+        "diffusion models",
+        "generare immagini",
+        "modelli per immagini"
+      ],
+      "answers": [
+        "```sh\nlmget Comfy-Org/Flux-1-Schnell --include flux1-schnell.safetensors --to comfyui:diffusion_models\n```\n\nOgni file di pesi selezionato viene collegato direttamente nella sua cartella di ComfyUI (`diffusion_models`, `text_encoders`, `vae`, `loras`, `checkpoints`, ...). La cartella viene da `--to comfyui:FOLDER`, altrimenti dal percorso del file nel repository, altrimenti dai suoi tensori; se no lmget te la chiede. I repository con la struttura di diffusers sono rifiutati. `LMGET_COMFYUI_DIR` imposta la cartella dei modelli."
+      ],
+      "suggest": [
+        "targets",
+        "include-exclude"
+      ],
+      "tests": [
+        "come metto un modello in comfyui?",
+        "scaricare flux per comfy",
+        "dove va il vae?",
+        "modelli per generare immagini con lmget",
+        "posso scaricare una lora?",
+        "dove vanno i modelli flux per comfyui",
+        "comfyui",
+        "comfyui?",
+        "comfy",
+        "flux?",
+        "--to comfyui",
+        "modelli stable diffusion",
+        "dove vanno le lora",
+        "modelli per immagini"
+      ]
+    },
+    {
+      "id": "app-textgen",
+      "question": "Come uso lmget con Text Generation WebUI, KoboldCpp o llamafile?",
+      "source": "README.md#apps, README.md#works-with",
+      "keywords": [
+        "text generation webui",
+        "textgen",
+        "oobabooga",
+        "koboldcpp",
+        "kobold",
+        "llamafile",
+        "llama cpp",
+        "llamacpp",
+        "percorso del gguf",
+        "llama cpp server"
+      ],
+      "answers": [
+        "Usa una cartella normale:\n\n```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to dir:$HOME/textgen/user_data/models/Qwen3.5-4B-GGUF\n```\n\nText Generation WebUI legge `user_data/models` nella sua cartella di installazione. KoboldCpp, llamafile e llama-server prendono il percorso del file GGUF in quella cartella."
+      ],
+      "suggest": [
+        "dir-target",
+        "works-with"
+      ],
+      "tests": [
+        "come lo uso con text generation webui?",
+        "cartella dei modelli di oobabooga",
+        "funziona con koboldcpp?",
+        "llamafile con un gguf scaricato",
+        "il server di llama.cpp",
+        "oobabooga",
+        "oobabooga?",
+        "text generation webui",
+        "koboldcpp?",
+        "llamafile",
+        "llama.cpp?",
+        "kobold"
+      ]
+    },
+    {
+      "id": "works-with",
+      "question": "Con quali app funziona lmget?",
+      "source": "README.md#works-with",
+      "keywords": [
+        "compatibile",
+        "compatibilita",
+        "quali app",
+        "che app",
+        "app supportate",
+        "open webui",
+        "lobechat",
+        "librechat",
+        "sillytavern",
+        "cherry studio",
+        "chatbox",
+        "dify",
+        "langflow",
+        "ramalama",
+        "lemonade",
+        "goose",
+        "page assist",
+        "integrazioni",
+        "app",
+        "app compatibili",
+        "che programmi",
+        "quali programmi"
+      ],
+      "answers": [
+        "Cosa legge ogni app, e la destinazione che la riempie:\n\n- la cache di Hugging Face (`--to hf`): transformers, sentence-transformers, llama.cpp `-hf`, Goose, Lemonade\n- Ollama (`--to ollama`): Ollama, RamaLama, e le app che chiedono a Ollama: Open WebUI, Page Assist, Hollama, Oterm\n- le loro cartelle: oMLX, LM Studio, Jan, LocalAI, exo, colibri, ComfyUI\n- una cartella (`--to dir:PATH`): Text Generation WebUI, KoboldCpp, llamafile, llama-server\n\nLe app che parlano solo con un server (LobeChat, LibreChat, SillyTavern, Dify, ...) usano quello che ha quel server."
+      ],
+      "suggest": [
+        "targets",
+        "ollama"
+      ],
+      "tests": [
+        "con quali app funziona lmget?",
+        "funziona con open webui?",
+        "è compatibile con sillytavern?",
+        "e lobechat?",
+        "elenco delle app supportate",
+        "quali app",
+        "app?",
+        "app compatibili",
+        "che app supporta",
+        "open webui?",
+        "sillytavern?",
+        "lobechat?",
+        "funziona con librechat?",
+        "integrazioni?"
+      ]
+    },
+    {
+      "id": "app-revisions",
+      "question": "Cosa succede quando aggiorno un modello in un'app?",
+      "source": "README.md#apps",
+      "keywords": [
+        "aggiornare un modello",
+        "aggiorno un modello",
+        "aggiorna il modello",
+        "aggiornare il modello",
+        "nuova revisione",
+        "due revisioni",
+        "revisioni mescolate",
+        "mescolati",
+        "vecchi e nuovi",
+        "ultimo commit",
+        "commit piu recente",
+        "aggiornamenti app",
+        "aggiornamenti nelle app"
+      ],
+      "answers": [
+        "Esegui di nuovo lo stesso comando: la revisione viene risolta all'ultimo commit. Un modello nella cartella di un'app ha una revisione alla volta: aggiornarlo sostituisce i collegamenti fatti da lmget e toglie quelli che la nuova revisione non ha più, così l'app non carica mai due revisioni mescolate.\n\nI file che lmget non ha creato vengono lasciati stare, e uno che si trova in mezzo ferma l'esportazione."
+      ],
+      "suggest": [
+        "targets",
+        "rm"
+      ],
+      "tests": [
+        "cosa succede quando aggiorno un modello in un'app?",
+        "come aggiorno un modello all'ultimo commit?",
+        "l'app caricherà file vecchi e nuovi mescolati?",
+        "aggiornare il modello alla revisione più recente",
+        "aggiornare un modello in lm studio",
+        "nuova revisione di un modello",
+        "l'app vedrà due revisioni?",
+        "file vecchi e nuovi mescolati",
+        "come funzionano gli aggiornamenti nelle app",
+        "lm studio carica revisioni mescolate dopo un aggiornamento?",
+        "aggiornare un modello sostituisce i vecchi collegamenti?"
+      ]
+    },
+    {
+      "id": "gguf-hf-ollama",
+      "question": "Come metto in Ollama un GGUF di Hugging Face?",
+      "source": "README.md#gguf-repositories-on-hugging-face",
+      "keywords": [
+        "hf co",
+        "hf co ollama",
+        "gguf ollama",
+        "gguf in ollama",
+        "gguf per ollama",
+        "use this model",
+        "bottone ollama",
+        "pulsante",
+        "gguf di hugging face",
+        "pulsante ollama",
+        "hf co gguf"
+      ],
+      "answers": [
+        "Usa il nome che Hugging Face dà a Ollama, `hf.co/<org>/<name>:<quantization>`:\n\n```sh\nlmget hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M\n```\n\nIl modello arriva in Ollama come `hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M`, pronto per `ollama run`. Il GGUF è controllato contro lo sha256 che Hugging Face pubblica, e i repository gated funzionano con il tuo token una volta accettate le condizioni. `lmget Org/Name --to ollama` su un repository GGUF si ferma e ti dà questo nome."
+      ],
+      "suggest": [
+        "ollama",
+        "include-exclude"
+      ],
+      "tests": [
+        "come metto in ollama un gguf di hugging face?",
+        "i modelli hf.co in ollama",
+        "il pulsante use this model per ollama",
+        "scaricare un gguf di unsloth per ollama",
+        "come scarico un gguf da huggingface e lo uso in ollama",
+        "gguf in ollama",
+        "hf.co?",
+        "gguf di hugging face in ollama",
+        "pulsante ollama su hugging face",
+        "gguf di unsloth per ollama",
+        "hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M"
+      ]
+    },
+    {
+      "id": "ollama",
+      "question": "lmget funziona con Ollama?",
+      "source": "README.md#ollama",
+      "keywords": [
+        "ollama",
+        "registro di ollama",
+        "registro ollama",
+        "to ollama",
+        "uso lmget con ollama",
+        "per ollama",
+        "modelli di ollama"
+      ],
+      "answers": [
+        "Sì. Un modello del registro di Ollama va nella cartella dei modelli di Ollama (`$OLLAMA_MODELS`, altrimenti `~/.ollama/models`):\n\n```sh\nlmget ollama:qwen3:0.6b\n```\n\npoi `ollama run qwen3:0.6b`. Ogni layer è controllato contro lo sha256 del manifest, e il digest del manifest viene fissato come commit. Sono supportati solo i modelli pubblici del registro, e non gli viene mandato nessun token."
+      ],
+      "suggest": [
+        "gguf-hf-ollama",
+        "why-not-ollama-pull",
+        "rm"
+      ],
+      "tests": [
+        "lmget funziona con ollama?",
+        "scaricare un modello per ollama",
+        "come uso lmget con ollama?",
+        "dove vanno i modelli di ollama?",
+        "posso usare lmget al posto di ollama per scaricare i modelli di ollama?",
+        "ollama",
+        "ollama?",
+        "supporta ollama?",
+        "va con ollama?",
+        "lmget e ollama",
+        "scaricare per ollama",
+        "modelli ollama",
+        "ollama:qwen3"
+      ]
+    },
+    {
+      "id": "revocations",
+      "question": "E se un modello si rivela malevolo?",
+      "source": "README.md#signed-index-and-nodes",
+      "keywords": [
+        "revocato",
+        "revocati",
+        "revoca",
+        "revoche",
+        "revocare",
+        "malevolo",
+        "malevoli",
+        "blocklist",
+        "lista nera",
+        "modello cattivo",
+        "etichettato male",
+        "modello e un malware",
+        "file cattivi"
+      ],
+      "answers": [
+        "L'indice firmato può revocare dei blob: contenuti che il progetto ha trovato malevoli o etichettati male, elencati per sha256 con un motivo. lmget allora rifiuta quel blob da qualsiasi origine, rifiuta di esportarne uno già nello store, e `lmget doctor` lo segnala con i modelli che lo usano.\n\nLe revoche arrivano sulla tua macchina con `lmget index` (e quando una fonte che non risponde fa scaricare l'indice a lmget): eseguilo ogni tanto."
+      ],
+      "suggest": [
+        "signed-index",
+        "doctor"
+      ],
+      "tests": [
+        "e se un modello si rivela malevolo?",
+        "un modello cattivo può essere revocato?",
+        "come funzionano le revoche?",
+        "c'è una lista nera di file cattivi?",
+        "revocato",
+        "revoche?",
+        "modello malevolo?",
+        "e se un modello è un malware",
+        "lista nera?",
+        "modello cattivo revocato"
+      ]
+    },
+    {
+      "id": "index-keys",
+      "question": "Quali chiavi firmano l'indice?",
+      "source": "README.md#signed-index-and-nodes",
+      "keywords": [
+        "chiavi",
+        "chiave root",
+        "rotazione delle chiavi",
+        "keys json",
+        "chiave di firma",
+        "chiave pubblica",
+        "index key",
+        "lmget index key",
+        "chiave minisign",
+        "quali chiavi",
+        "chiavi firmano",
+        "chiave",
+        "chiave firma"
+      ],
+      "answers": [
+        "Una chiave root offline (`736BC89C91E98921`, dentro lmget) firma solo `keys.json`: le chiavi autorizzate a firmare l'indice, e quelle revocate. Finché uno store non accetta una lista di chiavi, lmget si fida della chiave di progetto incorporata `21C7BDA090E969F4`. Un indice firmato dalla chiave root, da una chiave revocata o da una chiave non elencata viene rifiutato.\n\n`lmget index` mostra la chiave che ha firmato l'indice e la lista di chiavi in vigore. `LMGET_INDEX_KEY` aggiunge una chiave, mai al posto delle altre."
+      ],
+      "suggest": [
+        "signed-index",
+        "run-a-node"
+      ],
+      "tests": [
+        "quali chiavi firmano l'indice?",
+        "cos'è la chiave root?",
+        "come funziona la rotazione delle chiavi?",
+        "cos'è keys.json?",
+        "chiavi?",
+        "chiave root",
+        "quale chiave firma",
+        "chiave minisign",
+        "keys.json",
+        "rotazione delle chiavi"
+      ]
+    },
+    {
+      "id": "run-a-node",
+      "question": "Posso far girare un mio nodo o un mio indice?",
+      "source": "README.md#signed-index-and-nodes",
+      "keywords": [
+        "nodo mio",
+        "mio nodo",
+        "far girare un nodo",
+        "ospitare un mirror",
+        "self host",
+        "self hosted",
+        "indice mio",
+        "mio indice",
+        "strumenti del maintainer",
+        "lmget index build",
+        "costruire l indice",
+        "strumento lmget node",
+        "node tool",
+        "ospito un mirror",
+        "mirror dell indice",
+        "lmget node",
+        "ospitare un nodo",
+        "ospitare",
+        "index build",
+        "strumento"
+      ],
+      "answers": [
+        "Sì, con gli strumenti del maintainer, compilati dai sorgenti:\n\n```sh\ngo build ./cmd/lmget-index ./cmd/lmget-node\n```\n\n`lmget-index build` scrive un indice da un lockfile (firmalo con `minisign -S`), `lmget-node mirror` scarica i modelli indicizzati, `lmget-node serve` li serve dietro un proxy TLS, `lmget-node seed` li condivide come torrent. I client usano il tuo indice con `LMGET_INDEX_URL` e la tua chiave con `LMGET_INDEX_KEY` (`LMGET_ROOT_KEY` per una tua chiave root)."
+      ],
+      "suggest": [
+        "nodes",
+        "index-keys",
+        "origins"
+      ],
+      "tests": [
+        "posso far girare un mio nodo?",
+        "come ospito un mirror dell'indice?",
+        "indice self hosted",
+        "cos'è lo strumento lmget-node?",
+        "far girare un nodo",
+        "ospitare un nodo",
+        "un mio indice",
+        "lmget-index build",
+        "ospitare un nodo per il progetto",
+        "posso far girare un nodo mirror",
+        "come costruisco un mio indice"
+      ]
+    },
+    {
+      "id": "nodes",
+      "question": "Cosa sono i nodi di lmget?",
+      "source": "README.md#signed-index-and-nodes",
+      "keywords": [
+        "nodi",
+        "lmget nodi",
+        "torrent",
+        "bittorrent",
+        "dht",
+        "p2p",
+        "peer to peer",
+        "seed",
+        "node1",
+        "node2",
+        "ci sono mirror",
+        "node1 lmget org",
+        "usati i nodi"
+      ],
+      "answers": [
+        "Server che tengono copie dei modelli indicizzati e li servono per hash. lmget li interpella per ultimi: dopo che la fonte e, per Hugging Face, ModelScope non hanno risposto. I rifiuti di accesso (gated, privati) non vanno mai ai nodi, e ogni byte è controllato contro lo sha256 firmato.\n\nOgni blob copiato è anche un torrent BitTorrent v2 condiviso da `lmget-node seed`, ma la CLI `lmget` non ha un client torrent: scarica dai nodi in HTTP."
+      ],
+      "suggest": [
+        "signed-index",
+        "run-a-node",
+        "hf-down"
+      ],
+      "tests": [
+        "cosa sono i nodi di lmget?",
+        "lmget usa bittorrent?",
+        "è peer to peer?",
+        "quando vengono usati i nodi?",
+        "nodi",
+        "nodi?",
+        "node1.lmget.org",
+        "bittorrent?",
+        "p2p?",
+        "ci sono mirror dei modelli?"
+      ]
+    },
+    {
+      "id": "signed-index",
+      "question": "Cos'è l'indice firmato?",
+      "source": "README.md#signed-index-and-nodes",
+      "keywords": [
+        "indice firmato",
+        "indice",
+        "lmget index",
+        "minisign",
+        "firma",
+        "firmato",
+        "index json",
+        "index"
+      ],
+      "answers": [
+        "Il progetto tiene un indice firmato dei modelli di Hugging Face che copia: il commit di ogni modello, la dimensione e lo sha256 di ogni file, e i nodi che li servono.\n\n```sh\nlmget index\n```\n\nlo scarica e verifica la sua firma minisign; un indice più vecchio di uno già accettato, scaduto o valido per più di 60 giorni viene rifiutato. Quando Hugging Face non risponde, lmget può prendere un modello indicizzato dai nodi, con ogni byte controllato contro l'hash firmato."
+      ],
+      "suggest": [
+        "nodes",
+        "index-keys",
+        "revocations"
+      ],
+      "tests": [
+        "cos'è l'indice firmato?",
+        "cosa fa lmget index?",
+        "come è firmato l'indice?",
+        "cosa c'è in index.json?",
+        "indice?",
+        "indice firmato",
+        "lmget index",
+        "index.json",
+        "cos'è l'indice",
+        "minisign?"
+      ]
+    },
+    {
+      "id": "no-mirror",
+      "question": "Posso spegnere il ripiego su ModelScope?",
+      "source": "README.md#when-hugging-face-fails",
+      "keywords": [
+        "no mirror",
+        "spegnere modelscope",
+        "disattivare modelscope",
+        "senza modelscope",
+        "evitare modelscope",
+        "mai modelscope",
+        "niente modelscope",
+        "non voglio",
+        "spegnere il ripiego",
+        "smettere di scaricare",
+        "non usare mai modelscope"
+      ],
+      "answers": [
+        "Sì:\n\n```sh\nlmget Qwen/Qwen3-0.6B --no-mirror\n```\n\nComunque a ModelScope non si chiede niente finché Hugging Face funziona, e il log dice quali file sono arrivati da lì (`from=modelscope`)."
+      ],
+      "suggest": [
+        "hf-down"
+      ],
+      "tests": [
+        "posso spegnere il ripiego su modelscope?",
+        "non voglio file da modelscope",
+        "disattivare modelscope",
+        "cosa fa --no-mirror?",
+        "--no-mirror",
+        "niente modelscope",
+        "spegnere il ripiego",
+        "non usare mai modelscope",
+        "smettere di scaricare da modelscope",
+        "disattivare il mirror modelscope",
+        "flag no-mirror"
+      ]
+    },
+    {
+      "id": "hf-endpoint",
+      "question": "Posso usare un mirror di Hugging Face (HF_ENDPOINT)?",
+      "source": "README.md#when-hugging-face-fails",
+      "keywords": [
+        "hf endpoint",
+        "mirror di hugging face",
+        "hf mirror",
+        "mirror",
+        "bloccato",
+        "bloccata",
+        "cina",
+        "hugging face bloccato",
+        "bloccato nel mio paese"
+      ],
+      "answers": [
+        "Sì: `HF_ENDPOINT` sceglie un altro endpoint di Hugging Face, e il token va solo a quell'endpoint (viene tolto se c'è un redirect verso un altro host o un'altra porta).\n\nPer un server che tiene i file per sha256 (una cache in LAN, un mirror aziendale), usa invece le tue origini: `--origin` o `LMGET_ORIGINS`."
+      ],
+      "suggest": [
+        "origins",
+        "gated-token"
+      ],
+      "tests": [
+        "posso usare un mirror di hugging face?",
+        "rispetta HF_ENDPOINT?",
+        "hugging face è bloccato nel mio paese",
+        "supporto per hf-mirror",
+        "HF_ENDPOINT",
+        "mirror hf",
+        "hugging face bloccato",
+        "mirror in cina",
+        "hf-mirror.com",
+        "usare un mirror di hugging face"
+      ]
+    },
+    {
+      "id": "hf-down",
+      "question": "Cosa succede quando Hugging Face non risponde?",
+      "source": "README.md#when-hugging-face-fails, README.md#signed-index-and-nodes",
+      "keywords": [
+        "hugging face giu",
+        "huggingface giu",
+        "hf giu",
+        "giu",
+        "non risponde",
+        "non funziona hugging face",
+        "modelscope",
+        "ripiego",
+        "fallback",
+        "irraggiungibile",
+        "429",
+        "rate limit",
+        "5xx",
+        "502",
+        "503",
+        "fallisce",
+        "non va",
+        "huggingface non va",
+        "huggingface non funziona",
+        "supporta modelscope",
+        "down",
+        "huggingface e down"
+      ],
+      "answers": [
+        "lmget ha due ripieghi:\n\n- **ModelScope**: un file che Hugging Face non riesce a servire (errori di rete, 5xx o 429 dopo i tentativi, file mancante) viene preso dallo stesso repository su ModelScope, se elenca lo stesso percorso, la stessa dimensione e lo stesso sha256; i byte sono controllati contro l'hash di Hugging Face\n- **i nodi del progetto**, per ultimi, per i modelli dell'indice firmato\n\nUn file che Hugging Face rifiuta (401, 403) non viene mai chiesto altrove: un modello gated resta gated. Se Hugging Face non è raggiungibile del tutto, si può pianificare solo un modello indicizzato."
+      ],
+      "suggest": [
+        "no-mirror",
+        "nodes",
+        "signed-index"
+      ],
+      "tests": [
+        "cosa succede quando hugging face non risponde?",
+        "hugging face mi dà 429",
+        "usa modelscope?",
+        "c'è un ripiego?",
+        "il download fallisce con 503",
+        "huggingface non va",
+        "hugging face giù",
+        "hf giù?",
+        "huggingface non funziona",
+        "429",
+        "503 da hugging face",
+        "hugging face non va",
+        "e se huggingface fallisce",
+        "supporta modelscope?"
+      ]
+    },
+    {
+      "id": "gated-token",
+      "question": "Come scarico un modello gated o privato?",
+      "source": "README.md#when-hugging-face-fails, README.md#exit-codes",
+      "keywords": [
+        "gated",
+        "modello gated",
+        "modello privato",
+        "repo privato",
+        "repository privato",
+        "token",
+        "hf token",
+        "accesso negato",
+        "401",
+        "403",
+        "login",
+        "cli login",
+        "accettare le condizioni",
+        "non autorizzato",
+        "codice 4",
+        "dice gated",
+        "codice di uscita 4",
+        "scaricare gated",
+        "accesso",
+        "accesso a zllamaz",
+        "token di hugging face",
+        "metto il token"
+      ],
+      "answers": [
+        "Con un token di Hugging Face che ha accesso, dopo aver accettato le condizioni del modello sulla sua pagina. lmget usa `HF_TOKEN`, altrimenti il file di token che legge `huggingface_hub`: `$HF_TOKEN_PATH`, altrimenti `$HF_HOME/token` (dove lo salva `huggingface-cli login`).\n\n```sh\nHF_TOKEN=hf_... lmget <org>/<modello-gated>\n```\n\nIl token va solo all'endpoint di Hugging Face, mai a un'origine o a un nodo. Mancante o senza permesso: codice di uscita 4."
+      ],
+      "suggest": [
+        "hf-down",
+        "doctor"
+      ],
+      "tests": [
+        "come scarico un modello gated?",
+        "dove metto il token di hugging face?",
+        "mi dice accesso negato",
+        "usa il token di huggingface-cli login?",
+        "scaricare un repo privato",
+        "come scarico llama 3, dice gated",
+        "gated?",
+        "token",
+        "token hf",
+        "HF_TOKEN",
+        "accesso negato",
+        "modelli privati?",
+        "login su hugging face",
+        "dice gated",
+        "accesso a llama"
+      ]
+    },
+    {
+      "id": "license-change",
+      "question": "Perché lmget si è fermato perché la licenza è cambiata?",
+      "source": "README.md#lockfile",
+      "keywords": [
+        "licenza cambiata",
+        "cambio di licenza",
+        "accept license change",
+        "licenza diversa",
+        "nuova licenza",
+        "licenze affiancate",
+        "cambiata la licenza",
+        "per la licenza",
+        "fermato licenza",
+        "licenza sul modello"
+      ],
+      "answers": [
+        "Il lock registra la licenza che la fonte ha dichiarato. Quando un `get` o un `sync --update` successivo ne trova un'altra, lmget si ferma prima di scaricare, con codice di uscita 5 e le due licenze una accanto all'altra.\n\nLeggi le nuove condizioni, poi esegui lo stesso comando con `--accept-license-change` per andare avanti e registrare la nuova licenza."
+      ],
+      "suggest": [
+        "license-policy",
+        "lockfile"
+      ],
+      "tests": [
+        "perché lmget si è fermato perché la licenza è cambiata?",
+        "la licenza del modello è cambiata",
+        "cosa fa --accept-license-change?",
+        "mi dice licenza diversa",
+        "licenza cambiata",
+        "--accept-license-change",
+        "errore licenza cambiata",
+        "si è fermato per la licenza",
+        "nuova licenza sul modello",
+        "licenza cambiata, come vado avanti",
+        "accettare la nuova licenza"
+      ]
+    },
+    {
+      "id": "sbom",
+      "question": "lmget può generare uno SBOM?",
+      "source": "README.md#bill-of-materials",
+      "keywords": [
+        "sbom",
+        "bill of materials",
+        "distinta",
+        "cyclonedx",
+        "inventario",
+        "supply chain",
+        "catena di fornitura",
+        "aibom",
+        "lmget sbom"
+      ],
+      "answers": [
+        "```sh\nlmget sbom > sbom.cdx.json\n```\n\nscrive `lmget.lock` come documento CycloneDX 1.6: un componente `machine-learning-model` per modello (nome, commit, licenza, fonte, un package URL per i modelli di Hugging Face), con un componente `file` per ogni file e il suo sha256. Lo stesso lock dà sempre gli stessi byte. `--lockfile` sceglie un altro lock."
+      ],
+      "suggest": [
+        "lockfile",
+        "license-policy"
+      ],
+      "tests": [
+        "lmget può generare uno sbom?",
+        "esportare in cyclonedx",
+        "una distinta dei modelli che uso",
+        "inventario della supply chain dei modelli",
+        "sbom",
+        "sbom?",
+        "cyclonedx",
+        "distinta dei materiali",
+        "lmget sbom",
+        "supply chain"
+      ]
+    },
+    {
+      "id": "lockfile-trust",
+      "question": "È sicuro fare sync di un lockfile di un repository clonato?",
+      "source": "README.md#bill-of-materials",
+      "keywords": [
+        "lockfile non fidato",
+        "lock non fidato",
+        "lock clonato",
+        "lockfile clonato",
+        "lock malevolo",
+        "lockfile malevolo",
+        "lock sicuro",
+        "lockfile sicuro",
+        "lock di altri",
+        "fidarmi del lock",
+        "repository clonato",
+        "repo clonato",
+        "lock file malevolo",
+        "lmget lock malevolo",
+        "lock file danni",
+        "danni",
+        "fidarsi di un lockfile",
+        "lockfile da github",
+        "malevolo",
+        "di altri",
+        "clonato",
+        "pericoloso fare sync",
+        "progetto clonato"
+      ],
+      "answers": [
+        "lmget tratta un `lmget.lock` clonato come input non fidato: le destinazioni `dir:` devono restare dentro la sua cartella, niente viene scritto attraverso `.git`, un lock non può rietichettare byte dello store come un altro modello, e `refs/main` della cache di Hugging Face viene solo riempito se è vuoto, mai spostato. Un lock che è un symlink non viene letto.\n\nPerò un lock può elencare URL https, e `sync` li scarica: rivedilo come rivedresti il codice del repository."
+      ],
+      "suggest": [
+        "sync",
+        "is-it-safe"
+      ],
+      "tests": [
+        "è sicuro fare sync di un lockfile di un repository clonato?",
+        "un lock file malevolo mi può fare danni?",
+        "posso fidarmi del lmget.lock di altri?",
+        "sicurezza del lockfile di un repo clonato",
+        "lockfile non fidato",
+        "un lockfile clonato è sicuro?",
+        "lmget.lock malevolo",
+        "un lock file può farmi danni?",
+        "fidarsi di un lockfile da github",
+        "un lockfile di uno sconosciuto è sicuro?",
+        "progetto clonato con lmget.lock, posso fare sync?"
+      ]
+    },
+    {
+      "id": "sync",
+      "question": "Cosa fa lmget sync?",
+      "source": "README.md#lockfile, lmget sync --help",
+      "keywords": [
+        "lmget sync",
+        "sync",
+        "sincronizzare",
+        "sincronizzo",
+        "sync update",
+        "aggiornare il lock",
+        "riscrivere il lock",
+        "riprodurre il lock",
+        "ripristinare",
+        "ripristino",
+        "sync fallito",
+        "codice 5",
+        "ripristino lmget lock",
+        "ripristino i modelli",
+        "rimetto a posto",
+        "dal lock"
+      ],
+      "answers": [
+        "```sh\nlmget sync                   # i commit del lock, ogni file controllato contro il suo sha256\nlmget sync --update          # risolve di nuovo le revisioni e riscrive il lock\nlmget sync Qwen/Qwen3-0.6B   # solo i modelli nominati\n```\n\n`sync` si ferma con codice di uscita 5 se la fonte non corrisponde più al lock. Quando questa macchina ha già verificato ogni file del lock e sono nello store, non usa la rete. `--lockfile PATH` usa un altro lock."
+      ],
+      "suggest": [
+        "lockfile",
+        "lockfile-trust",
+        "offline"
+      ],
+      "tests": [
+        "cosa fa lmget sync?",
+        "come aggiorno il lock?",
+        "sync di un modello solo",
+        "sync fallito con codice di uscita 5",
+        "come ripristino i modelli da lmget.lock?",
+        "come rimetto a posto i modelli dal lock",
+        "sync",
+        "sync?",
+        "lmget sync",
+        "cos'è sync",
+        "sync --update",
+        "sync fallito"
+      ]
+    },
+    {
+      "id": "lockfile",
+      "question": "Come fisso i modelli di un progetto con un lockfile?",
+      "source": "README.md#lockfile",
+      "keywords": [
+        "lockfile",
+        "lock file",
+        "lmget lock",
+        "riproducibile",
+        "riproducibili",
+        "fissare",
+        "fisso",
+        "fissati",
+        "squadra",
+        "colleghi",
+        "stessi modelli",
+        "requirements",
+        "lmget.lock",
+        "lock",
+        "package lock"
+      ],
+      "answers": [
+        "Aggiungi `--lock`: crea `./lmget.lock`, o ci aggiunge il modello:\n\n```sh\nlmget Qwen/Qwen3-0.6B --lock\n```\n\nIl lock fissa ogni modello a un commit e ogni file alla sua dimensione e al suo sha256, con la selezione e la destinazione. Una volta che c'è, `lmget get` lo tiene aggiornato. Chi clona il progetto ottiene gli stessi byte con `lmget sync`."
+      ],
+      "suggest": [
+        "sync",
+        "license-policy",
+        "sbom"
+      ],
+      "tests": [
+        "come fisso i modelli di un progetto?",
+        "c'è un lockfile?",
+        "download dei modelli riproducibili per la squadra",
+        "come fanno i colleghi ad avere gli stessi modelli?",
+        "cos'è lmget.lock?",
+        "lockfile",
+        "lockfile?",
+        "file di lock",
+        "lmget.lock",
+        "--lock",
+        "fissare i modelli",
+        "download riproducibili",
+        "stessi modelli per tutto il team"
+      ]
+    },
+    {
+      "id": "ls",
+      "question": "Come vedo i modelli che ho scaricato?",
+      "source": "README.md#managing-the-store",
+      "keywords": [
+        "lmget ls",
+        "elencare i modelli",
+        "elenco dei modelli",
+        "lista dei modelli",
+        "cosa ho scaricato",
+        "vedere i modelli",
+        "mostrare i modelli",
+        "miei modelli",
+        "modelli che ho",
+        "dove vedo",
+        "vedo tutto",
+        "ls",
+        "quali modelli ho",
+        "nel mio store",
+        "modelli ho",
+        "vedo i modelli"
+      ],
+      "answers": [
+        "```sh\nlmget ls\n```\n\nelenca i modelli nello store, la loro dimensione e dove è esportato ognuno. `--json` dà un oggetto per gli script."
+      ],
+      "suggest": [
+        "rm",
+        "store"
+      ],
+      "tests": [
+        "come vedo i modelli che ho scaricato?",
+        "elencami i miei modelli",
+        "cosa ho scaricato finora?",
+        "mostrami i modelli che ho",
+        "dove vedo tutto quello che ho scaricato",
+        "ls",
+        "lmget ls",
+        "elenco modelli",
+        "i miei modelli",
+        "quali modelli ho",
+        "mostra i modelli scaricati",
+        "cosa c'è nel mio store"
+      ]
+    },
+    {
+      "id": "rm",
+      "question": "Come cancello un modello e libero spazio?",
+      "source": "README.md#managing-the-store",
+      "keywords": [
+        "lmget rm",
+        "cancellare",
+        "cancello",
+        "eliminare",
+        "rimuovere",
+        "rimuovo",
+        "togliere",
+        "liberare spazio",
+        "libero spazio",
+        "fare pulizia",
+        "pulire",
+        "recuperare spazio",
+        "rm",
+        "disinstallare un modello",
+        "pulizia",
+        "liberare",
+        "disinstallo un modello",
+        "elimino",
+        "liberare spazio sul disco",
+        "li tolgo",
+        "pulizia dei modelli",
+        "vecchi modelli"
+      ],
+      "answers": [
+        "```sh\nlmget rm Qwen/Qwen3-0.6B\nlmget rm Qwen/Qwen3-0.6B@<commit>   # solo quel commit\nlmget rm ollama:qwen3:0.6b\n```\n\n`rm` toglie i collegamenti fatti da lmget che puntano ancora ai suoi dati, poi ogni blob che nessun modello dello store usa, e dice lo spazio liberato. I file che hai sostituito, i download di altri strumenti e i file che un altro modello usa ancora restano al loro posto."
+      ],
+      "suggest": [
+        "ls",
+        "disk-space"
+      ],
+      "tests": [
+        "rimuovere un modello e liberare spazio",
+        "come faccio pulizia dei vecchi modelli?",
+        "liberare spazio sul disco",
+        "cancellare un commit solo",
+        "come disinstallo un modello?",
+        "come elimino un modello che non uso più",
+        "rm",
+        "lmget rm",
+        "cancellare un modello",
+        "rimuovere un modello",
+        "liberare spazio",
+        "cancellare qwen",
+        "pulire i modelli",
+        "come cancello i modelli"
+      ]
+    },
+    {
+      "id": "doctor",
+      "question": "Come controllo che lo store sia sano?",
+      "source": "README.md#managing-the-store, lmget doctor --help",
+      "keywords": [
+        "lmget doctor",
+        "doctor",
+        "salute",
+        "sano",
+        "integro lo store",
+        "controllare lo store",
+        "controllo lo store",
+        "riverificare",
+        "ricontrollare",
+        "ricalcolare gli hash",
+        "quarantena",
+        "diagnosi",
+        "diagnosticare",
+        "problemi",
+        "quarantine",
+        "cartella quarantine",
+        "riverificare tutti"
+      ],
+      "answers": [
+        "```sh\nlmget doctor            # store, cache ed endpoint di Hugging Face, token, blob revocati, lockfile\nlmget doctor --verify   # ricalcola anche l'hash di ogni blob\n```\n\n`--verify` sposta un blob corrotto in `quarantine/` e toglie i collegamenti di lmget verso di lui, così il prossimo `get` o `sync` lo riscarica. `doctor` non stampa mai il token, solo dove l'ha trovato. Un controllo fallito esce con codice 1."
+      ],
+      "suggest": [
+        "verify",
+        "rm"
+      ],
+      "tests": [
+        "come controllo che lo store sia sano?",
+        "riverificare tutti i file scaricati",
+        "cosa fa lmget doctor?",
+        "cos'è la cartella quarantine?",
+        "diagnosticare problemi nella mia installazione",
+        "doctor",
+        "lmget doctor",
+        "controllo di salute",
+        "controllare lo store",
+        "doctor --verify",
+        "quarantena?"
+      ]
+    },
+    {
+      "id": "history",
+      "question": "Cosa ricorda lmget dei miei download?",
+      "source": "README.md#history",
+      "keywords": [
+        "cronologia",
+        "storia",
+        "history",
+        "lmget history",
+        "history jsonl",
+        "ricorda",
+        "ricordare",
+        "cancellare la cronologia",
+        "log",
+        "registro dei download",
+        "download passati",
+        "registra",
+        "registra prompt",
+        "ricorda lmget",
+        "ricorda dei download"
+      ],
+      "answers": [
+        "Un registro locale, `~/.lmget/history.jsonl` (permessi 0600): per ogni pull l'ora, il comando, il modello, il commit, i byte per origine, il tempo impiegato e il codice di uscita. Nessun token, nessun prompt, nessun percorso fuori dallo store, e non va da nessuna parte. Serve a ordinare i nodi dell'indice per velocità e a ricordare `--for` e `--format` di un soprannome.\n\n```sh\nlmget history         # le ultime 20 voci\nlmget history clear   # la cancella\n```\n\n`LMGET_HISTORY=off` la spegne."
+      ],
+      "suggest": [
+        "phone-home",
+        "ls"
+      ],
+      "tests": [
+        "cosa ricorda lmget dei miei download?",
+        "come cancello la cronologia?",
+        "posso spegnere la cronologia?",
+        "dov'è history.jsonl?",
+        "tiene un log di quello che ho scaricato?",
+        "lmget registra i miei prompt?",
+        "cronologia",
+        "lmget history",
+        "cronologia?",
+        "cancellare la cronologia",
+        "history.jsonl",
+        "spegnere la cronologia",
+        "LMGET_HISTORY"
+      ]
+    },
+    {
+      "id": "url-hash",
+      "question": "Come do l'hash atteso per un URL?",
+      "source": "README.md#direct-urls",
+      "keywords": [
+        "hash atteso",
+        "mio hash",
+        "dare l hash",
+        "hash noto",
+        "frammento",
+        "fissato al primo download",
+        "hash dell url",
+        "hash url",
+        "contro il mio hash",
+        "frammento sha256",
+        "conosco lo sha256",
+        "sha256 atteso",
+        "dare lo sha256",
+        "sha256 per un link",
+        "url diretto hash",
+        "download diretto",
+        "mio sha256",
+        "download da url"
+      ],
+      "answers": [
+        "Aggiungilo come frammento:\n\n```sh\nlmget 'https://example.org/models/tiny.gguf#sha256=<64 hex>'\n```\n\nUn frammento in disaccordo con l'header digest del server ferma l'esecuzione con codice di uscita 5. Senza frammento né header, si usa l'hash del primo download e viene registrato in `lmget.lock` se c'è; senza lock, l'esecuzione successiva riscarica e lo registra di nuovo."
+      ],
+      "suggest": [
+        "direct-url",
+        "lockfile"
+      ],
+      "tests": [
+        "come do l'hash atteso per un url?",
+        "conosco lo sha256 del file",
+        "verificare un download diretto contro il mio hash",
+        "cosa vuol dire fissato al primo download?",
+        "sha256 atteso per un url",
+        "hash per un url diretto",
+        "fissato al primo download?",
+        "dare lo sha256",
+        "#sha256 per un link",
+        "verificare un download da url con il mio sha256",
+        "impostare l'hash atteso di un download diretto"
+      ]
+    },
+    {
+      "id": "oci",
+      "question": "lmget scarica modelli da Docker Hub o da registri OCI?",
+      "source": "README.md#oci-registries",
+      "keywords": [
+        "oci",
+        "registro oci",
+        "registri oci",
+        "docker hub",
+        "dockerhub",
+        "docker model",
+        "docker ai",
+        "ai smollm2",
+        "ghcr io",
+        "ghcr"
+      ],
+      "answers": [
+        "Sì, immagini pubbliche:\n\n```sh\nlmget oci://docker.io/ai/smollm2\nlmget oci://docker.io/ai/smollm2:360M-Q4_K_M\nlmget oci://ghcr.io/org/model@sha256:<64 hex>\n```\n\nIl digest del manifest viene fissato come commit, e ogni layer è controllato contro il suo sha256. Il modello viene esportato in `dir:./<name>` per default. Gli indici multipiattaforma sono rifiutati: fissa un manifest con `@sha256:`."
+      ],
+      "suggest": [
+        "sources",
+        "lockfile"
+      ],
+      "tests": [
+        "lmget scarica modelli da docker hub?",
+        "supporto ai registri oci",
+        "scaricare ai/smollm2 da docker",
+        "modelli pubblicati su ghcr.io",
+        "prendere un modello da docker hub",
+        "oci",
+        "oci?",
+        "docker hub",
+        "ghcr",
+        "registro oci",
+        "docker model",
+        "ai/smollm2"
+      ]
+    },
+    {
+      "id": "direct-url",
+      "question": "Posso scaricare da un URL https qualsiasi?",
+      "source": "README.md#direct-urls, README.md#usage",
+      "keywords": [
+        "url https",
+        "url diretto",
+        "qualsiasi url",
+        "link diretto",
+        "url",
+        "web server",
+        "sito",
+        "url firmato",
+        "presigned",
+        "link di download",
+        "release di github",
+        "link qualsiasi"
+      ],
+      "answers": [
+        "Sì, solo https:\n\n```sh\nlmget https://example.org/models/tiny.gguf\n```\n\nIl file viene salvato nella cartella corrente. Lo sha256 atteso viene da un frammento `#sha256=` che aggiungi tu, altrimenti dall'header `Repr-Digest` o `Digest` del server, altrimenti viene fissato al primo download. Gli URL con `user:pass@` sono rifiutati; la query di un URL firmato serve solo per il download e compare come `REDACTED` nei log, nella cronologia e nello store."
+      ],
+      "suggest": [
+        "url-hash",
+        "hf-url"
+      ],
+      "tests": [
+        "posso scaricare da un url https qualsiasi?",
+        "scaricare un gguf da un link diretto",
+        "supporta gli url firmati?",
+        "posso usare un url http semplice?",
+        "scaricare un file dal mio web server",
+        "scaricare un modello dall'url di una release di github",
+        "qualsiasi url",
+        "url diretto",
+        "url https",
+        "scaricare da un url",
+        "url firmato",
+        "url http semplice",
+        "dal mio web server"
+      ]
+    },
+    {
+      "id": "hf-url",
+      "question": "Posso incollare un link di Hugging Face, o prendere un file solo?",
+      "source": "README.md#usage, README.md#ollama",
+      "keywords": [
+        "huggingface co",
+        "link di hugging face",
+        "url di hugging face",
+        "link huggingface",
+        "url huggingface",
+        "incollare",
+        "incollo",
+        "un file solo",
+        "file singolo",
+        "solo un file",
+        "resolve main"
+      ],
+      "answers": [
+        "Sì, anche gli URL funzionano:\n\n```sh\nlmget https://huggingface.co/Qwen/Qwen3-0.6B\nlmget https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf\n```\n\nIl primo è tutto il repository, il secondo un suo file. Per Ollama funziona anche `https://ollama.com/library/qwen3:0.6b`."
+      ],
+      "suggest": [
+        "include-exclude",
+        "direct-url"
+      ],
+      "tests": [
+        "posso incollare un link di hugging face?",
+        "scaricare un file solo da un repo",
+        "solo un file gguf",
+        "accetta gli url di huggingface.co?",
+        "link di hugging face",
+        "incollare un url di huggingface",
+        "un file solo",
+        "file singolo da un repo",
+        "url huggingface.co",
+        "url resolve/main"
+      ]
+    },
+    {
+      "id": "origins",
+      "question": "Posso usare un mio server di cache o un mirror?",
+      "source": "README.md#your-own-origins",
+      "keywords": [
+        "origine",
+        "origini",
+        "lmget origins",
+        "server di cache",
+        "cache server",
+        "mio mirror",
+        "mirror aziendale",
+        "mirror interno",
+        "artifactory",
+        "blob server",
+        "server http",
+        "cache in lan",
+        "server interno",
+        "mio server di cache",
+        "cache dei modelli in ufficio",
+        "ufficio"
+      ],
+      "answers": [
+        "Sì. Un'origine è un server qualsiasi con i blob in `<origin>/blobs/sha256/<sha256>`: una cache in LAN, un mirror aziendale, un `lmget-node`, o un server statico sopra lo store di un'altra macchina:\n\n```sh\nlmget sync --origin https://cache.example.lan\n```\n\noppure `LMGET_ORIGINS=\"https://a,http://b\"`. lmget chiede prima alle origini ogni file di cui il piano conosce lo sha256, verifica quello che servono e ripiega sulla fonte. A un'origine non viene mai mandato nessun token."
+      ],
+      "suggest": [
+        "s3-origin",
+        "lan-serve",
+        "hf-endpoint"
+      ],
+      "tests": [
+        "posso usare un mio server di cache?",
+        "mirror aziendale per i modelli",
+        "cos'è un'origine?",
+        "servire i modelli da un server interno",
+        "come funziona --origin?",
+        "in ufficio abbiamo una cache dei modelli, lmget la può usare?",
+        "origini",
+        "--origin",
+        "LMGET_ORIGINS",
+        "server di cache",
+        "mirror aziendale",
+        "mirror interno",
+        "artifactory"
+      ]
+    },
+    {
+      "id": "s3-origin",
+      "question": "lmget può scaricare da un bucket S3 o R2 privato?",
+      "source": "README.md#your-own-origins",
+      "keywords": [
+        "s3",
+        "r2",
+        "bucket",
+        "bucket privato",
+        "bucket s3",
+        "bucket r2",
+        "amazon s3",
+        "cloudflare r2",
+        "minio",
+        "object storage",
+        "origine s3",
+        "lmget s3",
+        "chiave di accesso",
+        "chiavi s3",
+        "signature version 4",
+        "sigv4",
+        "aws",
+        "credenziali aws",
+        "chiavi aws",
+        "minio origine"
+      ],
+      "answers": [
+        "Sì, come origine: un bucket su Amazon S3, Cloudflare R2 o un altro server S3 che tiene una copia della cartella `blobs/` di uno store.\n\n```sh\nexport LMGET_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com\nexport LMGET_S3_ACCESS_KEY_ID=... LMGET_S3_SECRET_ACCESS_KEY=...\nlmget sync --origin s3://models/lmget\n```\n\nLe richieste sono firmate con AWS Signature Version 4. Endpoint e chiavi vengono solo dalle variabili di lmget (`LMGET_S3_SESSION_TOKEN` per le chiavi temporanee, `LMGET_S3_REGION`, predefinita `auto`), mai da `AWS_*` o `~/.aws`. Una richiesta firmata non segue redirect. Ogni byte è verificato come per qualunque origine; un blob mancante arriva dalla fonte, e chiavi rifiutate dal bucket fermano lo scaricamento con il motivo. Basta una chiave in sola lettura."
+      ],
+      "suggest": [
+        "origins",
+        "lan-serve"
+      ],
+      "tests": [
+        "lmget può scaricare da un bucket S3 privato?",
+        "usare un bucket R2 come cache dei modelli",
+        "LMGET_S3_ENDPOINT",
+        "come imposto le chiavi S3 per lmget",
+        "lmget legge le mie credenziali AWS?",
+        "origine s3",
+        "Cloudflare R2",
+        "teniamo i modelli in un bucket privato, lmget può scaricare da lì?",
+        "minio come origine",
+        "LMGET_S3_REGION"
+      ]
+    },
+    {
+      "id": "lan-security",
+      "question": "lmget serve è sicuro sulla mia rete?",
+      "source": "README.md#sharing-on-the-local-network, lmget serve --help",
+      "keywords": [
+        "serve sicuro",
+        "serve open",
+        "vpn",
+        "esposto",
+        "esporre",
+        "7878",
+        "listen",
+        "no mdns",
+        "chi puo accedere",
+        "chi puo collegarsi",
+        "chi si collega",
+        "firewall",
+        "serve porta",
+        "porta di lmget serve",
+        "spegnere mdns",
+        "mdns spento",
+        "open",
+        "porta 7878",
+        "sicurezza di lmget serve",
+        "accedere a serve",
+        "serve sulla vpn"
+      ],
+      "answers": [
+        "Risponde solo ai client delle reti locali di questa macchina: un peer VPN o un host su internet riceve 403, a meno di `--open`. Serve solo i blob dei modelli pubblici, al massimo 64 connessioni insieme, mai un blob revocato. `--listen` imposta l'indirizzo (default `:7878`), `--no-mdns` spegne l'annuncio.\n\nLato client, `LMGET_LAN=on` tiene al massimo 4 server, solo a indirizzi dentro le tue reti, e verifica ogni byte."
+      ],
+      "suggest": [
+        "lan-serve",
+        "origins"
+      ],
+      "tests": [
+        "lmget serve è sicuro sulla mia rete?",
+        "chi può collegarsi a lmget serve?",
+        "posso esporlo sulla vpn?",
+        "cambiare la porta di lmget serve",
+        "spegnere mdns",
+        "serve è sicuro?",
+        "sicurezza di lmget serve",
+        "--open",
+        "chi può accedere a serve",
+        "serve sulla vpn",
+        "--listen",
+        "porta 7878"
+      ]
+    },
+    {
+      "id": "lan-serve",
+      "question": "Posso condividere i modelli con altre macchine in LAN?",
+      "source": "README.md#sharing-on-the-local-network",
+      "keywords": [
+        "lmget serve",
+        "condividere",
+        "condivido",
+        "condivisione",
+        "lan",
+        "rete locale",
+        "rete di casa",
+        "altre macchine",
+        "altra macchina",
+        "altro computer",
+        "altro pc",
+        "mdns",
+        "desktop",
+        "portatile",
+        "lmget lan",
+        "un collega",
+        "dal fisso",
+        "lmget serve funziona",
+        "passare i modelli",
+        "riscaricarli"
+      ],
+      "answers": [
+        "Sì. Su una macchina:\n\n```sh\nlmget serve\n```\n\ncondivide in sola lettura i blob dei suoi modelli pubblici sulla porta 7878 e si annuncia con mDNS. Sulle altre:\n\n```sh\nLMGET_LAN=on lmget Qwen/Qwen3-0.6B\n```\n\ntrova questi server e chiede prima a loro, controllando ogni byte. I modelli gated e privati, gli URL e le immagini OCI non vengono mai condivisi. La ricerca è spenta per default."
+      ],
+      "suggest": [
+        "lan-security",
+        "origins"
+      ],
+      "tests": [
+        "posso condividere i modelli con altre macchine in lan?",
+        "come funziona lmget serve?",
+        "scaricare dall'altro computer invece che da internet",
+        "condividere i modelli con un collega",
+        "cos'è LMGET_LAN?",
+        "il portatile può scaricare i modelli dal fisso?",
+        "lmget serve",
+        "lan",
+        "condividere i modelli",
+        "condividere con i colleghi",
+        "LMGET_LAN",
+        "condivisione in rete locale",
+        "copiare i modelli su un altro computer"
+      ]
+    },
+    {
+      "id": "json",
+      "question": "lmget ha un output JSON?",
+      "source": "README.md#output-for-scripts-and-integrations",
+      "keywords": [
+        "json",
+        "eventi",
+        "evento",
+        "leggibile da macchina",
+        "jq",
+        "schema",
+        "ndjson",
+        "json lines"
+      ],
+      "answers": [
+        "`--json` scrive un evento JSON per riga: `resolve`, `plan`, `file_start`, `progress`, `file_done`, `export`, `done`, `lock`, `error` (e `answer` per `lmget run`). Ogni evento ha `v` (versione dello schema, 1), `type` e `time`.\n\n```sh\nlmget Qwen/Qwen3-0.6B --json | jq -c 'select(.type==\"file_done\")'\n```\n\n`ls`, `rm`, `doctor`, `index` e `history` con `--json` scrivono un oggetto solo."
+      ],
+      "suggest": [
+        "scripts-output",
+        "exit-codes"
+      ],
+      "tests": [
+        "lmget ha un output json?",
+        "output leggibile da macchina",
+        "che eventi emette --json?",
+        "leggere l'output con jq",
+        "come ottengo l'output in json?",
+        "json",
+        "json?",
+        "--json",
+        "output json",
+        "eventi",
+        "leggibile da macchina",
+        "jq"
+      ]
+    },
+    {
+      "id": "scripts-output",
+      "question": "Come uso lmget in uno script?",
+      "source": "README.md#output-for-scripts-and-integrations",
+      "keywords": [
+        "script",
+        "stdout",
+        "stderr",
+        "output semplice",
+        "righe semplici",
+        "pipe",
+        "parsare",
+        "automazione",
+        "automatizzare",
+        "script bash",
+        "bash",
+        "separato da tab",
+        "barra di avanzamento",
+        "percorso del download",
+        "vista dal vivo",
+        "lmget script",
+        "scripting",
+        "plain",
+        "percorso in uno script"
+      ],
+      "answers": [
+        "Senza terminale lmget scrive righe di log `lmget: ...` su stderr e il percorso risultante su stdout:\n\n```sh\ndir=$(lmget Qwen/Qwen3-0.6B --to dir:./models/qwen3)\n```\n\n`lmget info` stampa una riga `size<TAB>hash<TAB>path` per file; `ls`, `rm`, `doctor` e `index` stampano righe separate da tab. `--plain` forza righe semplici anche sul terminale, `--json` dà eventi, e ogni tipo di errore ha il suo codice di uscita."
+      ],
+      "suggest": [
+        "json",
+        "exit-codes",
+        "nickname-script"
+      ],
+      "tests": [
+        "come uso lmget in uno script?",
+        "avere il percorso del download in bash",
+        "togliere la vista dal vivo con la barra di avanzamento",
+        "cosa va su stdout e cosa su stderr?",
+        "automatizzare i download",
+        "script",
+        "scripting",
+        "bash",
+        "in uno script",
+        "stdout",
+        "--plain",
+        "il percorso in uno script",
+        "automatizzare"
+      ]
+    },
+    {
+      "id": "mcp",
+      "question": "Gli agenti AI possono usare lmget (MCP)?",
+      "source": "README.md#agents-mcp",
+      "keywords": [
+        "mcp",
+        "lmget mcp",
+        "agente",
+        "agenti",
+        "claude code",
+        "claude",
+        "cursor",
+        "zed",
+        "model context protocol",
+        "assistente ai",
+        "copilot",
+        "agente scaricare",
+        "agenti ai"
+      ],
+      "answers": [
+        "```sh\nclaude mcp add lmget -- lmget mcp\n```\n\n`lmget mcp` parla il Model Context Protocol su stdin e stdout, per Claude Code, Cursor, Zed e altri agenti. Tre strumenti: `info` (il piano, sola lettura), `list` (lo store, sola lettura) e `get`, che scarica solo con `confirm: true` e collega solo nelle app e nella cache di Hugging Face, mai in una cartella scelta dall'agente. URL e immagini OCI vengono presi solo da indirizzi pubblici."
+      ],
+      "suggest": [
+        "info",
+        "license-policy"
+      ],
+      "tests": [
+        "gli agenti ai possono usare lmget?",
+        "c'è un server mcp?",
+        "usare lmget da claude code",
+        "un agente può scaricare modelli?",
+        "integrazione con cursor",
+        "come aggiungo lmget a cursor?",
+        "mcp",
+        "mcp?",
+        "lmget mcp",
+        "claude code",
+        "cursor?",
+        "agente ai",
+        "agenti",
+        "claude può usare lmget?"
+      ]
+    },
+    {
+      "id": "library",
+      "question": "Posso usare lmget da codice Go?",
+      "source": "README.md#library",
+      "keywords": [
+        "libreria",
+        "pacchetto go",
+        "libreria go",
+        "codice go",
+        "sdk",
+        "client pull",
+        "importare lmget",
+        "integrare lmget",
+        "da programma",
+        "da go",
+        "usarlo da go",
+        "api golang",
+        "api"
+      ],
+      "answers": [
+        "Sì: la CLI è un renderer sopra il pacchetto Go `github.com/fabriziosalmi/lmget`. `Client.Pull` emette gli stessi eventi di `--json` (tranne `nickname`, `lock` ed `error`; `Pull` restituisce l'errore), con `progress` fino a 10 volte al secondo per file."
+      ],
+      "suggest": [
+        "json",
+        "mcp"
+      ],
+      "tests": [
+        "posso usare lmget da codice go?",
+        "c'è una libreria go?",
+        "usare lmget da programma",
+        "c'è un sdk?",
+        "libreria",
+        "libreria go",
+        "pacchetto go",
+        "sdk?",
+        "usarlo da go",
+        "api golang"
+      ]
+    },
+    {
+      "id": "pickle",
+      "question": "Perché i file .bin sono stati saltati?",
+      "source": "README.md#usage",
+      "keywords": [
+        "pickle",
+        "file bin",
+        "pytorch model bin",
+        "model bin",
+        "file pt",
+        "ckpt",
+        "pth",
+        "allow pickle",
+        "manca il bin",
+        "mancano i bin",
+        "bin saltati",
+        "stati saltati"
+      ],
+      "answers": [
+        "I file pickle (`.bin`, `.pt`, `.pth`, `.ckpt`, `.pkl`, ...) possono eseguire codice quando vengono caricati, quindi lmget li salta quando il repository elenca almeno un file `.safetensors`. Per tenerli:\n\n```sh\nlmget <model> --allow-pickle\n```\n\nUn `.bin` accanto a un `.xml` con lo stesso nome sono pesi OpenVINO, non un pickle. Il contenuto pickle con qualsiasi altro nome viene rifiutato."
+      ],
+      "suggest": [
+        "content-checks",
+        "include-exclude"
+      ],
+      "tests": [
+        "perché i file .bin sono stati saltati?",
+        "come scarico pytorch_model.bin?",
+        "lmget rifiuta i pickle?",
+        "cosa fa --allow-pickle?",
+        "manca il mio file ckpt",
+        "i pickle sono supportati?",
+        "pickle",
+        "pickle?",
+        ".bin saltati",
+        "dov'è pytorch_model.bin",
+        "--allow-pickle",
+        "perché niente file bin",
+        "manca il ckpt"
+      ]
+    },
+    {
+      "id": "content-checks",
+      "question": "lmget controlla cosa c'è dentro un file, non solo l'hash?",
+      "source": "README.md#content-checks",
+      "keywords": [
+        "controlli sul contenuto",
+        "controllo del contenuto",
+        "intestazione",
+        "intestazioni",
+        "header",
+        "intestazione safetensors",
+        "intestazione gguf",
+        "ispeziona",
+        "ispezionare",
+        "costruito ad arte",
+        "dentro il file",
+        "dentro i file",
+        "becca"
+      ],
+      "answers": [
+        "Sì. Un hash che corrisponde prova che i byte sono quelli che la fonte ha pubblicato, non che sono quello che dice il nome. Prima di salvare un file lmget percorre la sua intestazione come la legge il caricatore di riferimento:\n\n- `.safetensors`: ogni tensore descritto, e i tensori coprono i dati esattamente\n- `.gguf` versioni 2 e 3: conteggi, stringhe e tensori dentro il file, come controlla llama.cpp\n- il contenuto pickle che esegue codice è rifiutato, se il file non ha un nome da pickle\n\nI file rifiutati escono con codice 5."
+      ],
+      "suggest": [
+        "pickle",
+        "verify",
+        "is-it-safe"
+      ],
+      "tests": [
+        "lmget controlla cosa c'è dentro un file?",
+        "ispeziona le intestazioni dei safetensors?",
+        "un gguf costruito ad arte può passare?",
+        "cosa sono i controlli sul contenuto?",
+        "controlli sul contenuto",
+        "controlli sul contenuto?",
+        "controlla le intestazioni?",
+        "safetensors costruito ad arte",
+        "intestazione gguf malevola",
+        "lmget guarda dentro i file?"
+      ]
+    },
+    {
+      "id": "verify",
+      "question": "Come verifica i file lmget?",
+      "source": "README.md#usage, README.md#ollama, README.md#oci-registries",
+      "keywords": [
+        "verifica",
+        "verificare",
+        "verifico",
+        "hash",
+        "sha256",
+        "checksum",
+        "integrita",
+        "integro",
+        "corrotto",
+        "corrotti",
+        "manomesso",
+        "non corrisponde",
+        "mismatch",
+        "exit code 5",
+        "codice di uscita 5",
+        "verifica i file",
+        "controllo hash"
+      ],
+      "answers": [
+        "Ogni file è controllato contro l'hash che la sua fonte pubblica, al commit fissato: i file grandi (LFS) contro il loro sha256, quelli piccoli contro il loro id di blob git, di cui lmget registra anche lo sha256. I layer di Ollama e OCI sono controllati contro i digest sha256 del manifest.\n\nUn file che non corrisponde viene scartato ed esce con codice 5: non entra mai nello store."
+      ],
+      "suggest": [
+        "content-checks",
+        "doctor",
+        "is-it-safe"
+      ],
+      "tests": [
+        "come verifica i file lmget?",
+        "controlla lo sha256?",
+        "e se un file è corrotto?",
+        "errore di hash che non corrisponde",
+        "come so che il download è integro?",
+        "lmget controlla i checksum?",
+        "verifica",
+        "verifica?",
+        "verificare",
+        "controllo hash",
+        "sha256",
+        "checksum?",
+        "integrità",
+        "il download è verificato?",
+        "verifica i file?"
+      ]
+    },
+    {
+      "id": "memory-fit",
+      "question": "Il modello ci sta nella mia memoria?",
+      "source": "README.md#usage (--dry-run), memory.go",
+      "keywords": [
+        "memoria",
+        "ram",
+        "vram",
+        "ci sta",
+        "entra",
+        "abbastanza memoria",
+        "memoria della gpu",
+        "gpu",
+        "kv cache",
+        "memoria unificata",
+        "girera",
+        "gira sul mio",
+        "troppo grande",
+        "quanta ram",
+        "portatile",
+        "8gb",
+        "16gb",
+        "regge",
+        "mac regge",
+        "stima della memoria",
+        "calcolata la stima"
+      ],
+      "answers": [
+        "`lmget info` lo dice per un modello di Hugging Face con un `config.json` di transformers: i pesi selezionati più la cache KV per 8192 token (o il massimo del modello, se è minore), contro la memoria che lmget lascia usare a un modello qui: 30% della memoria unificata su Apple Silicon, 85% della memoria di una GPU NVIDIA, 50% della RAM altrove.\n\nAttivazioni, overhead del runtime e velocità non sono contati: è un minimo. Legge solo `config.json`, pochi kB."
+      ],
+      "suggest": [
+        "info",
+        "nickname-choice"
+      ],
+      "tests": [
+        "il modello ci sta nella mia memoria?",
+        "quanta ram serve per questo modello?",
+        "la mia gpu ce la fa?",
+        "ci sta in 16 GB?",
+        "come viene calcolata la stima della memoria?",
+        "un modello 7b gira sul mio portatile da 8gb?",
+        "memoria",
+        "ram?",
+        "ci sta?",
+        "vram",
+        "ci sta in memoria?",
+        "16gb bastano?",
+        "il mio mac regge questo modello?",
+        "gira sulla mia gpu?"
+      ]
+    },
+    {
+      "id": "needs-gpu",
+      "question": "Serve una GPU per usare lmget?",
+      "source": "README.md#nicknames, README.md#lmget-run, README.md#usage",
+      "keywords": [
+        "serve una gpu",
+        "serve la gpu",
+        "gpu obbligatoria",
+        "richiede una gpu",
+        "senza gpu",
+        "niente gpu",
+        "cuda",
+        "scheda nvidia",
+        "gpu nvidia",
+        "senza nvidia",
+        "scheda video",
+        "scheda grafica",
+        "solo cpu",
+        "grafica integrata",
+        "usa la mia gpu"
+      ],
+      "answers": [
+        "No. lmget scarica, verifica e collega i modelli; non ne esegue nessuno, quindi non serve una GPU. La macchina conta solo per le scelte: un soprannome legge la memoria, Apple Silicon e una GPU NVIDIA (tramite `nvidia-smi`) per proporre una variante che ci sta, e `--dry-run` dice se un modello ci sta nella memoria di questa macchina.\n\nPer eseguire il modello serve un'app: Ollama, LM Studio, oMLX o un'altra."
+      ],
+      "suggest": [
+        "memory-fit",
+        "run",
+        "nickname-choice"
+      ],
+      "tests": [
+        "serve una gpu?",
+        "gpu obbligatoria?",
+        "lmget richiede cuda?",
+        "non ho una scheda nvidia, posso usarlo?",
+        "macchina solo cpu",
+        "senza gpu funziona?",
+        "serve una scheda video?",
+        "lmget usa la mia gpu?",
+        "serve cuda?",
+        "funziona senza scheda grafica?"
+      ]
+    },
+    {
+      "id": "info",
+      "question": "Posso vedere cosa scarica prima di scaricare?",
+      "source": "README.md#usage, lmget info --help",
+      "keywords": [
+        "lmget info",
+        "dry run",
+        "anteprima",
+        "prima di scaricare",
+        "senza scaricare",
+        "elenco dei file",
+        "cosa scarica",
+        "comando info",
+        "vedere prima",
+        "il piano",
+        "grande il modello prima",
+        "prima di scaricarlo",
+        "senza scaricarli"
+      ],
+      "answers": [
+        "Sì:\n\n```sh\nlmget info Qwen/Qwen3-0.6B\n```\n\nMostra il commit, la licenza, ogni file con dimensione e hash, cosa c'è già nello store, i controlli su pickle e gated, lo spazio libero e, per un modello transformers, se ci sta nella memoria di questa macchina. Non scarica i pesi. `--dry-run` su un download si ferma dopo lo stesso piano."
+      ],
+      "suggest": [
+        "memory-fit",
+        "first-download",
+        "include-exclude"
+      ],
+      "tests": [
+        "posso vedere cosa scarica prima di scaricare?",
+        "c'è un dry run?",
+        "cosa mostra lmget info?",
+        "quanto è grande il modello prima di scaricarlo?",
+        "vedere i file di un repo senza scaricarli",
+        "lmget info",
+        "dry run",
+        "--dry-run",
+        "anteprima",
+        "vedere prima i file",
+        "il piano"
+      ]
+    },
+    {
+      "id": "include-exclude",
+      "question": "Come scarico solo alcuni file, come una quantizzazione?",
+      "source": "README.md#usage, lmget get --help",
+      "keywords": [
+        "include",
+        "exclude",
+        "alcuni file",
+        "solo alcuni",
+        "quantizzazione",
+        "quantizzazioni",
+        "q4 k m",
+        "q4",
+        "q8",
+        "glob",
+        "pattern",
+        "filtro",
+        "filtrare",
+        "selezionare i file",
+        "saltare i file",
+        "file specifici",
+        "gguf quant",
+        "tutto il repo",
+        "intero repo",
+        "tutto il repository",
+        "una quantizzazione",
+        "solo la q4",
+        "alcuni dei file"
+      ],
+      "answers": [
+        "Con dei glob sul percorso o sul nome del file:\n\n```sh\nlmget unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\nlmget Qwen/Qwen3-0.6B --exclude '*.onnx'\n```\n\n`--include` e `--exclude` si possono ripetere. Provali prima con `lmget info`: mostra cosa viene selezionato. La selezione viene registrata in `lmget.lock`."
+      ],
+      "suggest": [
+        "info",
+        "hf-url"
+      ],
+      "tests": [
+        "come scarico solo alcuni file?",
+        "voglio solo la quantizzazione Q4_K_M",
+        "saltare i file onnx",
+        "scaricare una quantizzazione sola da un repo gguf",
+        "filtrare i file con un glob",
+        "mi serve solo un file gguf, non tutto il repository",
+        "--include",
+        "--exclude",
+        "una quantizzazione sola",
+        "solo la Q4_K_M",
+        "solo la q4",
+        "filtrare i file",
+        "saltare alcuni file",
+        "solo alcuni dei file"
+      ]
+    },
+    {
+      "id": "revision",
+      "question": "Come prendo un branch, un tag o un commit preciso?",
+      "source": "README.md#usage",
+      "keywords": [
+        "branch",
+        "commit",
+        "revisione",
+        "revisione precisa",
+        "tag",
+        "versione vecchia",
+        "versione precedente",
+        "versione precisa",
+        "fissare un commit",
+        "a un commit",
+        "taggata",
+        "main",
+        "fissare una revisione",
+        "versione vecchia di un modello",
+        "release taggata"
+      ],
+      "answers": [
+        "Aggiungi `@` e la revisione:\n\n```sh\nlmget Qwen/Qwen3-0.6B@main\nlmget Qwen/Qwen3-0.6B@<tag o commit>\n```\n\nLa revisione viene risolta in un commit prima di scaricare qualsiasi cosa. Per tenere quel commit in un progetto aggiungi `--lock`: finisce in `lmget.lock`."
+      ],
+      "suggest": [
+        "lockfile",
+        "first-download"
+      ],
+      "tests": [
+        "come prendo un branch preciso?",
+        "scaricare una versione vecchia di un modello",
+        "fissare un modello a un commit",
+        "posso scegliere la revisione?",
+        "prendere una release taggata del repo",
+        "branch",
+        "commit",
+        "revisione",
+        "tag",
+        "commit preciso",
+        "versione vecchia di un modello",
+        "@main",
+        "fissare una revisione"
+      ]
+    },
+    {
+      "id": "dir-target",
+      "question": "Posso salvare il modello in una cartella a mia scelta?",
+      "source": "README.md#usage, README.md#bill-of-materials",
+      "keywords": [
+        "dir",
+        "cartella",
+        "directory",
+        "cartella mia",
+        "mia cartella",
+        "cartella a scelta",
+        "cartella precisa",
+        "salvare in",
+        "salvarlo in",
+        "cartella di output",
+        "dove voglio",
+        "cartella locale",
+        "cartella corrente",
+        "scaricare in",
+        "nella cartella",
+        "scaricare in models",
+        "in models",
+        "scegliere la cartella",
+        "cartella accanto",
+        "accanto al mio codice"
+      ],
+      "answers": [
+        "Sì, con `--to dir:`:\n\n```sh\nlmget Qwen/Qwen3-0.6B --to dir:./models/qwen3\n```\n\nI file sono hard link allo store (un symlink tra filesystem diversi), quindi non occupano una seconda copia. Con un lockfile, una destinazione `dir:` deve restare dentro la cartella del lockfile. Senza terminale, il percorso viene stampato su stdout."
+      ],
+      "suggest": [
+        "targets",
+        "scripts-output"
+      ],
+      "tests": [
+        "posso salvare il modello in una cartella a mia scelta?",
+        "scaricare in ./models",
+        "salvarlo nella cartella del mio progetto",
+        "cartella di output personalizzata",
+        "mettere i file dove voglio io",
+        "voglio i file in una cartella accanto al mio codice",
+        "--to dir",
+        "cartella personalizzata",
+        "una mia cartella",
+        "salvare in una cartella",
+        "cartella di output",
+        "scegliere la cartella"
+      ]
+    },
+    {
+      "id": "hf-cache",
+      "question": "Dov'è la cache di Hugging Face, e transformers troverà il modello?",
+      "source": "README.md#usage, README.md#works-with",
+      "keywords": [
+        "cache di hugging face",
+        "cache huggingface",
+        "hf cache",
+        "hf home",
+        "hf hub cache",
+        "hub cache",
+        "from pretrained",
+        "sentence transformers",
+        "cartella della cache",
+        "transformers vede",
+        "transformers trova",
+        "transformers trovera",
+        "transformers non trova",
+        "transformers non lo trova",
+        "huggingface transformers",
+        "transformers vede il modello"
+      ],
+      "answers": [
+        "La cache è `$HF_HUB_CACHE`, altrimenti `$HF_HOME/hub`, altrimenti `$XDG_CACHE_HOME/huggingface/hub`, altrimenti `~/.cache/huggingface/hub`. È la destinazione predefinita per i modelli di Hugging Face, quindi `from_pretrained(\"Qwen/Qwen3-0.6B\")` in transformers li trova, come sentence-transformers e `-hf` di llama.cpp.\n\nUn repository scritto con maiuscole diverse viene salvato con la sua grafia, dove transformers lo cerca."
+      ],
+      "suggest": [
+        "targets",
+        "store"
+      ],
+      "tests": [
+        "dov'è la cache di hugging face?",
+        "transformers troverà il modello?",
+        "from_pretrained funziona dopo lmget?",
+        "dove punta HF_HOME?",
+        "usarlo con sentence-transformers",
+        "transformers vede il modello scaricato con lmget?",
+        "cache hf",
+        "cache di hugging face",
+        "from_pretrained",
+        "HF_HOME",
+        "sentence-transformers",
+        "transformers non trova il mio modello",
+        "dov'è la cache hf"
+      ]
+    },
+    {
+      "id": "store",
+      "question": "Dove tiene i suoi file lmget?",
+      "source": "README.md#usage",
+      "keywords": [
+        "store",
+        "lmget home",
+        "posizione",
+        "spostare lo store",
+        "cartella dei dati",
+        "dove sono i file",
+        "dove salva",
+        "tenere i file",
+        "conservati",
+        "blob",
+        "indirizzati per contenuto",
+        "disco esterno",
+        "dove tiene",
+        "salvati",
+        "dove sono salvati",
+        "posizione dello store",
+        "cartella lmget",
+        "nella cartella lmget"
+      ],
+      "answers": [
+        "Nello store: `~/.lmget`, o `$LMGET_HOME`. Ogni file è tenuto una volta sola, per sha256, e collegato con hard link nelle destinazioni (symlink tra filesystem diversi), quindi lo stesso modello in tre app occupa lo spazio di uno.\n\nPer tenere lo store altrove, imposta `LMGET_HOME`."
+      ],
+      "suggest": [
+        "targets",
+        "disk-space",
+        "ls"
+      ],
+      "tests": [
+        "dove tiene i suoi file lmget?",
+        "cos'è lo store?",
+        "posso cambiare la posizione dei dati?",
+        "dove sono i blob?",
+        "mettere lo store su un disco esterno",
+        "dove sono salvati davvero i file?",
+        "store",
+        "store?",
+        "cosa c'è nella cartella .lmget",
+        "LMGET_HOME",
+        "dove sono i blob",
+        "spostare lo store",
+        "cambiare la posizione dello store"
+      ]
+    },
+    {
+      "id": "targets",
+      "question": "Dove mette i modelli lmget?",
+      "source": "README.md#usage",
+      "keywords": [
+        "dove mette",
+        "dove li mette",
+        "dove finiscono",
+        "dove vanno i modelli",
+        "destinazione",
+        "destinazioni",
+        "flag to",
+        "opzione to",
+        "esportare",
+        "collegati",
+        "collegamenti",
+        "altre app",
+        "zwherez",
+        "dove finiscono i download",
+        "dove scarica",
+        "dove salva i modelli",
+        "opzioni di to",
+        "quali opzioni"
+      ],
+      "answers": [
+        "Dove li cercano i tuoi strumenti, scelto con `--to`:\n\n- `--to hf`: la cache di Hugging Face (default per i modelli di Hugging Face)\n- `--to ollama`: Ollama (default per i modelli di Ollama)\n- `--to omlx`, `lmstudio`, `jan`, `localai`, `exo`, `colibri`, `comfyui`: le cartelle di quelle app\n- `--to dir:PATH`: una tua cartella\n- `--to none`: solo lo store\n\nI file stanno una volta sola nello store, `~/.lmget`, e vengono collegati lì."
+      ],
+      "suggest": [
+        "hf-cache",
+        "dir-target",
+        "works-with"
+      ],
+      "tests": [
+        "dove mette i modelli lmget?",
+        "che destinazioni ci sono?",
+        "cosa fa il flag --to?",
+        "dove finiscono i file dopo il download?",
+        "può esportare in altre app?",
+        "destinazioni",
+        "opzioni di --to",
+        "dove vanno i modelli",
+        "dove salva i modelli",
+        "dove li mette?",
+        "dove finiscono i download",
+        "dove scarica?",
+        "esportare"
+      ]
+    },
+    {
+      "id": "disk-space",
+      "question": "Quanto spazio su disco serve a lmget?",
+      "source": "README.md#usage",
+      "keywords": [
+        "spazio su disco",
+        "disco pieno",
+        "quanto occupa",
+        "occupa",
+        "duplicati",
+        "duplica",
+        "doppio",
+        "due volte",
+        "512",
+        "codice 7",
+        "exit code 7",
+        "occupera",
+        "occupare",
+        "codice di uscita 7",
+        "uscita 7",
+        "quanto spazio",
+        "disco",
+        "spazio"
+      ],
+      "answers": [
+        "Quanto il modello: `lmget info` mostra la dimensione di ogni file, cosa c'è già nello store e lo spazio libero. I file sono salvati una volta per sha256 e collegati, quindi un modello in più app, o un file condiviso da due modelli, sta sul disco una volta sola.\n\nUn download che lascerebbe meno di 512 MiB liberi sul disco dello store non parte (codice di uscita 7). Per liberare spazio: `lmget rm`."
+      ],
+      "suggest": [
+        "rm",
+        "store",
+        "info"
+      ],
+      "tests": [
+        "quanto spazio su disco serve a lmget?",
+        "duplica i file tra le app?",
+        "ho il disco quasi pieno",
+        "salva il modello due volte?",
+        "è fallito con codice di uscita 7",
+        "quanto occuperà?",
+        "spazio su disco",
+        "disco?",
+        "spazio",
+        "disco pieno",
+        "codice di uscita 7",
+        "quanto spazio",
+        "duplicati?",
+        "usa il doppio dello spazio?"
+      ]
+    },
+    {
+      "id": "resume",
+      "question": "E se un download si interrompe?",
+      "source": "README.md#usage, README.md#direct-urls, README.md#exit-codes",
+      "keywords": [
+        "riprendere",
+        "ripresa",
+        "interrotto",
+        "interrompere",
+        "interruzione",
+        "si e fermato",
+        "fermato",
+        "ctrl c",
+        "connessione caduta",
+        "continuare il download",
+        "ricominciare",
+        "crash",
+        "pausa",
+        "a meta",
+        "ricomincio",
+        "connessione persa",
+        "download fermo",
+        "cade la connessione",
+        "riparte",
+        "da capo"
+      ],
+      "answers": [
+        "Esegui di nuovo lo stesso comando: riprende dall'ultimo blocco completato. Un'esecuzione interrotta esce con codice 130.\n\nUn server che ignora le richieste a intervalli (alcuni URL diretti e semplici file server) rimanda tutto il file. Se il file di un URL diretto cambia sul server nel frattempo, lmget si ferma (codice di uscita 6) e l'esecuzione successiva riparte da zero invece di unire due versioni."
+      ],
+      "suggest": [
+        "speed",
+        "exit-codes"
+      ],
+      "tests": [
+        "e se un download si interrompe?",
+        "posso riprendere un download?",
+        "ho premuto ctrl-c a metà",
+        "mi è caduta la connessione",
+        "continua da dove si è fermato?",
+        "il download si è fermato al 50%, devo ricominciare?",
+        "riprendere",
+        "riprendere?",
+        "interrotto",
+        "ctrl-c",
+        "connessione persa",
+        "download fermo",
+        "continuare un download",
+        "mettere in pausa e riprendere"
+      ]
+    },
+    {
+      "id": "speed",
+      "question": "lmget può scaricare più veloce?",
+      "source": "README.md#usage, README.md#your-own-origins, README.md#sharing-on-the-local-network",
+      "keywords": [
+        "veloce",
+        "velocita",
+        "lento",
+        "lenta",
+        "lentamente",
+        "parallelo",
+        "parallele",
+        "connessioni",
+        "conns",
+        "banda",
+        "accelerare",
+        "va piano",
+        "velocizzare",
+        "lentissimo"
+      ],
+      "answers": [
+        "lmget scarica ogni file con richieste parallele a intervalli, 8 connessioni per default; `--conns` le cambia:\n\n```sh\nlmget Qwen/Qwen3-0.6B --conns 16\n```\n\nIn LAN, `lmget serve` su un'altra macchina (con `LMGET_LAN=on`) o una tua `--origin` possono servire i file per primi."
+      ],
+      "suggest": [
+        "lan-serve",
+        "origins",
+        "resume"
+      ],
+      "tests": [
+        "lmget può scaricare più veloce?",
+        "il download è lento",
+        "quante connessioni parallele usa?",
+        "aumentare la velocità di download",
+        "cosa fa --conns?",
+        "velocità",
+        "più veloce",
+        "lento",
+        "download lento",
+        "--conns",
+        "download paralleli",
+        "velocità di download",
+        "va piano"
+      ]
+    },
+    {
+      "id": "proxy",
+      "question": "lmget funziona dietro un proxy?",
+      "source": "README.md#usage",
+      "keywords": [
+        "proxy",
+        "https proxy",
+        "http proxy",
+        "no proxy",
+        "aziendale",
+        "dietro un proxy"
+      ],
+      "answers": [
+        "Sì: `HTTPS_PROXY`, `HTTP_PROXY` e `NO_PROXY` valgono per ogni richiesta.\n\n```sh\nHTTPS_PROXY=http://proxy.example:3128 lmget Qwen/Qwen3-0.6B\n```"
+      ],
+      "suggest": [
+        "hf-endpoint",
+        "origins"
+      ],
+      "tests": [
+        "lmget funziona dietro un proxy?",
+        "supporto per il proxy aziendale",
+        "rispetta HTTPS_PROXY?",
+        "come imposto un proxy?",
+        "sono dietro un proxy aziendale",
+        "proxy",
+        "proxy?",
+        "HTTPS_PROXY",
+        "proxy aziendale",
+        "dietro un firewall con proxy",
+        "NO_PROXY"
+      ]
+    },
+    {
+      "id": "exit-codes",
+      "question": "Cosa vogliono dire i codici di uscita di lmget?",
+      "source": "README.md#exit-codes",
+      "keywords": [
+        "codici di uscita",
+        "exit code",
+        "codici",
+        "exit status",
+        "codici di errore",
+        "codice 130",
+        "130",
+        "restituito",
+        "ritorna"
+      ],
+      "answers": [
+        "- 0: riuscito\n- 1: altro errore (per `doctor`, un controllo fallito)\n- 2: uso: riferimento, flag, lockfile o soprannome sbagliati, niente selezionato, un soprannome non confermato\n- 3: repository, revisione o file non trovato\n- 4: privato o gated: token mancante o senza permesso\n- 5: verifica fallita: hash, contenuto, blob revocato, lock o licenza diversi, firma non valida\n- 6: rete: fonte irraggiungibile dopo i tentativi\n- 7: disco: spazio insufficiente, o una scrittura fallita\n- 130: interrotto: esegui lo stesso comando per riprendere"
+      ],
+      "suggest": [
+        "scripts-output",
+        "verify",
+        "gated-token"
+      ],
+      "tests": [
+        "cosa vogliono dire i codici di uscita di lmget?",
+        "cos'è il codice di uscita 3?",
+        "elenco dei codici di errore",
+        "lmget ha restituito 7",
+        "significato dell'exit status",
+        "codici di uscita",
+        "codice di uscita",
+        "codice di uscita 3",
+        "codice 6",
+        "codici di errore",
+        "codici di ritorno",
+        "codice 130"
+      ]
+    },
+    {
+      "id": "first-download",
+      "question": "Come scarico un modello?",
+      "source": "README.md#usage",
+      "keywords": [
+        "scaricare un modello",
+        "download di un modello",
+        "prendo un modello",
+        "primo download",
+        "per iniziare",
+        "come uso lmget",
+        "scaricare qwen",
+        "scaricare da hugging face",
+        "comando base",
+        "zusez lmget",
+        "iniziare",
+        "primi passi",
+        "esempio"
+      ],
+      "answers": [
+        "Scrivi il nome del repository:\n\n```sh\nlmget Qwen/Qwen3-0.6B\n```\n\nlmget lo risolve in un commit, elenca ogni file con dimensione e hash, li scarica in parallelo, controlla ognuno e collega il modello nella cache di Hugging Face, dove lo trova transformers. Funziona anche un URL di Hugging Face.\n\nPer vedere il piano senza scaricare: `lmget info Qwen/Qwen3-0.6B`."
+      ],
+      "suggest": [
+        "info",
+        "targets",
+        "nicknames"
+      ],
+      "tests": [
+        "come scarico un modello?",
+        "come si usa lmget?",
+        "per iniziare",
+        "scaricare qwen da hugging face",
+        "qual è il comando base per prendere un modello?",
+        "come prendo un modello da hugging face?",
+        "scaricare un modello",
+        "come si scarica un modello",
+        "come si usa",
+        "come lo uso?",
+        "esempio",
+        "primi passi",
+        "iniziare",
+        "scaricare qwen",
+        "come prendo un modello"
+      ]
+    }
+  ],
+  "smalltalk": [
+    {
+      "id": "st-hello",
+      "question": "Ciao",
+      "source": "smalltalk",
+      "keywords": [
+        "ciao",
+        "salve",
+        "buongiorno",
+        "buonasera",
+        "buon pomeriggio",
+        "hey",
+        "ehi",
+        "ehila",
+        "hello",
+        "hi",
+        "c e nessuno",
+        "ci zyouz",
+        "pronto"
+      ],
+      "answers": [
+        "Ciao. Chiedimi di lmget: come si installa, come scarica e verifica un modello, dove lo mette.",
+        "Salve. Rispondo a domande su lmget: prova a chiedermi come si installa, o come verifica un file."
+      ],
+      "suggest": [
+        "what-is",
+        "install",
+        "first-download"
+      ],
+      "tests": [
+        "ciao",
+        "buongiorno",
+        "ehi ciao",
+        "salve",
+        "buonasera",
+        "ciao!",
+        "c'è nessuno?",
+        "ci sei?"
+      ]
+    },
+    {
+      "id": "st-how-are-you",
+      "question": "Come stai?",
+      "source": "smalltalk",
+      "keywords": [
+        "come stai",
+        "come va",
+        "tutto bene",
+        "come ti va",
+        "come butta",
+        "stai bene"
+      ],
+      "answers": [
+        "Sono un insieme di risposte scritte, quindi niente giornate buone o cattive. Cosa vuoi sapere di lmget?"
+      ],
+      "suggest": [
+        "what-is",
+        "install"
+      ],
+      "tests": [
+        "come stai?",
+        "come va?",
+        "tutto bene?",
+        "come ti va oggi"
+      ]
+    },
+    {
+      "id": "st-thanks",
+      "question": "Grazie",
+      "source": "smalltalk",
+      "keywords": [
+        "grazie",
+        "grazie mille",
+        "ti ringrazio",
+        "gentile",
+        "gentilissimo",
+        "thx",
+        "thanks",
+        "molte grazie"
+      ],
+      "answers": [
+        "Prego. Se vuoi, prova `lmget info` su un modello che ti interessa: non scarica i pesi.",
+        "Bene, felice di essere stato utile."
+      ],
+      "suggest": [
+        "info"
+      ],
+      "tests": [
+        "grazie",
+        "grazie mille",
+        "perfetto, grazie",
+        "ti ringrazio",
+        "grazie, gentilissimo"
+      ]
+    },
+    {
+      "id": "st-bye",
+      "question": "Ciao ciao",
+      "source": "smalltalk",
+      "keywords": [
+        "arrivederci",
+        "a presto",
+        "alla prossima",
+        "ci vediamo",
+        "addio",
+        "ciao ciao",
+        "buonanotte",
+        "a dopo",
+        "devo andare",
+        "buona giornata",
+        "buona serata"
+      ],
+      "answers": [
+        "A presto. La documentazione completa è nel README: https://github.com/fabriziosalmi/lmget#readme"
+      ],
+      "suggest": [],
+      "tests": [
+        "arrivederci",
+        "a presto",
+        "ciao ciao, alla prossima",
+        "ci vediamo",
+        "buonanotte",
+        "buona notte",
+        "devo andare, ciao",
+        "buona giornata"
+      ]
+    },
+    {
+      "id": "st-ok",
+      "question": "OK",
+      "source": "smalltalk",
+      "keywords": [
+        "ok",
+        "okay",
+        "va bene",
+        "capito",
+        "chiaro",
+        "d accordo",
+        "bene",
+        "ah ok",
+        "ho capito",
+        "perfetto",
+        "ottimo",
+        "fantastico",
+        "benissimo"
+      ],
+      "answers": [
+        "Va bene. Chiedimi pure altro su lmget."
+      ],
+      "suggest": [
+        "first-download",
+        "targets"
+      ],
+      "tests": [
+        "ok",
+        "va bene",
+        "capito",
+        "chiaro",
+        "ho capito",
+        "perfetto",
+        "ottimo",
+        "Va bene, sto uscendo. Buona serata!"
+      ]
+    },
+    {
+      "id": "st-yes",
+      "question": "Sì",
+      "source": "smalltalk",
+      "keywords": [
+        "si",
+        "sì",
+        "certo",
+        "certamente",
+        "esatto",
+        "proprio cosi",
+        "gia",
+        "yes"
+      ],
+      "answers": [
+        "Allora chiedimi cosa vuoi sapere di lmget, in poche parole: installazione, Ollama, modelli gated, spazio su disco."
+      ],
+      "suggest": [
+        "install",
+        "first-download"
+      ],
+      "tests": [
+        "sì",
+        "certo",
+        "esatto",
+        "certamente"
+      ]
+    },
+    {
+      "id": "st-no",
+      "question": "No",
+      "source": "smalltalk",
+      "keywords": [
+        "no",
+        "macche",
+        "non proprio",
+        "no grazie",
+        "nah"
+      ],
+      "answers": [
+        "Va bene. Chiedimi altro su lmget quando vuoi."
+      ],
+      "suggest": [
+        "what-is"
+      ],
+      "tests": [
+        "no",
+        "no grazie",
+        "non proprio",
+        "macché"
+      ]
+    },
+    {
+      "id": "st-sorry",
+      "question": "Scusa",
+      "source": "smalltalk",
+      "keywords": [
+        "scusa",
+        "scusami",
+        "scusate",
+        "mi scuso",
+        "ops",
+        "oops",
+        "errore mio",
+        "ho sbagliato"
+      ],
+      "answers": [
+        "Nessun problema. Richiedimelo con altre parole, o con la parola che conta: installare, verifica, Ollama, token, lockfile."
+      ],
+      "suggest": [
+        "what-is"
+      ],
+      "tests": [
+        "scusa",
+        "scusami",
+        "ops",
+        "scusa, ho sbagliato a scrivere",
+        "errore mio"
+      ]
+    },
+    {
+      "id": "st-laugh",
+      "question": "Ahah",
+      "source": "smalltalk",
+      "keywords": [
+        "ahah",
+        "ahahah",
+        "haha",
+        "lol",
+        "ahaha",
+        "divertente",
+        "che ridere",
+        "xd"
+      ],
+      "answers": [
+        "Felice che ti diverta. C'è qualcosa su lmget a cui posso rispondere?"
+      ],
+      "suggest": [
+        "what-is"
+      ],
+      "tests": [
+        "ahah",
+        "ahahahah",
+        "lol",
+        "che ridere",
+        "divertente"
+      ]
+    },
+    {
+      "id": "st-wow",
+      "question": "Wow",
+      "source": "smalltalk",
+      "keywords": [
+        "wow",
+        "interessante",
+        "notevole",
+        "impressionante",
+        "incredibile",
+        "caspita",
+        "accidenti",
+        "figo",
+        "forte"
+      ],
+      "answers": [
+        "Per vederlo all'opera senza scaricare pesi: `lmget info Qwen/Qwen3-0.6B` mostra il piano, con file, dimensioni, hash e licenza."
+      ],
+      "suggest": [
+        "info",
+        "first-download"
+      ],
+      "tests": [
+        "wow",
+        "interessante",
+        "notevole!",
+        "caspita",
+        "figo"
+      ]
+    },
+    {
+      "id": "st-compliment",
+      "question": "Bel lavoro",
+      "source": "smalltalk",
+      "keywords": [
+        "bravo",
+        "bravi",
+        "bravissimo",
+        "bravissimi",
+        "bel lavoro",
+        "ottimo lavoro",
+        "complimenti",
+        "bel sito",
+        "sito bello",
+        "bel progetto",
+        "bello strumento",
+        "mi piace",
+        "adoro",
+        "zyouz bravo",
+        "zyouz bravissimo",
+        "zyouz grande",
+        "zyouz forte",
+        "zyouz un genio",
+        "sei grande"
+      ],
+      "answers": [
+        "Grazie. lmget è open source: se ti è utile, il repository è https://github.com/fabriziosalmi/lmget"
+      ],
+      "suggest": [
+        "contribute",
+        "first-download"
+      ],
+      "tests": [
+        "bravo",
+        "bel sito",
+        "complimenti per il progetto",
+        "sei bravissimo",
+        "ottimo lavoro",
+        "mi piace molto questo strumento",
+        "sei forte"
+      ]
+    },
+    {
+      "id": "st-love",
+      "question": "Ti amo",
+      "source": "smalltalk",
+      "keywords": [
+        "ti amo",
+        "ti voglio bene",
+        "sposami",
+        "vuoi sposarmi",
+        "amico mio",
+        "mi ami",
+        "bacio"
+      ],
+      "answers": [
+        "Gentile, ma sono un elenco di risposte scritte. Posso comunque dirti come si installa lmget."
+      ],
+      "suggest": [
+        "install"
+      ],
+      "tests": [
+        "ti amo",
+        "sposami",
+        "ti voglio bene",
+        "vuoi sposarmi?"
+      ]
+    },
+    {
+      "id": "st-frustrated",
+      "question": "Non mi è servito",
+      "source": "smalltalk",
+      "keywords": [
+        "non mi aiuti",
+        "non serve a niente",
+        "risposta sbagliata",
+        "non ho chiesto questo",
+        "non capisci",
+        "non mi hai aiutato",
+        "non e quello che ho chiesto",
+        "non c entra",
+        "non ha senso",
+        "sbagliato",
+        "risposta inutile",
+        "non risponde alla domanda"
+      ],
+      "answers": [
+        "Scusa. Ho solo risposte scritte, scelte per parole chiave. Prova una domanda più corta con la parola che conta, come installare, verifica, Ollama, token, lockfile o spazio su disco."
+      ],
+      "suggest": [
+        "what-is",
+        "commands"
+      ],
+      "tests": [
+        "risposta sbagliata",
+        "non ho chiesto questo",
+        "non mi aiuti",
+        "non mi hai aiutato per niente",
+        "non c'entra niente",
+        "non ha senso"
+      ]
+    },
+    {
+      "id": "st-insult",
+      "question": "(un insulto)",
+      "source": "smalltalk",
+      "keywords": [
+        "stupido",
+        "scemo",
+        "idiota",
+        "cretino",
+        "deficiente",
+        "imbecille",
+        "inutile",
+        "fai schifo",
+        "che schifo",
+        "schifo",
+        "vaffanculo",
+        "fanculo",
+        "merda",
+        "zyouz stupido",
+        "zyouz inutile",
+        "zyouz scemo",
+        "zyouz idiota",
+        "ti odio",
+        "pessimo"
+      ],
+      "answers": [
+        "Non me la prendo: sono risposte scritte scelte per parole chiave, e a volte sbaglio. Chiedimi di lmget in poche parole e ci riprovo."
+      ],
+      "suggest": [
+        "what-is",
+        "commands"
+      ],
+      "tests": [
+        "sei inutile",
+        "sei stupido",
+        "fai schifo",
+        "idiota",
+        "vaffanculo",
+        "ti odio",
+        "bot scemo"
+      ]
+    },
+    {
+      "id": "st-who",
+      "question": "Chi sei?",
+      "source": "smalltalk",
+      "keywords": [
+        "chi sei",
+        "chi zyouz",
+        "cosa zyouz",
+        "che cosa zyouz",
+        "chi c e dall altra parte",
+        "con chi parlo",
+        "con chi sto parlando",
+        "presentati",
+        "parlami di te"
+      ],
+      "answers": [
+        "Sono la chat di lmget: risposte scritte su lmget, ognuna controllata sul suo codice e sul README, scelte da un abbinamento deterministico. Nessun modello linguistico."
+      ],
+      "suggest": [
+        "st-how-work",
+        "what-is"
+      ],
+      "tests": [
+        "chi sei?",
+        "cosa sei?",
+        "con chi sto parlando?",
+        "presentati",
+        "parlami di te"
+      ]
+    },
+    {
+      "id": "st-name",
+      "question": "Come ti chiami?",
+      "source": "smalltalk",
+      "keywords": [
+        "come ti chiami",
+        "il tuo nome",
+        "tuo nome",
+        "hai un nome",
+        "come ti chiamo",
+        "ti posso chiamare"
+      ],
+      "answers": [
+        "Non ho un nome mio: sono la chat di lmget, un insieme di risposte scritte su lmget."
+      ],
+      "suggest": [
+        "what-is"
+      ],
+      "tests": [
+        "come ti chiami?",
+        "hai un nome?",
+        "qual è il tuo nome?",
+        "come ti posso chiamare"
+      ]
+    },
+    {
+      "id": "st-are-you-ai",
+      "question": "Sei un'intelligenza artificiale?",
+      "source": "smalltalk",
+      "keywords": [
+        "zyouz ai",
+        "zyouz ia",
+        "zyouz un ai",
+        "zyouz un ia",
+        "zyouz un intelligenza",
+        "zyouz intelligenza artificiale",
+        "zyouz bot",
+        "zyouz un bot",
+        "zyouz robot",
+        "zyouz umano",
+        "zyouz vero",
+        "zyouz una persona",
+        "zyouz persona",
+        "zyouz macchina",
+        "zyouz reale",
+        "zyouz cosciente",
+        "parlando con un bot",
+        "parlo con un bot",
+        "parlo con una macchina",
+        "parlo con una persona",
+        "persona vera",
+        "persona reale",
+        "intelligenza artificiale",
+        "chatbot",
+        "bot"
+      ],
+      "answers": [
+        "No. Dietro questa chat non c'è nessun modello: ogni risposta è stata scritta prima e controllata sul codice e sul README di lmget, e un abbinamento deterministico ne sceglie una dalle parole che scrivi. Per questo non posso inventare una risposta: se non ce l'ho, te lo dico."
+      ],
+      "suggest": [
+        "st-how-work",
+        "what-is"
+      ],
+      "tests": [
+        "sei un'intelligenza artificiale?",
+        "sei un bot?",
+        "sto parlando con un bot?",
+        "sei una persona vera?",
+        "sei umano?",
+        "è un'ai?",
+        "sei un robot?",
+        "sei una ia?",
+        "sei reale?"
+      ]
+    },
+    {
+      "id": "st-human",
+      "question": "Posso parlare con una persona?",
+      "source": "smalltalk",
+      "keywords": [
+        "parlare con un umano",
+        "parlare con una persona",
+        "un umano",
+        "una persona vera per favore",
+        "operatore",
+        "assistenza clienti",
+        "supporto clienti",
+        "assistenza",
+        "supporto umano",
+        "parlare con qualcuno",
+        "qualcuno",
+        "voglio un umano",
+        "voglio una persona",
+        "una persona"
+      ],
+      "answers": [
+        "In questa chat non c'è nessuna persona. Per raggiungere chi c'è dietro lmget, apri una issue su GitHub: https://github.com/fabriziosalmi/lmget/issues"
+      ],
+      "suggest": [
+        "report-bug",
+        "who-made"
+      ],
+      "tests": [
+        "posso parlare con una persona?",
+        "voglio un umano",
+        "fammi parlare con qualcuno",
+        "c'è un'assistenza clienti?",
+        "operatore per favore",
+        "posso parlare con qualcuno?"
+      ]
+    },
+    {
+      "id": "st-which-model",
+      "question": "Che modello sei?",
+      "source": "smalltalk",
+      "keywords": [
+        "modello zyouz",
+        "che modello zyouz",
+        "quale modello zyouz",
+        "modello c e dietro",
+        "llm dietro",
+        "modello dietro",
+        "modello usi",
+        "che llm",
+        "quale llm",
+        "zyouz un llm",
+        "zyouz llm",
+        "zyouz un modello",
+        "zyouz un modello linguistico",
+        "modello linguistico",
+        "dietro questa chat",
+        "dietro la chat",
+        "fa girare questa chat",
+        "tuo modello",
+        "che ai",
+        "quale ai",
+        "che ia",
+        "quale ia",
+        "llm dietro questa",
+        "girare questa chat",
+        "fa girare questa chat",
+        "ia zyouz",
+        "che ia zyouz",
+        "che ai zyouz",
+        "modello usa questa chat"
+      ],
+      "answers": [
+        "Nessuno. Questa chat non esegue modelli e non genera testo: sceglie una delle sue risposte scritte con un abbinamento di parole chiave, sempre la stessa per la stessa domanda."
+      ],
+      "suggest": [
+        "st-how-work",
+        "st-are-you-ai"
+      ],
+      "tests": [
+        "che modello sei?",
+        "che llm c'è dietro?",
+        "che modello usa questa chat",
+        "sei un llm?",
+        "qual è il tuo modello",
+        "che ia sei?",
+        "sei un modello linguistico?",
+        "cosa fa girare questa chat"
+      ]
+    },
+    {
+      "id": "st-chatgpt",
+      "question": "Sei ChatGPT?",
+      "source": "smalltalk",
+      "keywords": [
+        "chatgpt",
+        "chat gpt",
+        "zyouz gpt",
+        "gpt dietro",
+        "zyouz openai",
+        "usi openai",
+        "fatto da openai"
+      ],
+      "answers": [
+        "No, non sono ChatGPT né un altro GPT, e qui niente chiama OpenAI. Sono risposte scritte su lmget, scelte da un abbinamento deterministico."
+      ],
+      "suggest": [
+        "st-how-work"
+      ],
+      "tests": [
+        "sei chatgpt?",
+        "è chat gpt?",
+        "sei gpt-4?",
+        "è openai?",
+        "usi openai?",
+        "ma sei chat gpt"
+      ]
+    },
+    {
+      "id": "st-claude",
+      "question": "Sei Claude?",
+      "source": "smalltalk",
+      "keywords": [
+        "zyouz claude",
+        "claude dietro",
+        "fatto da anthropic",
+        "anthropic",
+        "zyouz anthropic",
+        "zyouz sonnet",
+        "zyouz opus"
+      ],
+      "answers": [
+        "No, non sono Claude, e qui niente chiama Anthropic. Sono risposte scritte su lmget, scelte da un abbinamento deterministico."
+      ],
+      "suggest": [
+        "st-how-work"
+      ],
+      "tests": [
+        "sei claude?",
+        "è claude?",
+        "sei fatto da anthropic?",
+        "anthropic?"
+      ]
+    },
+    {
+      "id": "st-other-llm",
+      "question": "Sei Llama, Gemini o Mistral?",
+      "source": "smalltalk",
+      "keywords": [
+        "zyouz zllamaz",
+        "zyouz gemini",
+        "zyouz mistral",
+        "zyouz qwen",
+        "zyouz deepseek",
+        "zyouz grok",
+        "zyouz bard",
+        "zyouz copilot",
+        "zyouz phi",
+        "zyouz gemma",
+        "gemini dietro",
+        "zllamaz dietro",
+        "modello locale dietro",
+        "gira un modello locale"
+      ],
+      "answers": [
+        "No. Dietro questa chat non gira Llama, Gemini, Mistral, Qwen né un altro modello: sceglie risposte scritte con un abbinamento di parole chiave. lmget però scarica modelli aperti: chiedimi quali."
+      ],
+      "suggest": [
+        "models-available",
+        "st-how-work"
+      ],
+      "tests": [
+        "sei llama?",
+        "sei gemini",
+        "sei mistral?",
+        "sei qwen?",
+        "sei deepseek?",
+        "qui gira un modello locale?"
+      ]
+    },
+    {
+      "id": "st-speed",
+      "question": "Quanto sei veloce?",
+      "source": "smalltalk",
+      "keywords": [
+        "token al secondo",
+        "token secondo fai",
+        "token per secondo",
+        "quanti token fai",
+        "tuoi token",
+        "zyouz veloce",
+        "quanto zyouz veloce",
+        "zyouz lento",
+        "zyouz rapido",
+        "velocita di risposta",
+        "tempo di risposta",
+        "latenza",
+        "generi token",
+        "generi",
+        "essere cosi veloce"
+      ],
+      "answers": [
+        "Non ci sono token da contare: qui non si genera niente. Ogni risposta è stata scritta prima e viene cercata con un abbinamento di parole chiave, quindi alla stessa domanda segue sempre lo stesso testo."
+      ],
+      "suggest": [
+        "st-how-work"
+      ],
+      "tests": [
+        "quanto sei veloce?",
+        "quanti token al secondo fai",
+        "sei veloce",
+        "qual è la tua latenza",
+        "come fai a essere così veloce"
+      ]
+    },
+    {
+      "id": "st-how-work",
+      "question": "Come funzioni?",
+      "source": "smalltalk",
+      "keywords": [
+        "come funzioni",
+        "come funziona questa chat",
+        "come funziona la chat",
+        "come rispondi",
+        "come scegli",
+        "scegli le risposte",
+        "come scegli le risposte",
+        "come decidi",
+        "sotto il cofano",
+        "abbinamento",
+        "parole chiave",
+        "deterministico",
+        "deterministica",
+        "come e fatta questa chat",
+        "come funziona qui",
+        "funziona qui"
+      ],
+      "answers": [
+        "La tua domanda viene normalizzata (accenti, grafie comuni), poi confrontata con le parole chiave di risposte scritte; vince quella che abbina meglio sopra una soglia, e sotto la soglia ti dico che non ho una risposta. Se non abbina niente, una parola lunga scritta male può essere corretta e la domanda riprovata. Nessun modello, e nessuna chiamata di rete per scegliere la risposta: alla stessa domanda, la stessa risposta."
+      ],
+      "suggest": [
+        "st-invent",
+        "st-who-made-you"
+      ],
+      "tests": [
+        "come funzioni?",
+        "come funziona questa chat",
+        "come scegli le risposte",
+        "cosa c'è sotto il cofano",
+        "come decidi cosa dire",
+        "è deterministica?"
+      ]
+    },
+    {
+      "id": "st-invent",
+      "question": "Puoi inventare le cose?",
+      "source": "smalltalk",
+      "keywords": [
+        "allucinazioni",
+        "allucinazione",
+        "allucini",
+        "inventare",
+        "inventi",
+        "inventato",
+        "ti inventi",
+        "inventarti",
+        "menti",
+        "mentire",
+        "bugie",
+        "dici bugie",
+        "tirare a indovinare",
+        "tiri a indovinare",
+        "indovini",
+        "fidarmi delle risposte",
+        "fidarmi delle tue risposte"
+      ],
+      "answers": [
+        "No: posso dare solo risposte scritte prima e controllate sul codice e sul README di lmget. Se nessuna va bene, te lo dico invece di tirare a indovinare."
+      ],
+      "suggest": [
+        "st-sure",
+        "st-how-work"
+      ],
+      "tests": [
+        "hai allucinazioni?",
+        "puoi inventare le cose?",
+        "mi stai dicendo bugie?",
+        "te lo sei inventato?",
+        "tiri a indovinare?",
+        "posso fidarmi delle tue risposte?"
+      ]
+    },
+    {
+      "id": "st-sure",
+      "question": "Sei sicuro?",
+      "source": "smalltalk",
+      "keywords": [
+        "zyouz sicuro",
+        "zyouz certo",
+        "davvero",
+        "sul serio",
+        "seriamente",
+        "fonte",
+        "fonti",
+        "la tua fonte",
+        "prova",
+        "dimostralo",
+        "da dove viene",
+        "e vero",
+        "e corretto",
+        "come lo sai",
+        "come fai a saperlo"
+      ],
+      "answers": [
+        "Ogni risposta è scritta dal README e dal codice di lmget, e la sua fonte è registrata accanto. Il riferimento è il README: https://github.com/fabriziosalmi/lmget#readme"
+      ],
+      "suggest": [
+        "st-invent"
+      ],
+      "tests": [
+        "sei sicuro?",
+        "davvero?",
+        "è vero?",
+        "come fai a saperlo?",
+        "qual è la tua fonte",
+        "dimostralo",
+        "sul serio?"
+      ]
+    },
+    {
+      "id": "st-what-can-you-do",
+      "question": "Cosa sai fare?",
+      "source": "smalltalk",
+      "keywords": [
+        "cosa sai fare",
+        "che sai fare",
+        "cosa posso chiederti",
+        "cosa posso chiedere",
+        "cosa sai",
+        "argomenti",
+        "quali argomenti",
+        "che domande",
+        "menu",
+        "cos altro",
+        "cosa fai",
+        "di cosa parli"
+      ],
+      "answers": [
+        "Rispondo a domande su lmget: come si installa, come scarica e verifica i modelli, i soprannomi come `qwen`, dove vanno i modelli (cache di Hugging Face, Ollama, LM Studio e altre app), i lockfile, lo store, la condivisione in rete locale, gli agenti (MCP), i codici di uscita."
+      ],
+      "suggest": [
+        "what-is",
+        "install",
+        "first-download"
+      ],
+      "tests": [
+        "cosa sai fare?",
+        "cosa posso chiederti?",
+        "di quali argomenti sai qualcosa?",
+        "cos'altro mi sai dire",
+        "di cosa parli?"
+      ]
+    },
+    {
+      "id": "st-help",
+      "question": "Aiuto",
+      "source": "smalltalk",
+      "keywords": [
+        "aiuto",
+        "aiutami",
+        "aiutarmi",
+        "help",
+        "serve aiuto",
+        "ho bisogno di aiuto",
+        "soccorso"
+      ],
+      "answers": [
+        "Chiedimi di lmget in poche parole. Per esempio: come si installa, come scarico un modello, funziona con Ollama, dove mette i file, come scarico un modello gated."
+      ],
+      "suggest": [
+        "install",
+        "first-download",
+        "ollama"
+      ],
+      "tests": [
+        "aiuto",
+        "aiutami",
+        "help",
+        "ho bisogno di aiuto",
+        "puoi aiutarmi?"
+      ]
+    },
+    {
+      "id": "st-start",
+      "question": "Da dove comincio?",
+      "source": "smalltalk",
+      "keywords": [
+        "da dove comincio",
+        "da dove inizio",
+        "da dove parto",
+        "dove comincio",
+        "dove inizio",
+        "primo passo",
+        "sono nuovo",
+        "sono nuova",
+        "principiante",
+        "alle prime armi",
+        "neofita"
+      ],
+      "answers": [
+        "Installalo, poi guarda prima di scaricare:\n\n```sh\ncurl -fsSL https://lmget.org/install.sh | sh\nlmget info Qwen/Qwen3-0.6B\nlmget Qwen/Qwen3-0.6B\n```\n\n`lmget info` mostra file, dimensioni, hash e licenza, e non scarica i pesi."
+      ],
+      "suggest": [
+        "install",
+        "first-download",
+        "info"
+      ],
+      "tests": [
+        "da dove comincio?",
+        "sono nuovo, da dove parto",
+        "sono alle prime armi",
+        "primo passo?",
+        "sono un principiante, cosa faccio prima"
+      ]
+    },
+    {
+      "id": "st-who-made-you",
+      "question": "Chi ha fatto questa chat?",
+      "source": "smalltalk",
+      "keywords": [
+        "zwhoz zyouz",
+        "zwhoz questa chat",
+        "zwhoz chat",
+        "zwhoz chatbot",
+        "zwhoz bot",
+        "chi ha fatto questa chat",
+        "ha fatto la chat",
+        "scritto questa chat"
+      ],
+      "answers": [
+        "Questa chat fa parte del progetto lmget: risposte scritte su lmget, tenute nel suo repository accanto al codice che descrivono, e controllate su quel codice da test."
+      ],
+      "suggest": [
+        "who-made",
+        "st-how-work"
+      ],
+      "tests": [
+        "chi ti ha fatto?",
+        "chi ha fatto questa chat?",
+        "chi ti ha programmato",
+        "chi ha scritto questa chat",
+        "chi ti ha creato"
+      ]
+    },
+    {
+      "id": "st-memory",
+      "question": "Ti ricordi di me?",
+      "source": "smalltalk",
+      "keywords": [
+        "ricordi di me",
+        "ti ricordi",
+        "ricordi cosa",
+        "ricordi quello",
+        "ricordi la domanda",
+        "ti ricorderai",
+        "ricorderai",
+        "sai chi sono",
+        "mi conosci",
+        "memoria della chat"
+      ],
+      "answers": [
+        "Tengo solo l'argomento della tua ultima domanda, per capire un seguito breve, e solo finché questa chat è aperta. Non so chi sei."
+      ],
+      "suggest": [
+        "st-privacy-chat"
+      ],
+      "tests": [
+        "ti ricordi di me?",
+        "ti ricordi cosa ti ho chiesto prima?",
+        "sai chi sono?",
+        "te lo ricorderai domani?",
+        "Ti ricordi di cosa abbiamo parlato ieri, oppure ogni nuova chat riparte da zero?"
+      ]
+    },
+    {
+      "id": "st-privacy-chat",
+      "question": "Salvi quello che scrivo?",
+      "source": "smalltalk",
+      "keywords": [
+        "salvi quello",
+        "salvi le domande",
+        "salvate",
+        "registrate",
+        "registrata",
+        "salvata",
+        "conversazioni salvate",
+        "conversazione registrata",
+        "log delle domande",
+        "tieni traccia",
+        "quello che scrivo",
+        "le mie domande",
+        "i miei messaggi",
+        "cronologia della chat",
+        "viene salvato",
+        "log della chat",
+        "finiscono le mie domande"
+      ],
+      "answers": [
+        "Il codice che sceglie le mie risposte tiene la tua domanda in memoria solo per questo scambio: non scrive niente e non manda niente da nessuna parte."
+      ],
+      "suggest": [
+        "phone-home",
+        "st-memory"
+      ],
+      "tests": [
+        "salvi quello che scrivo?",
+        "registrate le domande?",
+        "i miei messaggi vengono salvati?",
+        "tenete i log della chat?",
+        "dove finiscono le mie domande",
+        "questa conversazione è registrata?"
+      ]
+    },
+    {
+      "id": "st-learn",
+      "question": "Impari da me?",
+      "source": "smalltalk",
+      "keywords": [
+        "impari da me",
+        "imparare da me",
+        "impari dalle",
+        "impari dalle mie domande",
+        "insegnarti",
+        "ti insegno",
+        "addestrarti",
+        "ti addestro",
+        "migliori da solo",
+        "diventi piu bravo",
+        "diventerai",
+        "diventerai piu bravo",
+        "correggerti"
+      ],
+      "answers": [
+        "No. Le mie risposte cambiano solo quando qualcuno le modifica nel repository di lmget e i test passano di nuovo. Niente di quello che scrivi le cambia."
+      ],
+      "suggest": [
+        "report-bug"
+      ],
+      "tests": [
+        "impari da me?",
+        "posso insegnarti qualcosa?",
+        "impari dalle mie domande?",
+        "posso addestrarti?",
+        "diventerai più bravo?"
+      ]
+    },
+    {
+      "id": "st-internet",
+      "question": "Puoi cercare su internet?",
+      "source": "smalltalk",
+      "keywords": [
+        "cercare su internet",
+        "cerchi su internet",
+        "cercare online",
+        "cerca online",
+        "cerca su google",
+        "googla",
+        "navigare",
+        "navighi",
+        "zyouz online",
+        "zyouz collegato",
+        "collegato a internet",
+        "accesso a internet",
+        "cercalo"
+      ],
+      "answers": [
+        "No. Non cerco niente: scelgo tra risposte scritte prima su lmget. Per tutto il resto, un motore di ricerca fa meglio."
+      ],
+      "suggest": [
+        "st-how-work"
+      ],
+      "tests": [
+        "puoi cercare su internet?",
+        "sei collegato a internet?",
+        "cercalo su google",
+        "puoi navigare?",
+        "sei online?"
+      ]
+    },
+    {
+      "id": "st-joke",
+      "question": "Raccontami una barzelletta",
+      "source": "smalltalk",
+      "keywords": [
+        "barzelletta",
+        "barzellette",
+        "battuta",
+        "battute",
+        "fammi ridere",
+        "qualcosa di divertente",
+        "una storiella"
+      ],
+      "answers": [
+        "Perché il modello non ha passato il checksum? Si era inventato un byte. lmget l'avrebbe fermato: ogni file è controllato contro l'hash che la sua fonte pubblica.",
+        "Ne ho una sola, e riguarda i modelli: un modello linguistico te ne direbbe una nuova ogni volta. Io sono risposte scritte, quindi ti becchi di nuovo questa."
+      ],
+      "suggest": [
+        "verify"
+      ],
+      "tests": [
+        "raccontami una barzelletta",
+        "sai qualche battuta?",
+        "fammi ridere",
+        "dimmi qualcosa di divertente"
+      ]
+    },
+    {
+      "id": "st-test",
+      "question": "Prova",
+      "source": "smalltalk",
+      "keywords": [
+        "prova",
+        "provo",
+        "test",
+        "testing",
+        "prova prova",
+        "sto provando",
+        "ping",
+        "123",
+        "prova 123"
+      ],
+      "answers": [
+        "Funziona. Chiedimi qualcosa su lmget: installazione, download, Ollama, verifica."
+      ],
+      "suggest": [
+        "install",
+        "first-download"
+      ],
+      "tests": [
+        "prova",
+        "prova prova",
+        "test",
+        "sto solo provando",
+        "ping"
+      ]
+    },
+    {
+      "id": "st-empty",
+      "question": "?",
+      "source": "smalltalk",
+      "keywords": [
+        "zemptyz",
+        "mah",
+        "boh",
+        "uhm",
+        "ehm",
+        "mmm",
+        "asdf"
+      ],
+      "answers": [
+        "Lì non c'era una domanda. Chiedimi di lmget in poche parole, per esempio: come si installa?"
+      ],
+      "suggest": [
+        "install",
+        "what-is"
+      ],
+      "tests": [
+        "?",
+        "...",
+        "!!!",
+        "boh",
+        "mah"
+      ]
+    },
+    {
+      "id": "st-lang-en",
+      "question": "Parla inglese",
+      "source": "smalltalk",
+      "keywords": [
+        "inglese",
+        "in inglese",
+        "parla inglese",
+        "parli inglese",
+        "rispondi in inglese",
+        "english",
+        "in english",
+        "speak english"
+      ],
+      "answers": [
+        "Here I answer in Italian. The same answers exist in English, in the English version of this chat."
+      ],
+      "suggest": [],
+      "tests": [
+        "parla inglese",
+        "parli inglese?",
+        "speak english",
+        "rispondi in inglese per favore",
+        "english please",
+        "Parli altre lingue oltre all'inglese?"
+      ]
+    },
+    {
+      "id": "st-lang-it",
+      "question": "Parla italiano",
+      "source": "smalltalk",
+      "keywords": [
+        "in italiano",
+        "parla italiano",
+        "parli italiano",
+        "rispondi in italiano"
+      ],
+      "answers": [
+        "Sto rispondendo in italiano. Chiedimi pure di lmget."
+      ],
+      "suggest": [
+        "what-is"
+      ],
+      "tests": [
+        "parli italiano?",
+        "rispondi in italiano",
+        "in italiano per favore"
+      ]
+    },
+    {
+      "id": "st-lang-other",
+      "question": "Altre lingue",
+      "source": "smalltalk",
+      "keywords": [
+        "parli francese",
+        "parli spagnolo",
+        "parli tedesco",
+        "parli portoghese",
+        "parli cinese",
+        "parli giapponese",
+        "parli russo",
+        "in francese",
+        "altre lingue",
+        "quali lingue",
+        "lingue",
+        "parlez",
+        "hablas",
+        "sprichst",
+        "francais",
+        "espanol",
+        "deutsch"
+      ],
+      "answers": [
+        "Rispondo solo in italiano e in inglese."
+      ],
+      "suggest": [
+        "st-lang-en"
+      ],
+      "tests": [
+        "parli francese?",
+        "hablas español?",
+        "parli tedesco?",
+        "quali lingue parli?",
+        "altre lingue?"
+      ]
+    }
+  ],
+  "fallbacks": [
+    "Su questo non ho una risposta scritta. Prova a chiedermi come installare lmget, come scaricare un modello o dove lo mette.",
+    "Non lo so, e non invento. Posso dirti come lmget verifica i file, come funzionano i soprannomi o come usarlo con Ollama.",
+    "Qui non ho niente di verificato da darti. Chiedimi dei comandi di lmget, del lockfile o delle app che riempie. La documentazione completa: https://github.com/fabriziosalmi/lmget#readme",
+    "È fuori da quello che so: rispondo solo su lmget. Prova con una parola come installare, verifica, Ollama, token o lockfile."
+  ],
+  "negatives": [
+    "che tempo fa oggi a genova",
+    "dammi la ricetta della carbonara",
+    "chi ha vinto il mondiale nel 2022",
+    "scrivimi una poesia sul mare",
+    "quanto fa 17 per 23",
+    "come centro un div con il css",
+    "scrivi una funzione python che inverte una stringa",
+    "come esco da vim",
+    "come faccio una tabella pivot in excel",
+    "qual è la capitale dell'australia",
+    "traduci gatto in tedesco",
+    "chi è il presidente della repubblica",
+    "consigliami un bel film per stasera",
+    "quanto è alto il monte bianco",
+    "la pizzeria migliore di napoli",
+    "spiegami la fisica quantistica in modo semplice",
+    "quanto vale l'azione di nvidia",
+    "come cambio le pastiglie dei freni della macchina",
+    "scrivi una query sql per contare le righe di una tabella",
+    "come funziona la fotosintesi",
+    "qual è il miglior framework javascript",
+    "come dimagrire in fretta",
+    "quando è stato fondato l'impero romano",
+    "come aggiorno i driver nvidia",
+    "come faccio il fine-tuning di mistral con axolotl",
+    "una rtx 4090 basta per un modello da 70b?",
+    "è meglio gemma o phi?",
+    "come carico un modello sull'hub di hugging face",
+    "come unisco due file safetensors",
+    "come addestro un modello da zero",
+    "cos'è un database vettoriale",
+    "quanto è grande gpt-4",
+    "come uso il trainer di transformers",
+    "quanto è lungo il contesto di llama 3",
+    "cos'è l'architettura transformer",
+    "come quantizzo un modello da solo",
+    "che nome do al mio gatto",
+    "come si fa il pane con la pasta madre",
+    "chi ha dipinto la gioconda",
+    "come imparo a suonare la chitarra",
+    "Come si dice 'Mi scusi, parla inglese?' in coreano?",
+    "Come faccio a verificare perché un servizio systemd non è riuscito ad avviarsi?",
+    "Come annullo il mio ultimo commit Git senza perdere le modifiche nella working directory?",
+    "Traduci in italiano: 'Thank you very much for your hospitality'."
+  ]
+}

@@ -1,0 +1,141 @@
+license-policy	Posso ammettere solo alcune licenze dei modelli?
+what-is	Cos'è lmget?
+why-not-hf-cli	Perché non usare semplicemente huggingface-cli?
+why-not-git	Perché non git clone con Git LFS?
+why-not-ollama-pull	Perché non usare semplicemente ollama pull?
+is-it-safe	lmget è sicuro?
+phone-home	lmget manda dati a casa o raccoglie telemetria?
+offline	lmget funziona offline?
+status	lmget è stabile? Posso usarlo in produzione?
+lmget-license	Con che licenza è distribuito lmget? È gratis?
+who-made	Chi ha fatto lmget?
+report-bug	Come segnalo un bug?
+security-report	Come segnalo una vulnerabilità di sicurezza?
+contribute	Come posso contribuire a lmget?
+roadmap	C'è una roadmap?
+datasets	lmget scarica dataset o Spaces?
+models-available	Quali modelli posso scaricare?
+sources	Da quali fonti scarica lmget?
+install-windows	Come installo lmget su Windows?
+windows-copies	Su Windows lmget copia i file?
+install-pip	Posso installare lmget con pip o uv?
+install-docker	C'è un'immagine Docker di lmget?
+install-ci	Posso usare lmget in GitHub Actions o in CI?
+install-source	Posso compilare lmget dai sorgenti?
+platforms	Su quali sistemi operativi e CPU gira lmget?
+binary-size	Quanto è grande il binario di lmget?
+written-in	In che linguaggio è scritto lmget? Serve Python?
+update	Come aggiorno lmget, e che versione ho?
+uninstall	Come disinstallo lmget?
+completion	lmget ha il completamento nella shell?
+commands	Quali comandi ha lmget?
+docs	Dov'è la documentazione?
+install	Come installo lmget?
+nickname-own	Posso creare i miei soprannomi?
+nickname-list	Quali soprannomi ci sono?
+nickname-script	Come uso un soprannome in uno script o in CI?
+nickname-choice	Come sceglie la variante un soprannome?
+nicknames	Cos'è un soprannome come lmget qwen?
+run-endpoint	lmget run può usare vLLM o llama-server?
+run-apps	Come trova lmget run oMLX, LM Studio o Ollama?
+run	lmget può eseguire un modello?
+app-omlx	Come metto un modello in oMLX?
+app-lmstudio	Come metto un modello in LM Studio?
+app-jan	Come metto un modello in Jan?
+app-localai	Come metto un modello in LocalAI?
+app-exo	Come metto un modello in exo?
+app-colibri	Come metto un modello in colibri?
+app-comfyui	Come metto un modello in ComfyUI?
+app-textgen	Come uso lmget con Text Generation WebUI, KoboldCpp o llamafile?
+works-with	Con quali app funziona lmget?
+app-revisions	Cosa succede quando aggiorno un modello in un'app?
+gguf-hf-ollama	Come metto in Ollama un GGUF di Hugging Face?
+ollama	lmget funziona con Ollama?
+revocations	E se un modello si rivela malevolo?
+index-keys	Quali chiavi firmano l'indice?
+run-a-node	Posso far girare un mio nodo o un mio indice?
+nodes	Cosa sono i nodi di lmget?
+signed-index	Cos'è l'indice firmato?
+no-mirror	Posso spegnere il ripiego su ModelScope?
+hf-endpoint	Posso usare un mirror di Hugging Face (HF_ENDPOINT)?
+hf-down	Cosa succede quando Hugging Face non risponde?
+gated-token	Come scarico un modello gated o privato?
+license-change	Perché lmget si è fermato perché la licenza è cambiata?
+sbom	lmget può generare uno SBOM?
+lockfile-trust	È sicuro fare sync di un lockfile di un repository clonato?
+sync	Cosa fa lmget sync?
+lockfile	Come fisso i modelli di un progetto con un lockfile?
+ls	Come vedo i modelli che ho scaricato?
+rm	Come cancello un modello e libero spazio?
+doctor	Come controllo che lo store sia sano?
+history	Cosa ricorda lmget dei miei download?
+url-hash	Come do l'hash atteso per un URL?
+oci	lmget scarica modelli da Docker Hub o da registri OCI?
+direct-url	Posso scaricare da un URL https qualsiasi?
+hf-url	Posso incollare un link di Hugging Face, o prendere un file solo?
+origins	Posso usare un mio server di cache o un mirror?
+s3-origin	lmget può scaricare da un bucket S3 o R2 privato?
+lan-security	lmget serve è sicuro sulla mia rete?
+lan-serve	Posso condividere i modelli con altre macchine in LAN?
+json	lmget ha un output JSON?
+scripts-output	Come uso lmget in uno script?
+mcp	Gli agenti AI possono usare lmget (MCP)?
+library	Posso usare lmget da codice Go?
+pickle	Perché i file .bin sono stati saltati?
+content-checks	lmget controlla cosa c'è dentro un file, non solo l'hash?
+verify	Come verifica i file lmget?
+memory-fit	Il modello ci sta nella mia memoria?
+needs-gpu	Serve una GPU per usare lmget?
+info	Posso vedere cosa scarica prima di scaricare?
+include-exclude	Come scarico solo alcuni file, come una quantizzazione?
+revision	Come prendo un branch, un tag o un commit preciso?
+dir-target	Posso salvare il modello in una cartella a mia scelta?
+hf-cache	Dov'è la cache di Hugging Face, e transformers troverà il modello?
+store	Dove tiene i suoi file lmget?
+targets	Dove mette i modelli lmget?
+disk-space	Quanto spazio su disco serve a lmget?
+resume	E se un download si interrompe?
+speed	lmget può scaricare più veloce?
+proxy	lmget funziona dietro un proxy?
+exit-codes	Cosa vogliono dire i codici di uscita di lmget?
+first-download	Come scarico un modello?
+st-hello	Ciao
+st-how-are-you	Come stai?
+st-thanks	Grazie
+st-bye	Ciao ciao
+st-ok	OK
+st-yes	Sì
+st-no	No
+st-sorry	Scusa
+st-laugh	Ahah
+st-wow	Wow
+st-compliment	Bel lavoro
+st-love	Ti amo
+st-frustrated	Non mi è servito
+st-insult	(un insulto)
+st-who	Chi sei?
+st-name	Come ti chiami?
+st-are-you-ai	Sei un'intelligenza artificiale?
+st-human	Posso parlare con una persona?
+st-which-model	Che modello sei?
+st-chatgpt	Sei ChatGPT?
+st-claude	Sei Claude?
+st-other-llm	Sei Llama, Gemini o Mistral?
+st-speed	Quanto sei veloce?
+st-how-work	Come funzioni?
+st-invent	Puoi inventare le cose?
+st-sure	Sei sicuro?
+st-what-can-you-do	Cosa sai fare?
+st-help	Aiuto
+st-start	Da dove comincio?
+st-who-made-you	Chi ha fatto questa chat?
+st-memory	Ti ricordi di me?
+st-privacy-chat	Salvi quello che scrivo?
+st-learn	Impari da me?
+st-internet	Puoi cercare su internet?
+st-joke	Raccontami una barzelletta
+st-test	Prova
+st-empty	?
+st-lang-en	Parla inglese
+st-lang-it	Parla italiano
+st-lang-other	Altre lingue
