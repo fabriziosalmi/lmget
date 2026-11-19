@@ -165,7 +165,7 @@ func run() lmget.ExitCode {
 	for _, c := range []*cobra.Command{root, get, sync} {
 		c.Flags().IntVar(&f.conns, "conns", 8, "parallel connections per file")
 		c.Flags().BoolVar(&f.noMirror, "no-mirror", false, "never fall back to ModelScope when Hugging Face fails")
-		c.Flags().StringSliceVar(&f.origins, "origin", nil, "ask this blob server first (URL; repeatable; default $LMGET_ORIGINS)")
+		c.Flags().StringSliceVar(&f.origins, "origin", nil, "ask this blob server first (URL, or s3://bucket/prefix with LMGET_S3_*; repeatable; default $LMGET_ORIGINS)")
 		c.Flags().BoolVar(&f.acceptLic, "accept-license-change", false, "go on when the license differs from the one in the lockfile, and record the new one")
 	}
 	sync.Flags().BoolVar(&f.update, "update", false, "resolve revisions again and rewrite the lock")

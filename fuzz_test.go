@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -159,5 +160,34 @@ func FuzzSafetensorsKeys(f *testing.F) {
 		p := filepath.Join(t.TempDir(), "x.safetensors")
 		os.WriteFile(p, b, 0o644)
 		safetensorsKeys(p)
+	})
+}
+
+// What an S3 server answers is not lmget's either.
+func FuzzS3Refusal(f *testing.F) {
+	f.Add(403, []byte(`<Error><Code>SignatureDoesNotMatch</Code></Error>`))
+	f.Add(400, []byte(`<Error><Code>AuthorizationHeaderMalformed</Code><Code>x</Code></Error>`))
+	f.Fuzz(func(t *testing.T, status int, body []byte) {
+		resp := &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewReader(body))}
+		s3Refusal(resp, "s3://b")
+	})
+}
+
+func FuzzParseS3Origin(f *testing.F) {
+	f.Add("s3://models/a/b")
+	f.Add("s3://my.models/../x")
+	f.Fuzz(func(t *testing.T, o string) {
+		s, ok := parseS3Origin(o)
+		if !ok {
+			return
+		}
+		if strings.Contains(s, "..") && !strings.Contains(strings.TrimPrefix(s, "s3://"), "/") {
+			return // a dotted bucket name such as a..b is refused below
+		}
+		for _, seg := range strings.Split(strings.TrimPrefix(s, "s3://"), "/") {
+			if seg == "" || seg == "." || seg == ".." || strings.ContainsAny(seg, "?#%\\ ") {
+				t.Fatalf("%q accepted as %q", o, s)
+			}
+		}
 	})
 }

@@ -80,7 +80,8 @@ type Client struct {
 	opt         Options
 	store       *Store
 	http        *http.Client
-	tokenSource string // where the token came from; never the token itself
+	tokenSource string    // where the token came from; never the token itself
+	s3          *s3Config // endpoint and keys for s3:// origins; nil without one
 	msMu        sync.Mutex
 	msFiles     map[string]map[string]msFile // ModelScope listings, per repository
 	ociMu       sync.Mutex
@@ -185,7 +186,16 @@ func New(o Options) (*Client, error) {
 	if err != nil {
 		return nil, newErr(ExitDisk, "disk", "cannot open the store at "+o.Home).wrap(err)
 	}
-	return &Client{opt: o, store: st, http: hc, tokenSource: tokenSource, retryBase: 500 * time.Millisecond}, nil
+	c := &Client{opt: o, store: st, http: hc, tokenSource: tokenSource, retryBase: 500 * time.Millisecond}
+	for _, or := range o.Origins {
+		if strings.HasPrefix(or, "s3://") {
+			if c.s3, err = s3FromEnv(); err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+	return c, nil
 }
 
 func (c *Client) Store() *Store { return c.store }
@@ -247,6 +257,12 @@ func noDowngrade(req *http.Request, via []*http.Request) error {
 	}
 	// net/http keeps Authorization on a redirect to the same host name on
 	// another port, and to subdomains: the token stays with the exact host.
+	// a signed request (an s3:// origin) goes to its endpoint only: the
+	// session token is a header too, and would follow
+	if len(via) > 0 && strings.HasPrefix(via[0].Header.Get("Authorization"), "AWS4-HMAC-SHA256 ") {
+		return newErr(ExitNetwork, "network", "refused a redirect of a signed request to "+req.URL.Host).
+			why("the bucket's keys sign requests for its endpoint only")
+	}
 	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
 		req.Header.Del("Authorization")
 	}
