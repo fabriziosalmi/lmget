@@ -1051,7 +1051,7 @@
         "not see"
       ],
       "answers": [
-        "At their usual addresses, or the ones you set:\n\n- oMLX: `server.host` and `server.port` from its settings, else `127.0.0.1:8000`, or `LMGET_OMLX_URL`\n- LM Studio: `127.0.0.1:1234`, or `LMGET_LMSTUDIO_URL`\n- Ollama: `OLLAMA_HOST`, else `127.0.0.1:11434`\n\nAn app is recognised by how it answers, not by its port. After linking, lmget asks oMLX to reload, which needs `LMGET_OMLX_API_KEY` (or key checks off on loopback); otherwise it says to restart oMLX. When the app has not enough memory, lmget says so and a nickname proposes a smaller variant for 7 days."
+        "At their usual addresses, or the ones you set:\n\n- oMLX: `server.host` and `server.port` from its settings, else `127.0.0.1:8000`, or `LMGET_OMLX_URL`\n- LM Studio: `127.0.0.1:1234`, or `LMGET_LMSTUDIO_URL`; `LMGET_LMSTUDIO_API_KEY` is sent only when LM Studio asks for a key\n- Ollama: `OLLAMA_HOST`, else `127.0.0.1:11434`\n\nAn app is recognised by how it answers, not by its port. After linking, lmget asks oMLX to reload, which needs `LMGET_OMLX_API_KEY` (or key checks off on loopback); otherwise it says to restart oMLX. When the app has not enough memory, lmget says so and a nickname proposes a smaller variant for 7 days."
       ],
       "suggest": [
         "run",
@@ -1085,7 +1085,7 @@
         "send a prompt"
       ],
       "answers": [
-        "lmget runs no model itself. `lmget run` gets the model, links it where an app loads it, and sends the prompt to that running app (oMLX, LM Studio or Ollama):\n\n```sh\nlmget run qwen \"what model are you?\"\nlmget run ollama:smollm2:135m \"hello\"\necho \"summarize this\" | lmget run qwen --yes\n```\n\nThe answer goes to stdout; `--max-tokens` caps it (default 512). The prompt and the answer are never written to the history."
+        "lmget runs no model itself. `lmget run` gets the model, links it where an app loads it, and sends the prompt to that running app (oMLX, LM Studio or Ollama):\n\n```sh\nlmget run qwen \"what model are you?\"\nlmget run ollama:smollm2:135m \"hello\"\necho \"summarize this\" | lmget run qwen --yes\n```\n\nThe answer goes to stdout; `--max-tokens` caps it (default 512). lmget looks the model's name up in the app's model list; `--model-id` gives the name the app knows it by, when the lookup does not find it. The prompt and the answer are never written to the history."
       ],
       "suggest": [
         "run-apps",
@@ -1205,7 +1205,7 @@
         "exo model"
       ],
       "answers": [
-        "```sh\nlmget mlx-community/Qwen3-0.6B-4bit --to exo\n```\n\nThe model goes to `<org>--<name>/` in exo's models folder (`$LMGET_EXO_DIR`, else exo's own default), with the `.exo-download.json` manifest exo writes after a verified download. exo runs only models it has a model card for: another repository is stored but not offered."
+        "```sh\nlmget mlx-community/Qwen3-0.6B-4bit --to exo\n```\n\nThe model goes to `<org>--<name>/` in exo's models folder (`$LMGET_EXO_DIR`, else `$EXO_DEFAULT_MODELS_DIR`, else `~/$EXO_HOME/models`, else `~/.exo/models` on macOS and Windows, `$XDG_DATA_HOME/exo/models` or `~/.local/share/exo/models` on Linux), with the `.exo-download.json` manifest exo writes after a verified download. exo runs only models it has a model card for: another repository is stored but not offered."
       ],
       "suggest": [
         "targets"

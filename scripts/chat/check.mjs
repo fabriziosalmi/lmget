@@ -15,7 +15,7 @@
 //    subcommand's --help of the real binary (--lmget, else go run).
 
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -173,7 +173,28 @@ for (const e of db.entries) {
   }
 }
 
-console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; commands checked ${cmds}; subcommands known ${subs.size}`);
+// 6. coverage: every subcommand of lmget, every flag in its --help and every
+// environment variable the code reads is named in at least one answer, so a
+// new flag or variable fails the gate until the chat explains it
+const answersText = db.entries.flatMap((e) => e.answers).join("\n");
+const covSubs = [...subs].filter((s) => s !== "help" && s !== "completion");
+const covFlags = new Set();
+for (const sub of ["", ...covSubs]) {
+  for (const m of help(sub).matchAll(/^\s+(?:-\w, )?(--[a-z][a-z0-9-]*)/gm)) if (m[1] !== "--help") covFlags.add(m[1]);
+}
+const covEnv = new Set();
+for (const dir of [root, join(root, "cmd", "lmget")]) {
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith(".go") || f.endsWith("_test.go")) continue;
+    for (const m of readFileSync(join(dir, f), "utf8").matchAll(/"((?:LMGET|HF|OLLAMA|EXO|LOCALAI)_[A-Z0-9_]+|MODELS_PATH)"/g)) covEnv.add(m[1]);
+  }
+}
+const named = (t) => new RegExp(`(^|[^A-Za-z0-9_-])${t.replace(/[$]/g, "\\$")}(?![A-Za-z0-9_-])`).test(answersText);
+for (const s of covSubs) if (!new RegExp(`lmget ${s}\\b`).test(answersText)) fail("coverage", `subcommand ${s} is in no answer`);
+for (const f of covFlags) if (!named(f)) fail("coverage", `flag ${f} is in no answer`);
+for (const v of covEnv) if (!named(v)) fail("coverage", `variable ${v} is in no answer`);
+
+console.log(`entries ${db.entries.length} + smalltalk ${(db.smalltalk || []).length}; tests ${tests}; typos ${typoOK}/${typoTotal} (${(typoRate * 100).toFixed(1)}%); heavy typos ${heavyOK}/${heavyTotal} (${(heavyRate * 100).toFixed(1)}%); negatives ${(db.negatives || []).length}; commands checked ${cmds}; coverage ${covSubs.length} subcommands, ${covFlags.size} flags, ${covEnv.size} variables; subcommands known ${subs.size}`);
 if (fails.length) {
   console.log(`FAIL (${fails.length})`);
   for (const f of fails) console.log("  " + f);
