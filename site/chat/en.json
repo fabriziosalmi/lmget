@@ -121,7 +121,9 @@
         "huggingface hub",
         "instead of huggingface",
         "why switch",
-        "replacement"
+        "replacement",
+        "hf transfer",
+        "hf_transfer"
       ],
       "answers": [
         "You can keep it: lmget fills the same Hugging Face cache, so transformers and other tools find the files where they expect them. What lmget adds:\n\n- the plan first: commit, files, sizes, hashes, license\n- every file checked against the published hash, and its header checked the way its loader reads it\n- pickle weights skipped when safetensors exist\n- ModelScope and the project's nodes when Hugging Face fails\n- a lockfile, and one copy on disk linked into Ollama, LM Studio and other apps"
@@ -143,7 +145,8 @@
         "what does it add over hf download",
         "I use hf download already",
         "is it better than huggingface cli",
-        "why would I switch from huggingface-cli"
+        "why would I switch from huggingface-cli",
+        "does it do anything hf_transfer doesn't"
       ]
     },
     {
@@ -160,7 +163,10 @@
         "use git",
         "with git",
         "just git",
-        "plain git"
+        "plain git",
+        "wget",
+        "than wget",
+        "vs wget"
       ],
       "answers": [
         "lmget fetches only the files you select, with parallel requests that resume after an interruption, checks each one against its published hash, and stores it once by sha256, linked where your tools look:\n\n```sh\nlmget unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\n```\n\nPickle weights are skipped when safetensors exist, and the plan is shown before a byte is downloaded."
@@ -180,7 +186,8 @@
         "git clone the model repo instead?",
         "cloning with git works for me",
         "lmget vs git clone",
-        "can't I just use git"
+        "can't I just use git",
+        "is this better than wget"
       ]
     },
     {
@@ -811,7 +818,10 @@
         "windows pc",
         "run on windows",
         "windows 11",
-        "windows 10"
+        "windows 10",
+        "windows support",
+        "install powershell",
+        "can i use it on windows"
       ],
       "answers": [
         "In PowerShell (amd64 and arm64):\n\n```powershell\nirm https://lmget.org/install.ps1 | iex\n```\n\nIt installs `lmget.exe` into `%LOCALAPPDATA%\\Programs\\lmget` and says how to add it to PATH; it does not change PATH itself. With Scoop:\n\n```powershell\nscoop bucket add lmget https://github.com/fabriziosalmi/lmget\nscoop install lmget\n```\n\nCI tests it on Windows Server 2025, not yet on a Windows desktop."
@@ -834,7 +844,9 @@
         "scoop?",
         "how to install lmget on windows 10",
         "is there a windows version",
-        "win11 install"
+        "win11 install",
+        "can I use it on windows",
+        "install in powershel"
       ]
     },
     {
@@ -855,7 +867,8 @@
         "windows store",
         "windows copied",
         "models copied",
-        "developer mode windows"
+        "developer mode windows",
+        "twice the disk"
       ],
       "answers": [
         "On Windows a model is hard-linked where it is exported when the store and the target are on the same drive, and copied otherwise, since symlinks need Developer Mode. lmget checks the free space of that drive before copying, and `lmget rm` removes its copies too.\n\nTo avoid copies, keep the store on the drive of your caches with `LMGET_HOME`."
@@ -1396,7 +1409,17 @@
         "macbook",
         "lmget macbook",
         "set up ubuntu",
-        "install ubuntu"
+        "install ubuntu",
+        "install on mac",
+        "install mac",
+        "install it on a mac",
+        "admin rights",
+        "administrator",
+        "need admin",
+        "curl to sh",
+        "pipe to sh",
+        "curl sh",
+        "install script"
       ],
       "answers": [
         "On macOS and Linux (amd64 and arm64):\n\n```sh\ncurl -fsSL https://lmget.org/install.sh | sh\n```\n\nIt downloads the latest release, checks it against the release's `checksums.txt` (and its build provenance when `gh` is installed and signed in), and installs `lmget` into `~/.local/bin`, without sudo. `LMGET_INSTALL_DIR` changes the folder.\n\nThe README documents no Homebrew formula. Other ways: Windows, pip or uv, a container, GitHub Actions."
@@ -1421,7 +1444,10 @@
         "brew?",
         "homebrew?",
         "curl install",
-        "set it up on ubuntu"
+        "set it up on ubuntu",
+        "how do i install it on a mac",
+        "does it need admin rights",
+        "is it safe to pipe curl to sh"
       ]
     },
     {
@@ -1580,7 +1606,10 @@
         "format gguf",
         "format",
         "choose that size",
-        "pick that model"
+        "pick that model",
+        "pick that size",
+        "which size",
+        "16gb mac"
       ],
       "answers": [
         "From this machine, not from what is free right now:\n\n- target: the first installed app among oMLX (Apple Silicon only), LM Studio, Ollama with a variant that fits, else the Hugging Face cache\n- format: the best one that target loads\n- size: the largest whose weights fit the budget: 30% of the memory on Apple Silicon (5.15 GB on a 16 GB Mac), 85% of an NVIDIA GPU's, 50% otherwise\n\n`--to`, `--format` and `--for` override it, and a nickname reuses the `--for` and `--format` of your last accepted pull:\n\n```sh\nlmget qwen --for 4GB --format gguf\n```"
@@ -1601,7 +1630,9 @@
         "--for 4GB",
         "--format gguf",
         "can I pick a bigger variant",
-        "how does qwen choose"
+        "how does qwen choose",
+        "why did it pick that size",
+        "and on a 16gb mac which size?"
       ]
     },
     {
@@ -2155,10 +2186,12 @@
         "hf co ollama",
         "ollama button",
         "button",
-        "hf co gguf"
+        "hf co gguf",
+        "modelfile",
+        "need a modelfile"
       ],
       "answers": [
-        "Use the name Hugging Face gives Ollama, `hf.co/<org>/<name>:<quantization>`:\n\n```sh\nlmget hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M\n```\n\nThe model lands in Ollama as `hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M`, ready for `ollama run`. The GGUF is checked against the sha256 Hugging Face publishes, and gated repositories work with your token once their terms are accepted. `lmget Org/Name --to ollama` on a GGUF repository stops and gives you this name."
+        "Use the name Hugging Face gives Ollama, `hf.co/<org>/<name>:<quantization>`:\n\n```sh\nlmget hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M\n```\n\nThe model lands in Ollama as `hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M`, ready for `ollama run`. The GGUF is checked against the sha256 Hugging Face publishes, and gated repositories work with your token once their terms are accepted. No Modelfile is needed: the manifest Hugging Face builds carries the chat template and the parameters. `lmget Org/Name --to ollama` on a GGUF repository stops and gives you this name."
       ],
       "suggest": [
         "ollama",
@@ -2174,7 +2207,8 @@
         "hugging face gguf in ollama",
         "ollama button on hugging face",
         "unsloth gguf for ollama",
-        "hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M"
+        "hf.co/unsloth/Qwen3-0.6B-GGUF:Q4_K_M",
+        "need a modelfile?"
       ]
     },
     {
@@ -2348,7 +2382,9 @@
         "seed",
         "lmget nodes",
         "mirrors",
-        "mirrored"
+        "mirrored",
+        "who runs the nodes",
+        "who runs the mirror nodes"
       ],
       "answers": [
         "Servers that hold copies of the indexed models and serve them by hash. lmget asks them last: after the source and, for Hugging Face, ModelScope have failed. Access refusals (gated, private) never go to the nodes, and every byte is checked against the signed sha256.\n\nEvery mirrored blob is also a BitTorrent v2 torrent seeded by `lmget-node seed`, but the `lmget` CLI has no torrent client: it fetches from the nodes over HTTP."
@@ -2368,7 +2404,8 @@
         "node1.lmget.org",
         "bittorrent?",
         "p2p?",
-        "are there mirrors of the models"
+        "are there mirrors of the models",
+        "who runs the mirror nodes"
       ]
     },
     {
@@ -2564,7 +2601,10 @@
         "access",
         "zllamaz access",
         "hugging face token",
-        "put my token"
+        "put my token",
+        "gated ones",
+        "accept the license first",
+        "need to accept the license"
       ],
       "answers": [
         "With a Hugging Face token that has access, after accepting the model's terms on its page. lmget uses `HF_TOKEN`, else the token file `huggingface_hub` reads: `$HF_TOKEN_PATH`, else `$HF_HOME/token` (where `huggingface-cli login` saves it).\n\n```sh\nHF_TOKEN=hf_... lmget <org>/<gated-model>\n```\n\nThe token goes only to the Hugging Face endpoint, never to an origin or a node. Missing or not granted: exit code 4."
@@ -2588,7 +2628,8 @@
         "exit code 4",
         "login to hugging face",
         "it says gated",
-        "llama access"
+        "llama access",
+        "what about gated ones, I need to accept the license first"
       ]
     },
     {
@@ -2767,7 +2808,10 @@
         "same models",
         "requirements",
         "package lock",
-        "package lock json"
+        "package lock json",
+        "same files",
+        "whole team",
+        "pin versions"
       ],
       "answers": [
         "Add `--lock`: it creates `./lmget.lock`, or adds the model to it:\n\n```sh\nlmget Qwen/Qwen3-0.6B --lock\n```\n\nThe lock pins each model to a commit and every file to its size and sha256, with the selection and the target. Once it exists, `lmget get` keeps it current. Whoever clones the project gets the same bytes with `lmget sync`."
@@ -2790,7 +2834,8 @@
         "--lock",
         "pin models",
         "reproducible downloads",
-        "same models for the team"
+        "same models for the team",
+        "can I pin versions so the whole team gets the same files"
       ]
     },
     {
@@ -3778,7 +3823,10 @@
         "a quantization",
         "single quantization",
         "one gguf",
-        "quantizations of"
+        "quantizations of",
+        "only one file",
+        "one file from",
+        "single file from a repo"
       ],
       "answers": [
         "With globs on the path or the file name:\n\n```sh\nlmget unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\nlmget Qwen/Qwen3-0.6B --exclude '*.onnx'\n```\n\n`--include` and `--exclude` can be repeated. Try them with `lmget info` first: it shows what is selected. The selection is recorded in `lmget.lock`."
@@ -3801,7 +3849,8 @@
         "Q4_K_M only",
         "just the q4",
         "filter files",
-        "skip some files"
+        "skip some files",
+        "can I download only one file from a repo"
       ]
     },
     {
@@ -5743,6 +5792,7 @@
     "How do I check which directory is eating up all the disk space on a Linux server?",
     "Can I squash the last four commits on my branch before opening a pull request?",
     "Draft a quick thank-you email to send after a job interview for a marketing coordinator role.",
-    "Give me five options that are completely different from the first batch."
+    "Give me five options that are completely different from the first batch.",
+    "how do I create a modelfile"
   ]
 }
