@@ -1,0 +1,424 @@
+what-is	what is this
+what-is	wtf is lmget
+what-is	Hi, could you explain in one sentence what lmget actually does?
+what-is	so what does this tool do exaclty
+what-is	whats lmget for
+what-is	is this basically wget for AI models?
+what-is	what problem does it solve
+install	install
+install	how to install
+install	how do i instal it on my mac
+install	Hello, what's the quickest way to get lmget installed on Ubuntu?
+install	curl comand to install?
+install	install on linux
+install	brew install lmget?
+install	what does the install script do before I pipe it into sh
+install	does the installer need sudo
+install	how to setup lmget
+install-windows	windows
+install-windows	windows support?
+install-windows	how do I install it on windows 11
+install-windows	powershel install comand?
+install-windows	can I use scoop for this
+install-windows	instal on windos
+install-windows	does it work on windows or only mac and linux
+windows-copies	on windows does it duplicate the model files or link them
+windows-copies	why is lmget copying files on windows instead of symlinking, my disk is filling up
+install-pip	pip install lmget?
+install-pip	can i get it with uv tool install
+install-pip	is it avaliable on pypi
+install-docker	is there a dokcer image?
+install-docker	Is there an official container image I can drop into my compose stack?
+install-docker	docker run lmget
+install-ci	github actions
+install-ci	how do I cache downloaded models between CI runs with this
+install-ci	can i use lmget in a gitlab pipeline
+install-source	go install?
+install-source	can i compile it myself from the repo
+update	how do I upgrade to the latest version
+update	which version am i running
+update	how to updte lmget
+uninstall	uninstall
+uninstall	how do I remove lmget completely from my system
+uninstall	how to unistall
+completion	tab completition for zsh?
+completion	does it support autocomplete in fish
+commands	list of commands
+commands	what subcommands are there
+commands	lmget --help
+nickname-own	can i define my own short names for models
+nickname-own	how do I add a custom alias for a repo I use every day
+nickname-list	which nicknames exist besides qwen
+nickname-list	is ther a nickname for gemma
+nickname-script	lmget qwen hangs in my script waiting for an answer
+nickname-script	my CI job exits with code 2 when I use lmget qwen
+nickname-choice	how lmget qwen decide wich size to download
+nickname-choice	why did it pick the 4B and not the 8B on my mac
+nicknames	what does lmget qwen do
+nicknames	what is a nickname
+nicknames	can I just type a short name instead of the full Org/Repo?
+run	can lmget run modles?
+run	can I chat with a model directly from lmget
+run	does lmget do inference itself or not
+run-apps	lmget run says it cannot find LM Studio
+run-apps	which port does lmget run use to talk to ollama
+run-endpoint	can lmget run send the prompt to my vllm server
+run-endpoint	use lmget run with llama-server on port 8080
+app-omlx	how do i get a model into omlx
+app-omlx	omlx doesnt see the model i downloaded
+app-lmstudio	lm studio?
+app-lmstudio	How can I use lmget to add a model to LM Studio?
+app-lmstudio	lmstudio doesnt show the gguf I downloded
+app-jan	it works whit jan.ai?
+app-localai	localai support?
+app-exo	can it put models in exo for my mac cluster
+app-colibri	can i use it with colibri
+app-comfyui	confyui
+app-comfyui	how do I download flux into my ComfyUI models folder
+app-textgen	oobabooga text generation webui
+app-textgen	koboldcpp?
+app-textgen	does it work with llamafile
+works-with	which apps are suported
+works-with	does it work with open webui
+works-with	sillytavern?
+works-with	what tools can use the models it downloads
+app-revisions	if I update a model will LM Studio end up with two versions mixed together
+gguf-hf-ollama	how do I get a gguf from huggingface into ollama
+gguf-hf-ollama	hf.co/unsloth/... names work?
+gguf-hf-ollama	i have a gguf repo on HF and want ollama run to see it
+ollama	ollama?
+ollama	does it works with olama
+ollama	can it download models from the ollama library
+ollama	lmget ollama:llama3.2 then what
+ollama	will ollama list show models pulled with lmget
+why-not-ollama-pull	why not juts ollama pull
+why-not-ollama-pull	what's the advantage over ollama pull
+why-not-ollama-pull	ollama already downloads models, why would i need this
+why-not-hf-cli	why not huggingface-cli download
+why-not-hf-cli	how is this different from hf download
+why-not-hf-cli	whats wrong with huggingface_hub snapshot_download
+why-not-git	why dont use git clone with lfs
+why-not-git	git lfs works fine for me, why switch
+revocations	what happens if a model is found to be malware after I already downloaded it
+revocations	can you pull back a bad model
+index-keys	which keys sign the index
+index-keys	what is the minisign root key for
+run-a-node	can I host a mirror node for the project
+run-a-node	can i run my own index for my company
+nodes	what are node1.lmget.org and node2
+nodes	what are the lmget nodes
+signed-index	what's the signed index
+signed-index	what does lmget index do
+no-mirror	i dont want it to download from modelscope, can I turn that off
+no-mirror	disable modelscope fallback
+hf-endpoint	I'm in China and use hf-mirror.com, does HF_ENDPOINT work?
+hf-endpoint	HF_ENDPOINT
+hf-down	what if huggingface is donw
+hf-down	hugging face gives 503, can I still get the model
+gated-token	gated modles?
+gated-token	token gated?
+gated-token	how do i download llama 3, it says I need access
+gated-token	I get exit code 4 on a meta-llama repo
+gated-token	where i must put my HF_TOKEN
+gated-token	can it dowload private repos from my org
+gated-token	401 unauthorized from huggingface
+license-change	why did it stop and say the license changed
+license-change	exit 5 license differs from lockfile, what do I do
+license-policy	can I allow only apache and mit licensed models in my project
+license-policy	block models with non commercial licenses in CI
+sbom	sbom
+sbom	can it generate a cyclonedx bill of materials for the models
+lockfile-trust	is it dangerous to run lmget sync on a repo I just cloned
+lockfile-trust	can a malicious lmget.lock harm me
+sync	what does lmget sync do
+sync	how my teammates get excatly the same models
+lockfile	lockfile?
+lockfile	is there something like package-lock.json but for models
+lockfile	how do i pin model versions in my project
+ls	list downloaded models
+ls	how do I see what I already downloaded
+ls	wich models i have downloaded
+rm	how i can delete a modle
+rm	delete model and free disk space
+rm	remove qwen
+rm	how to clean up old models taking 50GB
+doctor	how do I check my store isnt corupted
+doctor	lmget doctor
+doctor	is there a health check command
+history	does it keep a log of my downloads
+history	what is history.jsonl
+history	how do I turn off the history
+url-hash	how do I give the sha256 for a direct url
+url-hash	can I pin a hash on a plain https download
+oci	docker hub ai models?
+oci	can it pull from ghcr or other oci registries
+direct-url	can I download from any https url
+direct-url	can it download a random gguf from my own website
+hf-url	can I paste the huggingface url of a model
+hf-url	does it accept huggingface.co links or only Org/Name
+origins	can I point it at our company cache server
+origins	we have an internal mirror, can lmget use it
+lan-security	is lmget serve safe? will it expose my models to the internet
+lan-security	can someone on the cafe wifi grab my private models from lmget serve
+lan-serve	share models whit my other machines
+lan-serve	can my laptop get the model from my desktop over the lan instead of redownloading
+json	json output?
+json	does it have machine readable output
+scripts-output	how do I use lmget in a bash script and get the path
+scripts-output	is the output stable for parsing
+mcp	mcp
+mcp	can claude code use lmget?
+mcp	Does lmget have an MCP server so Cursor can download models?
+library	can I use lmget as a go library
+library	is there an API I can call from Go code
+pickle	why were the .bin files skipped
+pickle	pytorch_model.bin wasnt downloaded, only safetensors
+pickle	how do I force it to download the pickle weights
+content-checks	does it look inside the safetensors header or only check the hash
+content-checks	does it detect pickle exploits hidden in a file with another extension
+verify	how are the files verified
+verify	sha256 check?
+verify	does it verfy the hashes of every file
+verify	how do i know the download is not corrupted
+memory-fit	will a 70B model fit on my 16gb mac
+memory-fit	will this model fit in my ram? i have 8gb
+memory-fit	can it tell me if a model is too big for my gpu
+memory-fit	Hi, before downloading 40 GB I'd like to know if my machine can even load the model. Can lmget tell me?
+info	can I see what it will download before downloading
+info	dry run?
+info	how big is the model before i start the download
+include-exclude	i want only the Q4_K_M quant, not the whole repo
+include-exclude	how to download just one gguf out of a repo with 20 quantizations
+include-exclude	exclude some files
+revision	how do I get a specfic commit
+revision	download a model at a given branch or tag
+dir-target	can I save the model into a folder of my choice
+dir-target	i wnat the files in ./models not in some hidden cache
+dir-target	--to dir
+hf-cache	transformers can't find the model I downloaded
+hf-cache	where is the huggingface cache
+hf-cache	will from_pretrained pick it up offline after lmget downloads it
+hf-cache	does it use the same cache as huggingface_hub
+store	where does lmget keep its files
+store	whats in ~/.lmget
+store	can I move the store to an external drive
+targets	where does it put the models
+targets	where do the downloaded models end up
+targets	wher are the files saved
+disk-space	how much disk space does it need
+disk-space	it refused to start, says not enough disk
+resume	my download stopped halfway
+resume	wifi died at 80%, i have to start again from zero?
+resume	can I pause a download and continue tomorrow
+resume	ctrl-c during download
+speed	can it download faster
+speed	downlods are very slow
+speed	does it use multiple connections like aria2
+speed	how to make the dowload faster
+proxy	does it work behind a corporate proxi
+proxy	HTTPS_PROXY
+exit-codes	exit code 5 meaning
+exit-codes	what means the exit codes
+exit-codes	it exited with 6, why
+first-download	how do I download a model
+first-download	how to dowload qwen
+first-download	Hi! I just installed it, how do I get my first model?
+first-download	example command
+first-download	how i use it
+first-download	download Qwen/Qwen3-0.6B
+who-made	who made lmget?? who is the autor
+who-made	who is behind this project
+who-made	is this maintained by a company or one guy
+security-report	I found a vulnerability, where do I report it privately
+security-report	security disclosure
+report-bug	I found a bug
+report-bug	where do I open an issue
+report-bug	it crashes, who do i tell
+contribute	can i contribuite
+contribute	do you accept pull requests
+roadmap	roadmap
+roadmap	what's coming next
+roadmap	will you add more sources in the future
+platforms	does it run on a raspberry pi
+platforms	linux arm64?
+platforms	works on freebsd?
+platforms	which os does it suport
+binary-size	how big is the binary
+binary-size	how many mb is it
+written-in	what language is it written in
+written-in	i need python instaled?
+written-in	is it rust or go
+needs-gpu	do I need a GPU
+needs-gpu	i dont have nvidia, can I still use it
+docs	docs
+docs	where is the documentation
+docs	is there a manual or a guide somwhere
+lmget-license	license
+lmget-license	is it free
+lmget-license	is lmget open source
+lmget-license	can I use it at work comercially
+status	is it stable
+status	production ready?
+status	Is this mature enough to use at my company or still experimental?
+phone-home	does it phone home
+phone-home	telemetry?
+phone-home	does lmget send any data about me anywhere
+offline	does it work offline
+offline	airgaped machine
+offline	can i use it without internet after the first download
+is-it-safe	is it safe
+is-it-safe	can I trust this thing
+is-it-safe	is it safe to download random models with it
+is-it-safe	is lmget secure
+datasets	can it download datasets
+datasets	can it download hf spaces?
+datasets	can I get a huggingface dataset with lmget
+models-available	which models can I download
+models-available	can I download gpt-oss
+models-available	does it have llama 3
+models-available	what models are available
+models-available	wich models are suported
+sources	which sources does it support
+sources	does it support civitai
+sources	modelscope?
+sources	can it only download from hugging face
+st-hello	hi
+st-hello	hello there
+st-hello	good morning
+st-hello	hey
+st-hello	ciao
+st-how-are-you	how are you
+st-how-are-you	hows it going
+st-thanks	thanks
+st-thanks	thx a lot
+st-bye	bye
+st-bye	good night
+st-bye	cya
+st-ok	ok
+st-ok	cool got it
+st-yes	yes
+st-yes	yeah sure
+st-no	no
+st-no	nope
+st-sorry	sorry my bad
+st-laugh	lol
+st-laugh	hahaha
+st-wow	wow
+st-wow	interesting
+st-compliment	nice site
+st-compliment	this tool is awesome, good job
+st-love	i love you
+st-love	marry me
+st-frustrated	that didnt help
+st-frustrated	wrong answer
+st-frustrated	you don't understand what I'm asking
+st-insult	you are useless garbage
+st-insult	stupid bot
+st-who	who are you
+st-who	what are you
+st-name	whats your name
+st-are-you-ai	are you a bot
+st-are-you-ai	am I talking to a real person right now?
+st-human	can I talk to a human
+st-human	i want a real person
+st-which-model	what model runs this
+st-which-model	what llm is behind this chat
+st-chatgpt	are you chatgpt
+st-chatgpt	is this openai
+st-claude	are you claude
+st-other-llm	are u llama
+st-other-llm	is this gemini
+st-speed	how many tokens per second
+st-speed	how fast are you
+st-how-work	how do you pick your answers
+st-how-work	how does this chat work
+st-invent	do you hallucinate
+st-invent	can you make stuff up
+st-sure	are you sure?
+st-sure	source?
+st-what-can-you-do	what can i ask you
+st-what-can-you-do	what can you do
+st-help	help
+st-help	help me pls
+st-start	where do i start
+st-start	im new here, where should i begin
+st-who-made-you	who built this chatbot
+st-memory	do you remember what I asked earlier
+st-privacy-chat	do you log my questions
+st-privacy-chat	are my messages stored somewhere
+st-learn	can I teach you
+st-learn	do you learn from my questions
+st-internet	can you search the web
+st-internet	are you connected to the internet
+st-joke	tell me a joke
+st-test	test
+st-test	testing 123
+st-empty	?
+st-empty	...
+st-empty	!!
+st-lang-en	speak english please
+st-lang-it	speak italian
+st-lang-it	parli italiano?
+st-lang-other	do you speak french
+st-lang-other	hablas español?
+fallback	what's the weather in genoa today
+fallback	give me a carbonara recipe
+fallback	what is 17 times 23
+fallback	who won the champions league
+fallback	how do I center a div
+fallback	write a python function to reverse a string
+fallback	what's the capital of australia
+fallback	translate good morning to japanese
+fallback	any news today?
+fallback	bitcoin price
+fallback	my wifi keeps disconnecting, how to fix
+fallback	recommend a good movie for tonight
+fallback	what time is it in tokyo
+fallback	how do I learn rust
+fallback	explain quantum computing simply
+fallback	write a poem about cats
+fallback	how long do I boil rice
+fallback	is it going to rain tomorow
+fallback	best laptop under 1000 euro
+fallback	how do I reset my iphone
+fallback	sql query to join two tables
+fallback	undefined is not a function in my react app, help
+fallback	how many km from milan to rome
+fallback	who is the president of the united states
+fallback	git rebase vs merge
+fallback	my docker compose postgres container wont start
+fallback	what is the meaning of life
+fallback	how do I write a cover letter
+fallback	whats the best pizza in napoli
+fallback	can you do my homework
+fallback	how do I fine-tune llama
+fallback	what's the best quantization for coding
+fallback	how do I install ollama
+fallback	which GPU should I buy for 70B
+fallback	is Qwen better than Llama
+fallback	how do I run vllm on kubernetes
+fallback	write me a python script to download from huggingface
+fallback	what is the safetensors file format spec
+fallback	how much does a Hugging Face Pro account cost
+fallback	who founded Hugging Face
+fallback	how do I convert safetensors to gguf myself
+fallback	whats the diference between gguf and mlx
+fallback	what's the best local model for coding right now
+fallback	how to train a lora on my own data
+fallback	how do I set the temperature in ollama
+fallback	how do i write an ollama modelfile
+fallback	what's the context length of qwen3
+fallback	how do I upload my model to hugging face
+fallback	how do I create a hugging face account
+fallback	how to compil llama.cpp with cuda
+fallback	lm studio vs ollama, which one is better
+fallback	what is RAG
+fallback	how many parameters does gpt-4 have
+fallback	best embedding model for RAG?
+fallback	ollama run is really slow on my mac, how do I speed up inference
+fallback	how do i set up open webui with docker
+fallback	comfyui workflow for img2img
+fallback	how do I quantize a model to 4 bit with mlx
+fallback	what does Q4_K_M mean
+fallback	how do I use the transformers pipeline api
+fallback	how do I publish my own model on ollama.com
