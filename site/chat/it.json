@@ -113,7 +113,8 @@
         "perche cambiare",
         "sostituisce",
         "sostituire",
-        "rimpiazza"
+        "rimpiazza",
+        "aggiunge rispetto"
       ],
       "answers": [
         "Puoi continuare a usarlo: lmget riempie la stessa cache di Hugging Face, quindi transformers e gli altri strumenti trovano i file dove se li aspettano. Cosa aggiunge lmget:\n\n- prima il piano: commit, file, dimensioni, hash, licenza\n- ogni file controllato contro l'hash pubblicato, e la sua intestazione controllata come la legge il suo caricatore\n- i pesi pickle saltati quando ci sono i safetensors\n- ModelScope e i nodi del progetto quando Hugging Face non risponde\n- un lockfile, e una copia sola sul disco collegata in Ollama, LM Studio e altre app"
@@ -149,7 +150,8 @@
         "clonare",
         "clono",
         "clone",
-        "git"
+        "git",
+        "clono con git"
       ],
       "answers": [
         "lmget scarica solo i file che scegli, con richieste parallele che riprendono dopo un'interruzione, controlla ognuno contro il suo hash pubblicato e lo conserva una volta sola per sha256, collegato dove lo cercano i tuoi strumenti:\n\n```sh\nlmget unsloth/Qwen3-8B-GGUF --include '*Q4_K_M*'\n```\n\nI pesi pickle vengono saltati quando ci sono i safetensors, e il piano viene mostrato prima di scaricare un solo byte."
@@ -230,7 +232,10 @@
         "pericoloso scaricare",
         "fidare",
         "posso fidare",
-        "installa un virus"
+        "installa un virus",
+        "attaccare tramite",
+        "modello attaccare",
+        "bucarmi il computer"
       ],
       "answers": [
         "lmget tratta ogni fonte come non fidata:\n\n- ogni file è controllato contro l'hash che la fonte pubblica; se non corrisponde viene scartato (codice di uscita 5)\n- le intestazioni di `.safetensors` e `.gguf` sono controllate come le leggono i loro caricatori\n- il contenuto pickle che esegue codice è rifiutato, se il file non ha un nome da pickle\n- i percorsi che escono dalla cartella del modello o passano per `.git` sono rifiutati\n- un `lmget.lock` clonato è trattato come input non fidato\n\nlmget non esegue nessun modello. Le segnalazioni di sicurezza vanno in un advisory privato, vedi SECURITY.md."
@@ -325,7 +330,10 @@
         "connessione",
         "non ho connessione",
         "online",
-        "ambiente isolato"
+        "ambiente isolato",
+        "non ho internet",
+        "sempre online",
+        "essere online"
       ],
       "answers": [
         "In parte. `lmget <model>` risolve la revisione alla fonte, quindi serve la rete (oppure, quando la fonte non risponde, l'indice firmato per un modello indicizzato).\n\n`lmget sync` riproduce `lmget.lock` senza rete per un modello i cui file del lock sono già stati verificati da un pull precedente su questa macchina e sono ancora nello store. Riempie `refs/main` della cache di Hugging Face se è vuoto, così il caricamento offline trova lo snapshot."
@@ -751,7 +759,9 @@
         "solo huggingface",
         "anche altro",
         "quali registri",
-        "prende i modelli"
+        "prende i modelli",
+        "quali fonti",
+        "fonti scarica"
       ],
       "answers": [
         "In questa versione:\n\n- i repository di Hugging Face (`Org/Name` o il loro URL), con ModelScope come seconda origine\n- il registro di Ollama (`ollama:name:tag`)\n- i repository GGUF di Hugging Face, per Ollama (`hf.co/org/name:quant`)\n- i registri OCI (`oci://docker.io/ai/smollm2`, ghcr.io, ...)\n- qualsiasi URL https\n- i soprannomi come `qwen`"
@@ -789,7 +799,8 @@
         "installare windows",
         "installo windows",
         "win",
-        "installare su windows"
+        "installare su windows",
+        "pc windows"
       ],
       "answers": [
         "In PowerShell (amd64 e arm64):\n\n```powershell\nirm https://lmget.org/install.ps1 | iex\n```\n\nInstalla `lmget.exe` in `%LOCALAPPDATA%\\Programs\\lmget` e ti dice come aggiungerlo al PATH; il PATH non lo cambia da solo. Con Scoop:\n\n```powershell\nscoop bucket add lmget https://github.com/fabriziosalmi/lmget\nscoop install lmget\n```\n\nLa CI lo prova su Windows Server 2025, non ancora su un Windows desktop."
@@ -834,7 +845,10 @@
         "windows spazio",
         "store su windows",
         "windows e su d",
-        "windows occupa"
+        "windows occupa",
+        "windows copiati",
+        "modelli copiati",
+        "modalita sviluppatore windows"
       ],
       "answers": [
         "Su Windows un modello viene collegato con un hard link dove viene esportato quando lo store e la destinazione sono sulla stessa unità, e copiato altrimenti, perché i symlink richiedono la modalità sviluppatore. lmget controlla lo spazio libero di quell'unità prima di copiare, e `lmget rm` rimuove anche le sue copie.\n\nPer evitare le copie, tieni lo store sull'unità delle tue cache con `LMGET_HOME`."
@@ -1219,7 +1233,8 @@
         "lo tolgo",
         "togliere",
         "si disinstalla",
-        "disinstalla"
+        "disinstalla",
+        "sbarazzo di lmget"
       ],
       "answers": [
         "lmget è un file solo: cancella `~/.local/bin/lmget` (su Windows `lmget.exe` in `%LOCALAPPDATA%\\Programs\\lmget`), oppure disinstalla il pacchetto pip, uv o Scoop.\n\nI suoi dati sono lo store, `~/.lmget` (o `$LMGET_HOME`). Per togliere prima i collegamenti che ha creato nelle app e nelle cache, esegui `lmget rm` su ogni modello che `lmget ls` elenca."
@@ -1253,7 +1268,8 @@
         "autocomplete",
         "tab",
         "zsh",
-        "fish"
+        "fish",
+        "completamento shell"
       ],
       "answers": [
         "```sh\nlmget completion zsh\n```\n\nstampa lo script di completamento per zsh; funzionano anche `bash`, `fish` e `powershell`. `lmget completion zsh --help` spiega come caricarlo."
@@ -1747,7 +1763,10 @@
         "eseguire i modelli",
         "esegue i modelli",
         "fa girare",
-        "girare i modelli"
+        "girare i modelli",
+        "fare domande al modello",
+        "prompt al modello",
+        "domanda al modello"
       ],
       "answers": [
         "lmget non esegue nessun modello da sé. `lmget run` prende il modello, lo collega dove un'app lo carica e manda il prompt a quell'app in esecuzione (oMLX, LM Studio o Ollama):\n\n```sh\nlmget run qwen \"che modello sei?\"\nlmget run ollama:smollm2:135m \"ciao\"\necho \"riassumi questo\" | lmget run qwen --yes\n```\n\nLa risposta va su stdout; `--max-tokens` la limita (default 512). lmget cerca il nome del modello nell'elenco dell'app; `--model-id` dà il nome con cui l'app lo conosce, quando la ricerca non lo trova. Il prompt e la risposta non vengono mai scritti nella cronologia."
@@ -1811,7 +1830,8 @@
       "keywords": [
         "lm studio",
         "lmstudio",
-        "to lmstudio"
+        "to lmstudio",
+        "modello in lm studio"
       ],
       "answers": [
         "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_0*' --to lmstudio\n```\n\nLa cartella è `$LMGET_LMSTUDIO_DIR`, altrimenti `~/.lmstudio/models`, come `<org>/<name>/`. LM Studio carica GGUF, e MLX su Apple Silicon. Se hai spostato la cartella dei modelli nell'app, imposta `LMGET_LMSTUDIO_DIR`: LM Studio non tiene quell'impostazione in un file documentato."
@@ -1969,7 +1989,9 @@
         "vae",
         "lora",
         "text encoders",
-        "diffusion models"
+        "diffusion models",
+        "generare immagini",
+        "modelli per immagini"
       ],
       "answers": [
         "```sh\nlmget Comfy-Org/Flux-1-Schnell --include flux1-schnell.safetensors --to comfyui:diffusion_models\n```\n\nOgni file di pesi selezionato viene collegato direttamente nella sua cartella di ComfyUI (`diffusion_models`, `text_encoders`, `vae`, `loras`, `checkpoints`, ...). La cartella viene da `--to comfyui:FOLDER`, altrimenti dal percorso del file nel repository, altrimenti dai suoi tensori; se no lmget te la chiede. I repository con la struttura di diffusers sono rifiutati. `LMGET_COMFYUI_DIR` imposta la cartella dei modelli."
@@ -2216,7 +2238,8 @@
         "lista nera",
         "modello cattivo",
         "etichettato male",
-        "modello e un malware"
+        "modello e un malware",
+        "file cattivi"
       ],
       "answers": [
         "L'indice firmato può revocare dei blob: contenuti che il progetto ha trovato malevoli o etichettati male, elencati per sha256 con un motivo. lmget allora rifiuta quel blob da qualsiasi origine, rifiuta di esportarne uno già nello store, e `lmget doctor` lo segnala con i modelli che lo usano.\n\nLe revoche arrivano sulla tua macchina con `lmget index` (e quando una fonte che non risponde fa scaricare l'indice a lmget): eseguilo ogni tanto."
@@ -2341,7 +2364,8 @@
         "node1",
         "node2",
         "ci sono mirror",
-        "node1 lmget org"
+        "node1 lmget org",
+        "usati i nodi"
       ],
       "answers": [
         "Server che tengono copie dei modelli indicizzati e li servono per hash. lmget li interpella per ultimi: dopo che la fonte e, per Hugging Face, ModelScope non hanno risposto. I rifiuti di accesso (gated, privati) non vanno mai ai nodi, e ogni byte è controllato contro lo sha256 firmato.\n\nOgni blob copiato è anche un torrent BitTorrent v2 condiviso da `lmget-node seed`, ma la CLI `lmget` non ha un client torrent: scarica dai nodi in HTTP."
@@ -2447,7 +2471,9 @@
         "mirror",
         "bloccato",
         "bloccata",
-        "cina"
+        "cina",
+        "hugging face bloccato",
+        "bloccato nel mio paese"
       ],
       "answers": [
         "Sì: `HF_ENDPOINT` sceglie un altro endpoint di Hugging Face, e il token va solo a quell'endpoint (viene tolto se c'è un redirect verso un altro host o un'altra porta).\n\nPer un server che tiene i file per sha256 (una cache in LAN, un mirror aziendale), usa invece le tue origini: `--origin` o `LMGET_ORIGINS`."
@@ -2546,7 +2572,9 @@
         "codice di uscita 4",
         "scaricare gated",
         "accesso",
-        "accesso a zllamaz"
+        "accesso a zllamaz",
+        "token di hugging face",
+        "metto il token"
       ],
       "answers": [
         "Con un token di Hugging Face che ha accesso, dopo aver accettato le condizioni del modello sulla sua pagina. lmget usa `HF_TOKEN`, altrimenti il file di token che legge `huggingface_hub`: `$HF_TOKEN_PATH`, altrimenti `$HF_HOME/token` (dove lo salva `huggingface-cli login`).\n\n```sh\nHF_TOKEN=hf_... lmget <org>/<modello-gated>\n```\n\nIl token va solo all'endpoint di Hugging Face, mai a un'origine o a un nodo. Mancante o senza permesso: codice di uscita 4."
@@ -2853,7 +2881,9 @@
         "disinstallo un modello",
         "elimino",
         "liberare spazio sul disco",
-        "li tolgo"
+        "li tolgo",
+        "pulizia dei modelli",
+        "vecchi modelli"
       ],
       "answers": [
         "```sh\nlmget rm Qwen/Qwen3-0.6B\nlmget rm Qwen/Qwen3-0.6B@<commit>   # solo quel commit\nlmget rm ollama:qwen3:0.6b\n```\n\n`rm` toglie i collegamenti fatti da lmget che puntano ancora ai suoi dati, poi ogni blob che nessun modello dello store usa, e dice lo spazio liberato. I file che hai sostituito, i download di altri strumenti e i file che un altro modello usa ancora restano al loro posto."
@@ -2940,7 +2970,9 @@
         "registro dei download",
         "download passati",
         "registra",
-        "registra prompt"
+        "registra prompt",
+        "ricorda lmget",
+        "ricorda dei download"
       ],
       "answers": [
         "Un registro locale, `~/.lmget/history.jsonl` (permessi 0600): per ogni pull l'ora, il comando, il modello, il commit, i byte per origine, il tempo impiegato e il codice di uscita. Nessun token, nessun prompt, nessun percorso fuori dallo store, e non va da nessuna parte. Serve a ordinare i nodi dell'indice per velocità e a ricordare `--for` e `--format` di un soprannome.\n\n```sh\nlmget history         # le ultime 20 voci\nlmget history clear   # la cancella\n```\n\n`LMGET_HISTORY=off` la spegne."
@@ -3589,7 +3621,9 @@
         "8gb",
         "16gb",
         "regge",
-        "mac regge"
+        "mac regge",
+        "stima della memoria",
+        "calcolata la stima"
       ],
       "answers": [
         "`lmget info` lo dice per un modello di Hugging Face con un `config.json` di transformers: i pesi selezionati più la cache KV per 8192 token (o il massimo del modello, se è minore), contro la memoria che lmget lascia usare a un modello qui: 30% della memoria unificata su Apple Silicon, 85% della memoria di una GPU NVIDIA, 50% della RAM altrove.\n\nAttivazioni, overhead del runtime e velocità non sono contati: è un minimo. Legge solo `config.json`, pochi kB."
@@ -3671,7 +3705,10 @@
         "cosa scarica",
         "comando info",
         "vedere prima",
-        "il piano"
+        "il piano",
+        "grande il modello prima",
+        "prima di scaricarlo",
+        "senza scaricarli"
       ],
       "answers": [
         "Sì:\n\n```sh\nlmget info Qwen/Qwen3-0.6B\n```\n\nMostra il commit, la licenza, ogni file con dimensione e hash, cosa c'è già nello store, i controlli su pickle e gated, lo spazio libero e, per un modello transformers, se ci sta nella memoria di questa macchina. Non scarica i pesi. `--dry-run` su un download si ferma dopo lo stesso piano."
@@ -3766,7 +3803,8 @@
         "taggata",
         "main",
         "fissare una revisione",
-        "versione vecchia di un modello"
+        "versione vecchia di un modello",
+        "release taggata"
       ],
       "answers": [
         "Aggiungi `@` e la revisione:\n\n```sh\nlmget Qwen/Qwen3-0.6B@main\nlmget Qwen/Qwen3-0.6B@<tag o commit>\n```\n\nLa revisione viene risolta in un commit prima di scaricare qualsiasi cosa. Per tenere quel commit in un progetto aggiungi `--lock`: finisce in `lmget.lock`."
@@ -3813,7 +3851,9 @@
         "nella cartella",
         "scaricare in models",
         "in models",
-        "scegliere la cartella"
+        "scegliere la cartella",
+        "cartella accanto",
+        "accanto al mio codice"
       ],
       "answers": [
         "Sì, con `--to dir:`:\n\n```sh\nlmget Qwen/Qwen3-0.6B --to dir:./models/qwen3\n```\n\nI file sono hard link allo store (un symlink tra filesystem diversi), quindi non occupano una seconda copia. Con un lockfile, una destinazione `dir:` deve restare dentro la cartella del lockfile. Senza terminale, il percorso viene stampato su stdout."
@@ -5127,6 +5167,7 @@
         "cosa posso chiedere",
         "cosa sai",
         "argomenti",
+        "quali argomenti",
         "che domande",
         "menu",
         "cos altro",

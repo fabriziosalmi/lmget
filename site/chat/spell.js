@@ -63,12 +63,26 @@
   // scores strongly (a keyword phrase, 1.8 or more). A sentence of ordinary
   // words is never rewritten into a question about lmget.
   const SHORT = 2;
+  // the evidence a long question needs (Fab's choice 2, 2026-11-19): with 4
+  // or more words that are not stopwords, a score of 2 or more, at least one
+  // keyword phrase; measured on the development set: out-of-scope questions
+  // refused 72.1% -> 83.6% (en), 63.2% -> 75.0% (it)
+  const EVIDENCE_WORDS = 4;
+  const EVIDENCE_SCORE = 2.0;
   const STRONG = 1.8;
   // options.prepOff: names of prep rules to skip (the gates use it)
   function ask(text, db, M, vocab, options) {
     const prepped = Prep.prep(text, db.config && db.config.lang, { off: options && options.prepOff });
     const hit = M.match(prepped, db, options);
-    if (hit) return { hit, corrected: null, prepped };
+    if (hit) {
+      // a long question needs more than one loose word: "write an email to
+      // my boss" must not land on an entry because "boss" matched one
+      const n = M.tokens(prepped).length;
+      if (n >= EVIDENCE_WORDS && M.scoreEntry(hit, M.norm(prepped), M.tokens(prepped)) < EVIDENCE_SCORE) {
+        return { hit: null, corrected: null, prepped };
+      }
+      return { hit, corrected: null, prepped };
+    }
     const fixed = correct(prepped, vocab, M);
     if (!fixed) return { hit: null, corrected: null, prepped };
     const again = M.match(fixed, db, options);

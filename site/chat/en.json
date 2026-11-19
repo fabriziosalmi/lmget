@@ -230,7 +230,11 @@
         "dangerous to",
         "is safe",
         "safe to use",
-        "safe to download"
+        "safe to download",
+        "attack me",
+        "model attack",
+        "protect from malware",
+        "protect me"
       ],
       "answers": [
         "lmget treats every source as untrusted:\n\n- every file is checked against the hash the source publishes; a mismatch is discarded (exit code 5)\n- `.safetensors` and `.gguf` headers are checked the way their loaders read them\n- pickle content that runs code is refused unless the file is named as a pickle\n- paths that leave the model folder or pass through `.git` are refused\n- a cloned `lmget.lock` is handled as untrusted input\n\nlmget itself runs no model. Security reports go to a private advisory, see SECURITY.md."
@@ -329,7 +333,9 @@
         "flight",
         "airplane",
         "online",
-        "be online"
+        "be online",
+        "airgapped environment",
+        "air gapped environment"
       ],
       "answers": [
         "Partly. `lmget <model>` resolves the revision at the source, so it needs the network (or, when the source is down, the signed index for an indexed model).\n\n`lmget sync` reproduces `lmget.lock` without the network for a model whose locked files an earlier pull on this machine verified and that are still in the store. It fills the Hugging Face cache's `refs/main` when empty, so offline loading finds the snapshot."
@@ -370,7 +376,8 @@
         "lmget stable",
         "how stable",
         "stable enough",
-        "rely"
+        "rely",
+        "company rely"
       ],
       "answers": [
         "lmget is in early development (0.x). Only the latest release receives security fixes, so keep it current. CI runs the whole test suite, also on Windows Server 2025.\n\nSome parts are checked against simulated servers or documentation only: for example the layouts of LM Studio, Jan, LocalAI, exo, colibri and ComfyUI have not been checked against the running apps yet."
@@ -672,7 +679,10 @@
         "hugging face space",
         "hf space",
         "a dataset",
-        "datasets from"
+        "datasets from",
+        "hf datasets",
+        "datasets support",
+        "hugging face datasets"
       ],
       "answers": [
         "No: Hugging Face datasets and Spaces are out of scope, lmget downloads models. A `huggingface.co/datasets/...` or `/spaces/...` URL stops with exit code 2."
@@ -785,7 +795,12 @@
         "exe",
         "install on windows",
         "powershell install",
-        "windows or only"
+        "windows or only",
+        "work on windows",
+        "windows pc",
+        "run on windows",
+        "windows 11",
+        "windows 10"
       ],
       "answers": [
         "In PowerShell (amd64 and arm64):\n\n```powershell\nirm https://lmget.org/install.ps1 | iex\n```\n\nIt installs `lmget.exe` into `%LOCALAPPDATA%\\Programs\\lmget` and says how to add it to PATH; it does not change PATH itself. With Scoop:\n\n```powershell\nscoop bucket add lmget https://github.com/fabriziosalmi/lmget\nscoop install lmget\n```\n\nCI tests it on Windows Server 2025, not yet on a Windows desktop."
@@ -826,7 +841,10 @@
         "other drive",
         "same drive",
         "windows disk",
-        "windows store"
+        "windows store",
+        "windows copied",
+        "models copied",
+        "developer mode windows"
       ],
       "answers": [
         "On Windows a model is hard-linked where it is exported when the store and the target are on the same drive, and copied otherwise, since symlinks need Developer Mode. lmget checks the free space of that drive before copying, and `lmget rm` removes its copies too.\n\nTo avoid copies, keep the store on the drive of your caches with `LMGET_HOME`."
@@ -905,7 +923,8 @@
         "container store",
         "a container",
         "container image",
-        "in a container"
+        "in a container",
+        "work with podman"
       ],
       "answers": [
         "Yes: `ghcr.io/fabriziosalmi/lmget`, for linux/amd64 and linux/arm64, the release binary on a distroless base (no shell, a nonroot user). The store is `/home/nonroot/.lmget`: mount a volume there to keep it.\n\n```sh\ndocker run --rm -v lmget:/home/nonroot/.lmget ghcr.io/fabriziosalmi/lmget info Qwen/Qwen3-0.6B\n```"
@@ -1040,7 +1059,10 @@
         "freebsd",
         "openbsd",
         "netbsd",
-        "bsd"
+        "bsd",
+        "run on freebsd",
+        "run on openbsd",
+        "run on netbsd"
       ],
       "answers": [
         "Releases are built for macOS, Linux and Windows, each on amd64 and arm64. The install script covers macOS and Linux, the PowerShell script Windows. lmget also builds from source on FreeBSD, OpenBSD and NetBSD, with no release.\n\nOn Windows it is tested by CI on Windows Server 2025, not yet on a Windows desktop."
@@ -1085,7 +1107,11 @@
         "footprint",
         "how large",
         "executable big",
-        "is the executable"
+        "is the executable",
+        "lmget itself",
+        "how heavy",
+        "lmget binary",
+        "binary take"
       ],
       "answers": [
         "Measured on 2026-11-19, built from commit 32d0d49 with the release build's flags: 12.6 MB (linux/arm64), 12.8 MB (windows/arm64), 12.9 MB (darwin/arm64), 13.7 MB (linux/amd64), 13.9 MB (darwin/amd64), 14.1 MB (windows/amd64).\n\nIt is one static binary with no runtime to install, and it includes no torrent client."
@@ -1235,7 +1261,8 @@
         "autocompletion",
         "tab completion",
         "zsh",
-        "fish"
+        "fish",
+        "shell completion"
       ],
       "answers": [
         "```sh\nlmget completion zsh\n```\n\nprints the completion script for zsh; `bash`, `fish` and `powershell` work too. `lmget completion zsh --help` says how to load it."
@@ -1271,7 +1298,9 @@
         "lmget help",
         "lmget --help",
         "usage",
-        "help command"
+        "help command",
+        "lmget commands",
+        "which commands"
       ],
       "answers": [
         "- `lmget <model>` (same as `lmget get`): resolve, download, verify, link\n- `lmget info`: the plan only\n- `lmget run`: get a model and ask it in an app\n- `lmget sync`: reproduce `lmget.lock`\n- `lmget ls`, `lmget rm`, `lmget doctor`: the store\n- `lmget index`, `lmget history`, `lmget sbom`\n- `lmget serve`: share on the local network\n- `lmget mcp`: for AI agents\n\n`lmget --help` and `lmget <command> --help` give every flag."
@@ -1353,7 +1382,10 @@
         "raspberry",
         "sudo",
         "local bin",
-        "macbook"
+        "macbook",
+        "lmget macbook",
+        "set up ubuntu",
+        "install ubuntu"
       ],
       "answers": [
         "On macOS and Linux (amd64 and arm64):\n\n```sh\ncurl -fsSL https://lmget.org/install.sh | sh\n```\n\nIt downloads the latest release, checks it against the release's `checksums.txt` (and its build provenance when `gh` is installed and signed in), and installs `lmget` into `~/.local/bin`, without sudo. `LMGET_INSTALL_DIR` changes the folder.\n\nThe README documents no Homebrew formula. Other ways: Windows, pip or uv, a container, GitHub Actions."
@@ -1535,7 +1567,9 @@
         "for 4gb",
         "4gb",
         "format gguf",
-        "format"
+        "format",
+        "choose that size",
+        "pick that model"
       ],
       "answers": [
         "From this machine, not from what is free right now:\n\n- target: the first installed app among oMLX (Apple Silicon only), LM Studio, Ollama with a variant that fits, else the Hugging Face cache\n- format: the best one that target loads\n- size: the largest whose weights fit the budget: 30% of the memory on Apple Silicon (5.15 GB on a 16 GB Mac), 85% of an NVIDIA GPU's, 50% otherwise\n\n`--to`, `--format` and `--for` override it, and a nickname reuses the `--for` and `--format` of your last accepted pull:\n\n```sh\nlmget qwen --for 4GB --format gguf\n```"
@@ -1734,7 +1768,8 @@
       "keywords": [
         "omlx",
         "--to omlx",
-        "mlx model"
+        "mlx model",
+        "work with omlx"
       ],
       "answers": [
         "```sh\nlmget mlx-community/Qwen3.5-0.8B-4bit --to omlx\n```\n\nThe folder is `$LMGET_OMLX_DIR`, else `model.model_dir` in `~/.omlx/settings.json`, else `~/.omlx/models`, as `<org>/<name>/`. oMLX loads `config.json` and `*.safetensors`, so MLX models. Checked live with oMLX 0.8.0rc1."
@@ -1763,7 +1798,10 @@
       "keywords": [
         "lm studio",
         "lmstudio",
-        "--to lmstudio"
+        "--to lmstudio",
+        "work with lmstudio",
+        "work with lm studio",
+        "gguf for lm studio"
       ],
       "answers": [
         "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_0*' --to lmstudio\n```\n\nThe folder is `$LMGET_LMSTUDIO_DIR`, else `~/.lmstudio/models`, as `<org>/<name>/`. LM Studio loads GGUF, and MLX on Apple Silicon. If you moved the models folder in the app, set `LMGET_LMSTUDIO_DIR`: LM Studio keeps that setting in no documented file."
@@ -1794,7 +1832,9 @@
         "jan",
         "jan ai",
         "model yml",
-        "--to jan"
+        "--to jan",
+        "gguf for jan",
+        "work with jan"
       ],
       "answers": [
         "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to jan\n```\n\nlmget links one GGUF (and at most one `mmproj` file) into Jan's data folder under `llamacpp/models/<org>/<name>/`, and writes the `model.yml` Jan writes on import, marked `lmget_export: true`. A `model.yml` of Jan's own is never overwritten. `LMGET_JAN_DIR` sets the folder."
@@ -1824,7 +1864,9 @@
         "localai",
         "local ai",
         "local-ai",
-        "--to localai"
+        "--to localai",
+        "gguf for localai",
+        "work with localai"
       ],
       "answers": [
         "```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to localai\n```\n\nThe GGUF goes flat into `$LMGET_LOCALAI_DIR`, else `$LOCALAI_MODELS_PATH`, else `$MODELS_PATH`, else `~/.localai/models`; the file name is the model name. The `local-ai` command reads `./models` where it starts unless told otherwise: point `LMGET_LOCALAI_DIR` at the same folder."
@@ -1854,7 +1896,8 @@
         "exo",
         "--to exo",
         "exo cluster",
-        "exo model"
+        "exo model",
+        "work with exo"
       ],
       "answers": [
         "```sh\nlmget mlx-community/Qwen3-0.6B-4bit --to exo\n```\n\nThe model goes to `<org>--<name>/` in exo's models folder (`$LMGET_EXO_DIR`, else `$EXO_DEFAULT_MODELS_DIR`, else `~/$EXO_HOME/models`, else `~/.exo/models` on macOS and Windows, `$XDG_DATA_HOME/exo/models` or `~/.local/share/exo/models` on Linux), with the `.exo-download.json` manifest exo writes after a verified download. exo runs only models it has a model card for: another repository is stored but not offered."
@@ -1884,7 +1927,9 @@
         "colibri",
         "--to colibri",
         "coli",
-        "model for colibri"
+        "model for colibri",
+        "work with colibri",
+        "start colibri"
       ],
       "answers": [
         "```sh\nlmget Justvugg/Qwen3-Coder-30B-A3B-colibri-int4 --to colibri\n```\n\nThe folder is `~/colibri-models/<org>--<name>` (or under `$LMGET_COLIBRI_DIR`), with the `.colibri-download.json` manifest colibri's setup writes. Start it with:\n\n```sh\n./start-here.sh --model-dir ~/colibri-models/<org>--<name>\n```\n\nA GGUF goes to `--to dir:PATH`, then `./coli import`."
@@ -1963,7 +2008,9 @@
         "llamacpp",
         "gguf path",
         "path of the gguf",
-        "llama cpp server"
+        "llama cpp server",
+        "work with koboldcpp",
+        "llamafile gguf"
       ],
       "answers": [
         "Use a plain folder:\n\n```sh\nlmget unsloth/Qwen3.5-4B-GGUF --include '*Q4_K_M*' --to dir:$HOME/textgen/user_data/models/Qwen3.5-4B-GGUF\n```\n\nText Generation WebUI reads `user_data/models` in its install folder. KoboldCpp, llamafile and llama-server take the path of the GGUF file in that folder."
@@ -2010,7 +2057,10 @@
         "goose",
         "page assist",
         "integrations",
-        "apps"
+        "apps",
+        "work with librechat",
+        "compatible with sillytavern",
+        "work with open webui"
       ],
       "answers": [
         "What each app reads, and the target that fills it:\n\n- the Hugging Face cache (`--to hf`): transformers, sentence-transformers, llama.cpp `-hf`, Goose, Lemonade\n- Ollama (`--to ollama`): Ollama, RamaLama, and apps that ask Ollama: Open WebUI, Page Assist, Hollama, Oterm\n- their own folders: oMLX, LM Studio, Jan, LocalAI, exo, colibri, ComfyUI\n- a folder (`--to dir:PATH`): Text Generation WebUI, KoboldCpp, llamafile, llama-server\n\nApps that only talk to a server (LobeChat, LibreChat, SillyTavern, Dify, ...) use what that server has."
@@ -2053,7 +2103,10 @@
         "old and new",
         "mixed",
         "updates apps",
-        "updates in apps"
+        "updates in apps",
+        "newest revision",
+        "old links",
+        "see two revisions"
       ],
       "answers": [
         "Run the same command again: the revision is resolved to the latest commit. A model in an app folder has one revision at a time: updating it replaces the links lmget made and removes those the new revision no longer has, so the app never loads two revisions mixed.\n\nFiles lmget did not create are left alone, and one in the way stops the export."
@@ -2122,7 +2175,8 @@
         "ollama registry",
         "ollama models",
         "--to ollama",
-        "use lmget with ollama"
+        "use lmget with ollama",
+        "work with ollama"
       ],
       "answers": [
         "Yes. A model of the Ollama registry goes into Ollama's models folder (`$OLLAMA_MODELS`, else `~/.ollama/models`):\n\n```sh\nlmget ollama:qwen3:0.6b\n```\n\nthen `ollama run qwen3:0.6b`. Every layer is checked against the manifest's sha256, and the manifest's digest is pinned as the commit. Only public models of the registry are supported, and no token is sent to it."
@@ -2161,7 +2215,9 @@
         "bad model",
         "mislabeled",
         "is malware",
-        "model is malware"
+        "model is malware",
+        "turns out to be malicious",
+        "blocklist bad"
       ],
       "answers": [
         "The signed index can revoke blobs: content the project found malicious or mislabeled, listed by sha256 with a reason. lmget then refuses that blob from any origin, refuses to export one already stored, and `lmget doctor` reports it with the models that use it.\n\nRevocations reach your machine through `lmget index` (and when a failing source makes lmget fetch the index): run it now and then."
@@ -2356,7 +2412,8 @@
         "stop downloading",
         "stop using modelscope",
         "not want modelscope",
-        "not want files from modelscope"
+        "not want files from modelscope",
+        "downloading from modelscope"
       ],
       "answers": [
         "Yes:\n\n```sh\nlmget Qwen/Qwen3-0.6B --no-mirror\n```\n\nModelScope is asked nothing while Hugging Face works anyway, and the log says which files came from it (`from=modelscope`)."
@@ -2389,7 +2446,9 @@
         "huggingface mirror",
         "mirror",
         "blocked",
-        "china"
+        "china",
+        "hugging face blocked",
+        "blocked in my country"
       ],
       "answers": [
         "Yes: `HF_ENDPOINT` selects another Hugging Face endpoint, and the token goes only to that endpoint (it is dropped on a redirect to any other host or port).\n\nFor a server that holds files by sha256 (a LAN cache, a company mirror), use your own origins instead: `--origin` or `LMGET_ORIGINS`."
@@ -2436,7 +2495,9 @@
         "responding",
         "hugging face not working",
         "face not",
-        "support modelscope"
+        "support modelscope",
+        "hugging face 429",
+        "hugging face 503"
       ],
       "answers": [
         "lmget has two fallbacks:\n\n- **ModelScope**: a file Hugging Face cannot serve (network errors, 5xx or 429 after retries, missing) is taken from the same repository on ModelScope, if it lists the same path, size and sha256; the bytes are checked against Hugging Face's hash\n- **the project's nodes**, last, for models in the signed index\n\nA file Hugging Face refuses (401, 403) is never asked elsewhere: a gated model stays gated. If Hugging Face cannot be reached at all, only an indexed model can still be planned."
@@ -2490,7 +2551,9 @@
         "is gated",
         "gated repo",
         "access",
-        "zllamaz access"
+        "zllamaz access",
+        "hugging face token",
+        "put my token"
       ],
       "answers": [
         "With a Hugging Face token that has access, after accepting the model's terms on its page. lmget uses `HF_TOKEN`, else the token file `huggingface_hub` reads: `$HF_TOKEN_PATH`, else `$HF_HOME/token` (where `huggingface-cli login` saves it).\n\n```sh\nHF_TOKEN=hf_... lmget <org>/<gated-model>\n```\n\nThe token goes only to the Hugging Face endpoint, never to an origin or a node. Missing or not granted: exit code 4."
@@ -2650,7 +2713,8 @@
         "sync update",
         "code 5",
         "restore lmget lock",
-        "restore the lock"
+        "restore the lock",
+        "sync one model"
       ],
       "answers": [
         "```sh\nlmget sync                   # the locked commits, every file checked against the locked sha256\nlmget sync --update          # resolve the revisions again and rewrite the lock\nlmget sync Qwen/Qwen3-0.6B   # only the models named\n```\n\n`sync` stops with exit code 5 if the source no longer matches the lock. When this machine already verified every locked file and they are in the store, it does not use the network. `--lockfile PATH` uses another lock."
@@ -2734,7 +2798,8 @@
         "see the models",
         "ls",
         "which models do i have",
-        "in my store"
+        "in my store",
+        "downloaded so far"
       ],
       "answers": [
         "```sh\nlmget ls\n```\n\nlists the models in the store, their size, and where each one is exported. `--json` gives one object for scripts."
@@ -2775,7 +2840,10 @@
         "rm",
         "uninstall a model",
         "free disk space",
-        "delete model"
+        "delete model",
+        "delete one commit",
+        "delete commit",
+        "clean up models"
       ],
       "answers": [
         "```sh\nlmget rm Qwen/Qwen3-0.6B\nlmget rm Qwen/Qwen3-0.6B@<commit>   # only that commit\nlmget rm ollama:qwen3:0.6b\n```\n\n`rm` removes the links lmget made that still point at its data, then every blob no stored model uses, and reports the space freed. Files you replaced, other tools' downloads and files another model still uses are left in place."
@@ -2856,7 +2924,9 @@
         "past downloads",
         "log of downloads",
         "record",
-        "log"
+        "log",
+        "log pulled",
+        "keep a log"
       ],
       "answers": [
         "A local record, `~/.lmget/history.jsonl` (mode 0600): for each pull the time, command, model, commit, bytes per origin, time taken and exit code. No token, no prompt, no path outside the store, and it goes nowhere. It orders the index nodes by speed and remembers your `--for` and `--format` for a nickname.\n\n```sh\nlmget history         # the last 20 entries\nlmget history clear   # delete it\n```\n\n`LMGET_HISTORY=off` turns it off."
@@ -3152,7 +3222,9 @@
         "lmget serve work",
         "from my desktop",
         "my laptop download",
-        "other laptop"
+        "other laptop",
+        "share models",
+        "models to another computer"
       ],
       "answers": [
         "Yes. On one machine:\n\n```sh\nlmget serve\n```\n\nshares, read only, the blobs of its public models on port 7878 and announces itself by mDNS. On the others:\n\n```sh\nLMGET_LAN=on lmget Qwen/Qwen3-0.6B\n```\n\nfinds such servers and asks them first, checking every byte. Gated and private models, URLs and OCI images are never shared. Discovery is off by default."
@@ -3190,7 +3262,9 @@
         "jq",
         "schema",
         "ndjson",
-        "json lines"
+        "json lines",
+        "output jq",
+        "parse the output"
       ],
       "answers": [
         "`--json` writes one JSON event per line: `resolve`, `plan`, `file_start`, `progress`, `file_done`, `export`, `done`, `lock`, `error` (and `answer` for `lmget run`). Every event has `v` (schema version 1), `type` and `time`.\n\n```sh\nlmget Qwen/Qwen3-0.6B --json | jq -c 'select(.type==\"file_done\")'\n```\n\n`ls`, `rm`, `doctor`, `index` and `history` with `--json` write one object."
@@ -3405,7 +3479,9 @@
         "another extension",
         "other extension",
         "hidden in",
-        "under another name"
+        "under another name",
+        "crafted gguf",
+        "inside a file"
       ],
       "answers": [
         "Yes. A matching hash proves the bytes are what the source published, not that they are what the name says. Before storing a file lmget walks its header the way the reference loader reads it:\n\n- `.safetensors`: every tensor described, tiling the data exactly\n- `.gguf` versions 2 and 3: counts, strings and tensors inside the file, as llama.cpp checks\n- pickle content that runs code is refused unless the file has a pickle name\n\nRefused files exit with code 5."
@@ -3502,7 +3578,8 @@
         "gpu run",
         "fit on my gpu",
         "my laptop",
-        "8gb laptop"
+        "8gb laptop",
+        "fit in gb"
       ],
       "answers": [
         "`lmget info` says so for a Hugging Face model with a transformers `config.json`: the selected weights plus the KV cache for 8192 tokens (or the model's maximum, if lower), against the memory lmget lets a model use here: 30% of unified memory on Apple Silicon, 85% of an NVIDIA GPU's memory, 50% of the RAM otherwise.\n\nActivations, runtime overhead and speed are not counted: it is a floor. It reads `config.json` only, a few kB."
@@ -3550,7 +3627,8 @@
         "have nvidia",
         "not have nvidia",
         "use my gpu",
-        "lmget use my gpu"
+        "lmget use my gpu",
+        "need a graphics card"
       ],
       "answers": [
         "No. lmget downloads, verifies and links models; it runs none, so it needs no GPU. The machine matters only for choices: a nickname reads the memory, Apple Silicon and an NVIDIA GPU (through `nvidia-smi`) to propose a variant that fits, and `--dry-run` says whether a model fits this machine's memory.\n\nTo run the model you need an app: Ollama, LM Studio, oMLX or another."
@@ -3687,7 +3765,8 @@
         "tagged",
         "main",
         "pin a revision",
-        "older version of a model"
+        "older version of a model",
+        "tagged release"
       ],
       "answers": [
         "Add `@` and the revision:\n\n```sh\nlmget Qwen/Qwen3-0.6B@main\nlmget Qwen/Qwen3-0.6B@<tag or commit>\n```\n\nThe revision is resolved to a commit before anything is downloaded. To keep that commit for a project, add `--lock`: it goes into `lmget.lock`."
@@ -3736,7 +3815,8 @@
         "into models",
         "download to models",
         "to models",
-        "save in"
+        "save in",
+        "project directory"
       ],
       "answers": [
         "Yes, with `--to dir:`:\n\n```sh\nlmget Qwen/Qwen3-0.6B --to dir:./models/qwen3\n```\n\nThe files are hard links to the store (a symlink across filesystems), so they take no second copy. With a lockfile, a `dir:` target must stay inside the lockfile's folder. Without a terminal, the path is printed on stdout."
@@ -3776,7 +3856,9 @@
         "cache folder",
         "--to hf",
         "transformers see",
-        "transformers find"
+        "transformers find",
+        "transformers find the model",
+        "transformers see the model"
       ],
       "answers": [
         "The cache is `$HF_HUB_CACHE`, else `$HF_HOME/hub`, else `$XDG_CACHE_HOME/huggingface/hub`, else `~/.cache/huggingface/hub`. It is the default target for Hugging Face models, so `from_pretrained(\"Qwen/Qwen3-0.6B\")` in transformers finds them, as do sentence-transformers and llama.cpp's `-hf`.\n\nA repository typed in another case is stored under its own spelling, where transformers looks for it."
@@ -3818,7 +3900,9 @@
         "blobs",
         "content addressed",
         "keep files",
-        "lmget folder"
+        "lmget folder",
+        "store external",
+        "external disk"
       ],
       "answers": [
         "In the store: `~/.lmget`, or `$LMGET_HOME`. Every file is kept once, by sha256, and hard-linked into the targets (symlinked across filesystems), so the same model in three apps takes the space of one.\n\nTo keep the store elsewhere, set `LMGET_HOME`."
@@ -3905,7 +3989,9 @@
         "512",
         "code 7",
         "store twice",
-        "exit code 7"
+        "exit code 7",
+        "duplicate files",
+        "double the space"
       ],
       "answers": [
         "As much as the model: `lmget info` shows each file's size, what is already stored and the free space. Files are stored once by sha256 and linked, so a model in several apps, or a file shared by two models, is on disk once.\n\nA download that would leave less than 512 MiB free on the store's disk does not start (exit code 7). To free space: `lmget rm`."
@@ -3956,7 +4042,9 @@
         "lost connection",
         "start again",
         "from zero",
-        "died"
+        "died",
+        "continue where it stopped",
+        "continue stopped"
       ],
       "answers": [
         "Run the same command again: it resumes from the last completed chunk. An interrupted run exits with code 130.\n\nA server that ignores range requests (some direct URLs and plain file servers) sends the whole file again. If a direct URL's file changes on the server meanwhile, lmget stops (exit code 6) and the next run starts over rather than join two versions."
@@ -5035,7 +5123,8 @@
         "guess",
         "guess answers",
         "you guess",
-        "trust your answers"
+        "trust your answers",
+        "invent that"
       ],
       "answers": [
         "No: I can only give answers that were written in advance and checked against lmget's code and README. When none fits, I say so instead of guessing."
