@@ -12,6 +12,7 @@ const req = createRequire(import.meta.url);
 export const M = req(join(root, "site", "chat", "matcher.js"));
 export const Spell = req(join(root, "site", "chat", "spell.js"));
 export const Prep = req(join(root, "site", "chat", "prep.js"));
+export const Session = req(join(root, "site", "chat", "session.js"));
 
 export function loadChat(lang) {
   const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
@@ -19,5 +20,7 @@ export function loadChat(lang) {
   const vocab = Spell.vocabulary(db, M);
   // options: ctxEntry (the thread), prepOff (gates), code: false (gates)
   const ask = (q, options = {}) => Spell.ask(q, db, M, vocab, { ...options, code: options.code === false ? null : code });
-  return { db, code, vocab, ask };
+  // one conversation, as the terminal and the site hold it
+  const session = () => Session.session(db, code, M, Spell);
+  return { db, code, vocab, ask, session };
 }

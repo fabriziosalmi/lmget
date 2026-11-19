@@ -74,6 +74,7 @@ oci	Can lmget pull models from Docker Hub or OCI registries?
 direct-url	Can I download from any https URL?
 hf-url	Can I paste a Hugging Face link, or get one file?
 origins	Can I use my own cache server or mirror?
+s3-origin	Can lmget fetch from a private S3 or R2 bucket?
 lan-security	Is lmget serve safe on my network?
 lan-serve	Can I share my models with other machines on the LAN?
 json	Does lmget have JSON output?

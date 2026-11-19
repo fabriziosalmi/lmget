@@ -13,7 +13,15 @@
     ],
     "codeAnswer": "Questa è una domanda sul codice sorgente di lmget, e questa chat risponde a domande sull'uso di lmget. Dove sta quel codice:\n\n- {refs}",
     "closestLabel": "La domanda più vicina a cui so rispondere: **{q}**",
-    "framedExample": "Quali sottocomandi mette a disposizione la CLI per maintainer lmget-index?"
+    "framedExample": "Quali sottocomandi mette a disposizione la CLI per maintainer lmget-index?",
+    "siteLabel": "Chiedi di lmget",
+    "sitePlaceholder": "Fai una domanda su lmget",
+    "siteAsk": "Chiedi",
+    "siteNote": "Nessun modello dietro questa chat: ogni risposta è scritta prima e controllata sul codice di lmget.",
+    "siteOther": "en",
+    "siteOtherLabel": "In English",
+    "siteError": "Non è stato possibile caricare le risposte. La documentazione: https://github.com/fabriziosalmi/lmget#readme",
+    "siteYou": "Hai chiesto"
   },
   "entries": [
     {
@@ -3187,6 +3195,7 @@
         "Sì. Un'origine è un server qualsiasi con i blob in `<origin>/blobs/sha256/<sha256>`: una cache in LAN, un mirror aziendale, un `lmget-node`, o un server statico sopra lo store di un'altra macchina:\n\n```sh\nlmget sync --origin https://cache.example.lan\n```\n\noppure `LMGET_ORIGINS=\"https://a,http://b\"`. lmget chiede prima alle origini ogni file di cui il piano conosce lo sha256, verifica quello che servono e ripiega sulla fonte. A un'origine non viene mai mandato nessun token."
       ],
       "suggest": [
+        "s3-origin",
         "lan-serve",
         "hf-endpoint"
       ],
@@ -3204,6 +3213,52 @@
         "mirror aziendale",
         "mirror interno",
         "artifactory"
+      ]
+    },
+    {
+      "id": "s3-origin",
+      "question": "lmget può scaricare da un bucket S3 o R2 privato?",
+      "source": "README.md#your-own-origins",
+      "keywords": [
+        "s3",
+        "r2",
+        "bucket",
+        "bucket privato",
+        "bucket s3",
+        "bucket r2",
+        "amazon s3",
+        "cloudflare r2",
+        "minio",
+        "object storage",
+        "origine s3",
+        "lmget s3",
+        "chiave di accesso",
+        "chiavi s3",
+        "signature version 4",
+        "sigv4",
+        "aws",
+        "credenziali aws",
+        "chiavi aws",
+        "minio origine"
+      ],
+      "answers": [
+        "Sì, come origine: un bucket su Amazon S3, Cloudflare R2 o un altro server S3 che tiene una copia della cartella `blobs/` di uno store.\n\n```sh\nexport LMGET_S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com\nexport LMGET_S3_ACCESS_KEY_ID=... LMGET_S3_SECRET_ACCESS_KEY=...\nlmget sync --origin s3://models/lmget\n```\n\nLe richieste sono firmate con AWS Signature Version 4. Endpoint e chiavi vengono solo dalle variabili di lmget (`LMGET_S3_SESSION_TOKEN` per le chiavi temporanee, `LMGET_S3_REGION`, predefinita `auto`), mai da `AWS_*` o `~/.aws`. Una richiesta firmata non segue redirect. Ogni byte è verificato come per qualunque origine; un blob mancante arriva dalla fonte, e chiavi rifiutate dal bucket fermano lo scaricamento con il motivo. Basta una chiave in sola lettura."
+      ],
+      "suggest": [
+        "origins",
+        "lan-serve"
+      ],
+      "tests": [
+        "lmget può scaricare da un bucket S3 privato?",
+        "usare un bucket R2 come cache dei modelli",
+        "LMGET_S3_ENDPOINT",
+        "come imposto le chiavi S3 per lmget",
+        "lmget legge le mie credenziali AWS?",
+        "origine s3",
+        "Cloudflare R2",
+        "teniamo i modelli in un bucket privato, lmget può scaricare da lì?",
+        "minio come origine",
+        "LMGET_S3_REGION"
       ]
     },
     {

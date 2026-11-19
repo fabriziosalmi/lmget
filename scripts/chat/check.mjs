@@ -40,7 +40,7 @@ const fails = [];
 const fail = (gate, msg) => fails.push(`${gate}: ${msg}`);
 
 // 1. integrity
-for (const k of ["welcome", "header", "suggestLabel", "resetDone", "codeAnswer", "closestLabel"]) if (typeof db.config[k] !== "string") fail("integrity", `config.${k} missing`);
+for (const k of ["welcome", "header", "suggestLabel", "resetDone", "codeAnswer", "closestLabel", "siteLabel", "sitePlaceholder", "siteAsk", "siteNote", "siteOther", "siteOtherLabel", "siteError", "siteYou"]) if (typeof db.config[k] !== "string") fail("integrity", `config.${k} missing`);
 const ids = new Set();
 for (const e of all) {
   if (ids.has(e.id)) fail("integrity", `duplicate id ${e.id}`);
@@ -49,7 +49,7 @@ for (const e of all) {
   if (!e.answers?.length) fail("integrity", `${e.id} has no answers`);
 }
 for (const e of all) for (const s of e.suggest || []) if (!ids.has(s)) fail("integrity", `${e.id} suggests missing ${s}`);
-const visible = [db.config.welcome, db.config.header, db.config.suggestLabel, db.config.resetDone, db.config.codeAnswer, db.config.closestLabel, ...db.fallbacks, ...all.flatMap((e) => [e.question, ...e.answers])];
+const visible = [db.config.welcome, db.config.header, db.config.suggestLabel, db.config.resetDone, db.config.codeAnswer, db.config.closestLabel, db.config.siteLabel, db.config.sitePlaceholder, db.config.siteAsk, db.config.siteNote, db.config.siteOtherLabel, db.config.siteError, db.config.siteYou, ...db.fallbacks, ...all.flatMap((e) => [e.question, ...e.answers])];
 for (const t of visible) {
   if (t.includes("—")) fail("integrity", `em dash in: ${t.slice(0, 60)}`);
   if (/ – /.test(t)) fail("integrity", `spaced en dash in: ${t.slice(0, 60)}`);

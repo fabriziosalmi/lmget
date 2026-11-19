@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The lmget.org chat in a terminal: the same pipeline (site/chat/prep.js,
-// matcher.js, spell.js)
+// matcher.js, spell.js, session.js)
 // and the same answers (site/chat/<lang>.json) the site will use, so what is
 // tried here is what ships. No model: every answer is written and checked.
 //
@@ -14,7 +14,7 @@
 // from the config of <lang>.json, like the answers.
 
 import readline from "node:readline";
-import { Spell, loadChat } from "./load.mjs";
+import { loadChat } from "./load.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
@@ -28,7 +28,6 @@ const chat = loadChat(lang);
 const db = chat.db;
 const ui = db.config;
 const exits = new Set(["/exit", ...(ui.exitCommands || [])]);
-const byId = new Map([...db.entries, ...(db.smalltalk || [])].map((e) => [e.id, e]));
 
 // --- terminal rendering of the answers' small markdown: black and white ---
 const tty = process.stdout.isTTY;
@@ -71,43 +70,18 @@ async function say(text) {
   process.stdout.write("\n");
 }
 
-// --- one turn ---
-const cursor = Object.create(null); // answer variant per entry
-let ctx = null; // the thread's entry, for short follow-ups
-let fallbackAt = 0;
+// --- one turn: site/chat/session.js, as on the site ---
+const talk = chat.session();
 let debug = args.includes("--debug");
 
-let lastFix = null; // the repaired input, when the matcher needed it
-let lastPrep = null; // the canonical form the matcher saw
-let lastScore = null;
-
-function answer(text) {
-  const { hit, corrected, prepped, code, related, score, weak } = chat.ask(text, { ctxEntry: ctx });
-  lastFix = corrected;
-  lastPrep = prepped;
-  lastScore = score;
-  if (code) return { id: "code", text: Spell.codeAnswer(code, db, chat.code), suggest: related ? [related.id] : [] };
-  if (!hit) {
-    const f = db.fallbacks[fallbackAt++ % db.fallbacks.length];
-    return { id: null, text: f, suggest: [] };
-  }
-  const n = cursor[hit.id] || 0;
-  cursor[hit.id] = n + 1;
-  if (!hit.id.startsWith("st-")) ctx = hit;
-  const body = hit.answers[n % hit.answers.length];
-  // a weak match says which question it answers, so a near answer is not
-  // taken for the answer
-  return { id: hit.id, text: weak ? ui.closestLabel.replace("{q}", hit.question) + "\n\n" + body : body, suggest: hit.suggest || [] };
-}
-
 async function turn(text) {
-  const a = answer(text);
+  const a = talk.answer(text);
   if (debug) {
-    process.stdout.write(D(`[${a.id ?? "fallback"} score ${lastScore != null ? lastScore.toFixed(2) : "-"} · prepped: "${lastPrep}"${lastFix ? ` · corrected: "${lastFix}"` : ""}]`) + "\n");
+    const r = a.result;
+    process.stdout.write(D(`[${a.id ?? "fallback"} score ${r.score != null ? r.score.toFixed(2) : "-"}${r.coverage != null ? ` coverage ${r.coverage.toFixed(2)}` : ""} · prepped: "${r.prepped}"${r.corrected ? ` · corrected: "${r.corrected}"` : ""}]`) + "\n");
   }
   await say(render(a.text));
-  const next = a.suggest.map((id) => byId.get(id)?.question).filter(Boolean);
-  if (next.length) process.stdout.write(D("\n" + ui.suggestLabel + next.join(" | ")) + "\n");
+  if (a.suggest.length) process.stdout.write(D("\n" + ui.suggestLabel + a.suggest.map((x) => x.question).join(" | ")) + "\n");
 }
 
 if (once) {
@@ -126,7 +100,7 @@ for await (const line of rl) {
     debug = !debug;
     process.stdout.write(D(`debug ${debug ? "on" : "off"}`) + "\n");
   } else if (text === "/reset") {
-    ctx = null;
+    talk.reset();
     process.stdout.write(D(ui.resetDone) + "\n");
   } else if (text) {
     process.stdout.write("\n");

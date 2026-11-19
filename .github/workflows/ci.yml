@@ -43,6 +43,26 @@ jobs:
             GOOS=${t%/*} GOARCH=${t#*/} go build -o /dev/null ./cmd/lmget
           done
 
+  chat:
+    # the lmget.org chat's gates (scripts/chat/check.mjs): answers, typos,
+    # negatives, rules, the code index, and every command an answer shows
+    # checked against this lmget's --help. Node is the runner's own.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: the chat's gates, English and Italian
+        run: |
+          node --version
+          go build -o "$RUNNER_TEMP/lmget" ./cmd/lmget
+          node scripts/chat/check.mjs --lang en --lmget "$RUNNER_TEMP/lmget"
+          node scripts/chat/check.mjs --lang it --lmget "$RUNNER_TEMP/lmget"
+
   windows:
     runs-on: windows-2025
     steps:

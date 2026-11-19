@@ -134,7 +134,7 @@
   // the answer to a question about the code: where each name is, linked
   function codeAnswer(refs, db, code) {
     const where = refs.map((r) => "`" + r.name + "`: " + r.paths.slice(0, 3).map((p) => "[" + p + "](" + code.repo + p + ")").join(", "));
-    return db.config.codeAnswer.replace("{refs}", where.join("\n- "));
+    return db.config.codeAnswer.replace("{refs}", () => where.join("\n- "));
   }
 
   // the canonical form of the question (prep.js, in the language of db), the

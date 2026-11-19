@@ -74,6 +74,7 @@ oci	lmget scarica modelli da Docker Hub o da registri OCI?
 direct-url	Posso scaricare da un URL https qualsiasi?
 hf-url	Posso incollare un link di Hugging Face, o prendere un file solo?
 origins	Posso usare un mio server di cache o un mirror?
+s3-origin	lmget può scaricare da un bucket S3 o R2 privato?
 lan-security	lmget serve è sicuro sulla mia rete?
 lan-serve	Posso condividere i modelli con altre macchine in LAN?
 json	lmget ha un output JSON?

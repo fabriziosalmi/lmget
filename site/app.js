@@ -52,6 +52,30 @@ for (const wrap of document.querySelectorAll(".copy[hidden]")) {
   wrap.hidden = false; // the buttons work now: show them
 }
 
+// --- the chat: site/chat/ui.js, loaded the first time the form is touched;
+// with a deploy's version (data-chat-v, written by scripts/site-stamp.py) on
+// every file it loads ---
+
+const ask = document.getElementById("ask");
+if (ask) {
+  const v = ask.dataset.chatV ? `?v=${ask.dataset.chatV}` : "";
+  let chat = null;
+  const load = () => (chat ??= import(`/chat/ui.js${v}`).then((m) => m.start(ask, v)));
+  ask.addEventListener("focusin", load, { once: true });
+  ask.addEventListener("pointerenter", load, { once: true });
+  ask.addEventListener("submit", async (event) => {
+    event.preventDefault(); // nothing is sent anywhere: the answers are here
+    try {
+      (await load()).submit();
+    } catch {
+      chat = null; // the next try loads again
+      const log = ask.querySelector(".ask-log");
+      log.replaceChildren(el("p", "The answers could not be loaded. The docs: github.com/fabriziosalmi/lmget", "ask-q"));
+      log.hidden = false;
+    }
+  });
+}
+
 // --- mirrored models -----------------------------------------------------
 
 function el(tag, text, cls) {
