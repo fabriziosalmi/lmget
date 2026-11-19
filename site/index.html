@@ -36,10 +36,10 @@
     </span>
   </div>
   <p class="alt">Windows, in PowerShell: <code>irm https://lmget.org/install.ps1 <span class="nw">| iex</span></code></p>
-  <div class="facts" id="facts" hidden></div>
+  <div class="facts pending" id="facts" aria-hidden="true"><div class="stat"><span class="stat-value">0</span><span class="stat-label">models mirrored</span></div><div class="stat"><span class="stat-value">0</span><span class="stat-label">verified by sha256</span></div><div class="stat"><span class="stat-value">0</span><span class="stat-label">mirror nodes</span></div><div class="stat"><span class="stat-value">0</span><span class="stat-label">signed nicknames</span></div><div class="stat"><span class="stat-value">0</span><span class="stat-label">until the signature expires</span></div></div>
 </div>
 
-<figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="726"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo or a directory." width="960" height="392"></picture></figure>
+<figure class="flow"><picture><source media="(max-width: 720px)" srcset="/flow-narrow.svg" width="360" height="726"><img src="/flow.svg" alt="lmget takes a model from Hugging Face, ModelScope, the Ollama registry, OCI registries or an https URL, or from its mirror nodes when the source fails; pins the commit, verifies every sha256, checks the content and stores each file once; and links it into the Hugging Face cache, Ollama, oMLX, LM Studio, Jan, LocalAI, exo, ComfyUI, colibri or a directory." width="960" height="440"></picture></figure>
 
 <main>
   <section aria-labelledby="use">
@@ -131,7 +131,7 @@
       <h2 id="install">Install</h2>
       <p>macOS, Linux and Windows, amd64 and arm64.</p>
     </header>
-    <p class="note">The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code class="nw">~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a> (<span class="nw">v0.4.0</span>, <span class="nw">2026-11-18</span>).</p>
+    <p class="note">The <a href="/install.sh">script</a> checks the archive against the release's checksums and, when <code>gh</code> is installed and signed in, its build provenance, then installs into <code class="nw">~/.local/bin</code>. Or take an archive from the <a href="https://github.com/fabriziosalmi/lmget/releases/latest">latest release</a> (<span class="nw">v0.5.0</span>, <span class="nw">2026-11-19</span>).</p>
   </section>
 </main>
 

@@ -261,7 +261,11 @@ heroCycle();
 
 function showFacts(ix, al) {
   const box = document.getElementById("facts");
-  if (!box || !ix) return; // without the index the hero stays as it is
+  if (!box) return;
+  if (!ix) { // without the index the placeholder strip goes
+    box.hidden = true;
+    return;
+  }
   const total = ix.models.reduce((s, m) => s + (m.files || []).reduce((t, f) => t + (f.size || 0), 0), 0);
   const left = Math.floor((new Date(ix.expires) - Date.now()) / DAY);
   const facts = [
@@ -276,6 +280,8 @@ function showFacts(ix, al) {
     left < 7 ? "warn" : "",
   ));
   box.replaceChildren(...facts);
+  box.classList.remove("pending");
+  box.removeAttribute("aria-hidden");
   box.hidden = false;
 }
 

@@ -309,6 +309,13 @@ dd {
   display: none;
 }
 
+/* the facts' boxes are in the page from the start, invisible, so the strip
+   holds its place while the signed files load: nothing below moves when
+   the numbers arrive */
+.facts.pending {
+  visibility: hidden;
+}
+
 .stat {
   display: flex;
   flex-direction: column;
