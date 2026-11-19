@@ -162,6 +162,34 @@ dd {
   text-wrap: balance;
 }
 
+/* the word that crumbles: models, weights, GGUFs, once, then models again.
+   app.js measures each word (hidden copies, out of the flow) and slides the
+   slot's width from one to the next while the letters change; the line
+   count never changes, so nothing below the title moves */
+.cycle {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  text-align: center;
+  overflow-x: clip; /* a glyph never touches the next word; descenders stay */
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cycle-ghost {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  visibility: hidden;
+}
+
+.cycle-live .g {
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.8em; /* about a sans letter's width */
+  font-weight: 400;
+  line-height: 0; /* a fallback font's taller line must not move the title */
+}
+
 .sub {
   max-inline-size: 34em;
   margin: 0;
