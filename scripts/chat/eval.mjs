@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Held-out evaluation of the lmget.org chat: questions written by someone who
-// never saw the keywords or the tests, frozen in scripts/chat/eval-<lang>.txt
-// as `expected-id<TAB>question` (`fallback` for out-of-scope questions).
+// never saw the keywords or the tests, frozen in scripts/chat/eval-dev-<lang>.txt,
+// or any file in the same format given with --file:
+// `expected-id<TAB>question` (`fallback` for out-of-scope questions).
 // It reports, never fails: the gates are check.mjs. The same pipeline the
 // chat uses answers each question (ask(): normalisation, matcher, spelling).
 //
-//   node scripts/chat/eval.mjs [--lang en|it] [--misses]
+//   node scripts/chat/eval.mjs [--lang en|it] [--file PATH] [--misses]
 
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -21,11 +22,12 @@ const args = process.argv.slice(2);
 const opt = (n, d) => (args.indexOf(n) >= 0 ? args[args.indexOf(n) + 1] : d);
 const lang = opt("--lang", "en");
 const showMisses = args.includes("--misses");
+const file = opt("--file", join(here, `eval-dev-${lang}.txt`));
 const db = JSON.parse(readFileSync(join(root, "site", "chat", `${lang}.json`), "utf8"));
 const vocab = Spell.vocabulary(db, M);
 const ids = new Set([...db.entries, ...(db.smalltalk || [])].map((e) => e.id));
 
-const lines = readFileSync(join(here, `eval-${lang}.txt`), "utf8").split("\n").filter(Boolean);
+const lines = readFileSync(file, "utf8").split("\n").filter(Boolean);
 let inTotal = 0, inOK = 0, inFallback = 0, outTotal = 0, outOK = 0, unknown = 0;
 const misses = [];
 for (const line of lines) {
@@ -47,7 +49,7 @@ for (const line of lines) {
 }
 const pct = (a, b) => (b ? ((a / b) * 100).toFixed(1) : "-") + "%";
 console.log(
-  `eval ${lang}: ${lines.length} questions; hit rate ${inOK + outOK}/${lines.length} (${pct(inOK + outOK, lines.length)}); ` +
+  `eval ${lang} (${file.split("/").pop()}): ${lines.length} questions; hit rate ${inOK + outOK}/${lines.length} (${pct(inOK + outOK, lines.length)}); ` +
     `in scope ${inOK}/${inTotal} (${pct(inOK, inTotal)}), of which ${inFallback} got the fallback; ` +
     `fallback precision ${outOK}/${outTotal} (${pct(outOK, outTotal)}); expected ids not in ${lang}.json: ${unknown}`,
 );
